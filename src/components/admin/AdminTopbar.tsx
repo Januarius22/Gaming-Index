@@ -1,0 +1,35 @@
+"use client";
+
+import { Menu, ShieldCheck } from "lucide-react";
+import Button from "@/components/ui/Button";
+import type { Profile } from "@/types";
+
+export default function AdminTopbar({
+  profile,
+  onMenuClick
+}: {
+  profile: Profile;
+  onMenuClick: () => void;
+}) {
+  return (
+    <div className="sticky top-0 z-20 border-b border-border/70 bg-white/90 backdrop-blur-xl">
+      <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" className="lg:hidden" onClick={onMenuClick}>
+            <Menu className="h-5 w-5" />
+          </Button>
+          <div>
+            <p className="text-sm text-muted-foreground">Admin Dashboard</p>
+            <h1 className="font-heading text-xl font-semibold text-foreground">
+              Operations control center
+            </h1>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          {profile.full_name}
+        </div>
+      </div>
+    </div>
+  );
+}
