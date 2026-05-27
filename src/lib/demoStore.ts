@@ -7,13 +7,15 @@ import type {
   KycStatus,
   Listing,
   ListingStatus,
-  Profile
+  Profile,
+  SellerRating
 } from "@/types";
 
 const SESSION_COOKIE = "gi_demo_session";
 const PROFILES_COOKIE = "gi_demo_profiles";
 const KYC_COOKIE = "gi_demo_kyc";
 const LISTINGS_COOKIE = "gi_demo_listings";
+const SELLER_RATINGS_COOKIE = "gi_demo_seller_ratings";
 
 function encode(value: unknown) {
   return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
@@ -152,23 +154,66 @@ export async function saveDemoKycSubmissions(submissions: KycSubmission[]) {
 export async function addDemoKycSubmission({
   seller,
   fullName,
+  email,
+  phoneNumber,
+  dateOfBirth,
+  country,
+  state,
+  city,
+  stateCity,
+  residentialAddress,
   documentType,
-  documentNumber
+  documentNumber,
+  documentFrontName,
+  documentBackName,
+  proofOfAddressType,
+  proofOfAddressName,
+  selfieFileName
 }: {
   seller: Profile;
   fullName: string;
+  email: string;
+  phoneNumber: string;
+  dateOfBirth: string;
+  country: string;
+  state: string;
+  city: string;
+  stateCity: string;
+  residentialAddress: string;
   documentType: string;
   documentNumber: string;
+  documentFrontName: string;
+  documentBackName: string;
+  proofOfAddressType: string;
+  proofOfAddressName: string;
+  selfieFileName: string;
 }) {
   const submissions = await getDemoKycSubmissions();
   const nextSubmission: KycSubmission = {
     id: crypto.randomUUID(),
     seller_id: seller.id,
     full_name: fullName,
+    email,
+    username: seller.username,
+    phone_number: phoneNumber,
+    date_of_birth: dateOfBirth,
+    country,
+    state,
+    city,
+    state_city: stateCity,
+    residential_address: residentialAddress,
     document_type: documentType,
     document_number: documentNumber,
-    email: seller.email,
-    username: seller.username,
+    document_front_name: documentFrontName,
+    document_front_path: "",
+    document_back_name: documentBackName,
+    document_back_path: "",
+    proof_of_address_type: proofOfAddressType,
+    proof_of_address_name: proofOfAddressName,
+    proof_of_address_path: "",
+    selfie_file_name: selfieFileName,
+    selfie_file_path: "",
+    rejection_reason: "",
     status: "pending",
     created_at: getNigeriaTimestamp()
   };
@@ -180,7 +225,8 @@ export async function addDemoKycSubmission({
 
 export async function updateDemoKycSubmissionStatus(
   submissionId: string,
-  status: Extract<KycStatus, "approved" | "rejected">
+  status: Extract<KycStatus, "approved" | "rejected">,
+  rejectionReason = ""
 ) {
   const submissions = await getDemoKycSubmissions();
   const target = submissions.find((submission) => submission.id === submissionId);
@@ -190,7 +236,13 @@ export async function updateDemoKycSubmissionStatus(
   }
 
   const nextSubmissions = submissions.map((submission) =>
-    submission.id === submissionId ? { ...submission, status } : submission
+    submission.id === submissionId
+      ? {
+          ...submission,
+          status,
+          rejection_reason: status === "rejected" ? rejectionReason : ""
+        }
+      : submission
   );
 
   await saveDemoKycSubmissions(nextSubmissions);
@@ -215,7 +267,8 @@ export async function addDemoListing({
   platform,
   accountLevel,
   loginMethod,
-  extraNotes
+  extraNotes,
+  imageNames = []
 }: {
   seller: Profile;
   game: string;
@@ -226,6 +279,7 @@ export async function addDemoListing({
   accountLevel: string;
   loginMethod: string;
   extraNotes: string;
+  imageNames?: string[];
 }) {
   const listings = await getDemoListings();
   const nextListing: Listing = {
@@ -241,7 +295,10 @@ export async function addDemoListing({
     account_level: accountLevel,
     login_method: loginMethod,
     extra_notes: extraNotes,
-    status: "pending_review",
+    image_names: imageNames,
+    image_paths: [],
+    image_urls: [],
+    status: "approved",
     created_at: getNigeriaTimestamp()
   };
 
@@ -259,4 +316,68 @@ export async function updateDemoListingStatus(
   );
   await saveDemoListings(nextListings);
   return nextListings.find((listing) => listing.id === listingId) ?? null;
+}
+
+export async function removeDemoListing(listingId: string) {
+  const listings = await getDemoListings();
+  const target = listings.find((listing) => listing.id === listingId) ?? null;
+
+  if (!target) {
+    return null;
+  }
+
+  await saveDemoListings(listings.filter((listing) => listing.id !== listingId));
+
+  const ratings = await getDemoSellerRatings();
+  await saveDemoSellerRatings(
+    ratings.map((rating) =>
+      rating.listing_id === listingId ? { ...rating, listing_id: null } : rating
+    )
+  );
+
+  return target;
+}
+
+export async function getDemoSellerRatings() {
+  return readCookieArray<SellerRating>(SELLER_RATINGS_COOKIE);
+}
+
+export async function saveDemoSellerRatings(ratings: SellerRating[]) {
+  await writeCookieValue(SELLER_RATINGS_COOKIE, ratings);
+}
+
+export async function upsertDemoSellerRating({
+  sellerId,
+  buyerId,
+  listingId,
+  rating,
+  review
+}: {
+  sellerId: string;
+  buyerId: string;
+  listingId?: string | null;
+  rating: number;
+  review: string;
+}) {
+  const ratings = await getDemoSellerRatings();
+  const existing = ratings.find(
+    (entry) => entry.seller_id === sellerId && entry.buyer_id === buyerId
+  );
+
+  const nextEntry: SellerRating = {
+    id: existing?.id ?? crypto.randomUUID(),
+    seller_id: sellerId,
+    buyer_id: buyerId,
+    listing_id: listingId,
+    rating,
+    review,
+    created_at: getNigeriaTimestamp()
+  };
+
+  const nextRatings = existing
+    ? ratings.map((entry) => (entry.id === existing.id ? nextEntry : entry))
+    : [nextEntry, ...ratings];
+
+  await saveDemoSellerRatings(nextRatings);
+  return nextEntry;
 }

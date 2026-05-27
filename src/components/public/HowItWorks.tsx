@@ -21,7 +21,7 @@ const steps = [
   {
     title: "Complete KYC and manage listings",
     description:
-      "Submit verification, send listings for review, and manage seller tools in a separate workspace.",
+      "Submit verification, publish listings directly, and manage seller tools in a separate workspace.",
     icon: BadgeCheck
   }
 ];

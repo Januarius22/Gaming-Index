@@ -26,10 +26,37 @@ export interface KycSubmission {
   id: string;
   seller_id: string;
   full_name: string;
-  document_type: string;
-  document_number: string;
   email: string;
   username: string;
+  phone_number?: string;
+  date_of_birth?: string;
+  country?: string;
+  state?: string;
+  city?: string;
+  state_city?: string;
+  residential_address?: string;
+  document_type: string;
+  document_number: string;
+  document_front_name?: string;
+  document_front_path?: string;
+  document_front_url?: string;
+  document_back_name?: string;
+  document_back_path?: string;
+  document_back_url?: string;
+  proof_of_address_type?: string;
+  proof_of_address_name?: string;
+  proof_of_address_path?: string;
+  proof_of_address_url?: string;
+  selfie_file_name?: string;
+  selfie_file_path?: string;
+  selfie_file_url?: string;
+  rejection_reason?: string;
+  doc_clear_confirmed?: boolean;
+  doc_color_confirmed?: boolean;
+  doc_corners_confirmed?: boolean;
+  doc_name_match_confirmed?: boolean;
+  doc_not_expired_confirmed?: boolean;
+  selfie_matches_id_confirmed?: boolean;
   status: Extract<KycStatus, "pending" | "approved" | "rejected">;
   created_at: string;
 }
@@ -48,6 +75,22 @@ export interface Listing {
   login_method: string;
   extra_notes: string;
   status: ListingStatus;
+  image_names?: string[];
+  image_paths?: string[];
+  image_urls?: string[];
+  seller_rating?: number;
+  seller_reviews?: number;
+  seller_tag?: "top_seller" | null;
+  created_at: string;
+}
+
+export interface SellerRating {
+  id: string;
+  seller_id: string;
+  buyer_id: string;
+  listing_id?: string | null;
+  rating: number;
+  review: string;
   created_at: string;
 }
 

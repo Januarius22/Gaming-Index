@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { ArrowLeft, Monitor } from "lucide-react";
+import { useEffect, useState } from "react";
 import { logoutAction } from "@/actions/auth";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminTopbar from "@/components/admin/AdminTopbar";
 import Button, { buttonClassName } from "@/components/ui/Button";
+import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 
 export default function AdminShell({
@@ -15,6 +17,21 @@ export default function AdminShell({
   profile: Profile;
   children: React.ReactNode;
 }) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    const savedValue = window.localStorage.getItem("gi-admin-sidebar-collapsed");
+    setCollapsed(savedValue === "true");
+  }, []);
+
+  const toggleCollapsed = () => {
+    setCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem("gi-admin-sidebar-collapsed", String(next));
+      return next;
+    });
+  };
+
   return (
     <div className="min-h-screen bg-surface">
       <div className="flex min-h-screen items-center justify-center px-6 py-12 xl:hidden">
@@ -47,14 +64,29 @@ export default function AdminShell({
       </div>
 
       <div className="hidden min-h-screen xl:flex">
-        <div className="w-80 shrink-0">
-          <div className="fixed inset-y-0 w-80 overflow-y-auto">
-            <AdminSidebar profile={profile} />
+        <div
+          className={cn(
+            "shrink-0 transition-[width] duration-300 ease-in-out",
+            collapsed ? "w-24" : "w-80"
+          )}
+        >
+          <div
+            className={cn(
+              "fixed inset-y-0 overflow-y-auto transition-[width] duration-300 ease-in-out",
+              collapsed ? "w-24" : "w-80"
+            )}
+          >
+            <AdminSidebar profile={profile} collapsed={collapsed} />
           </div>
         </div>
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-          <AdminTopbar profile={profile} onMenuClick={() => undefined} />
+          <AdminTopbar
+            profile={profile}
+            collapsed={collapsed}
+            onCollapseToggle={toggleCollapsed}
+            onMenuClick={() => undefined}
+          />
           <div className="flex-1 px-4 py-6 sm:px-6">{children}</div>
         </div>
       </div>

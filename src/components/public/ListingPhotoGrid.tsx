@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import type { Listing } from "@/types";
 
 const visualThemes: Record<string, { shell: string; accents: string[] }> = {
-  COD: {
+  CODM: {
     shell: "from-[#061733] via-[#0a3f96] to-[#07142d]",
     accents: [
       "from-[#1f6fff] to-[#65b2ff]",
@@ -57,23 +57,35 @@ const visualThemes: Record<string, { shell: string; accents: string[] }> = {
       "from-[#05659d] to-[#42c1ff]",
       "from-[#0a3c7a] to-[#00a6ff]"
     ]
+  },
+  DLS: {
+    shell: "from-[#07315c] via-[#0a63a7] to-[#031a33]",
+    accents: [
+      "from-[#12a6d7] to-[#83ebff]",
+      "from-[#0b4b9c] to-[#1f79ff]",
+      "from-[#0e7f61] to-[#6ae2b5]",
+      "from-[#0d3f75] to-[#43a4ff]",
+      "from-[#0f6d8f] to-[#57d1ff]",
+      "from-[#0b3f56] to-[#2fc9b6]"
+    ]
   }
 };
 
 const panelLabels: Record<string, string[]> = {
-  COD: ["Lobby", "Ranked", "Weapons", "Skins", "Loadout", "Vault"],
+  CODM: ["Lobby", "Ranked", "Weapons", "Skins", "Loadout", "Vault"],
   "Free Fire": ["Lobby", "Bundles", "Emotes", "Loadout", "Vault", "Rank"],
   "PUBG Mobile": ["Lobby", "Stats", "Loadout", "Crates", "Wardrobe", "Rank"],
   Fortnite: ["Locker", "Skins", "Loadout", "Stats", "Pickaxes", "Emotes"],
-  eFootball: ["Squad", "Cards", "Tactics", "Bench", "Boosts", "Stats"]
+  eFootball: ["Squad", "Cards", "Tactics", "Bench", "Boosts", "Stats"],
+  DLS: ["Squad", "Transfers", "Formation", "Trophies", "Bench", "Stats"]
 };
 
 function getVisualTheme(game: string) {
-  return visualThemes[game] ?? visualThemes.COD;
+  return visualThemes[game] ?? visualThemes.CODM;
 }
 
 function getPanelLabels(game: string) {
-  return panelLabels[game] ?? panelLabels.COD;
+  return panelLabels[game] ?? panelLabels.CODM;
 }
 
 export default function ListingPhotoGrid({
@@ -87,6 +99,7 @@ export default function ListingPhotoGrid({
 }) {
   const theme = getVisualTheme(listing.game);
   const labels = getPanelLabels(listing.game);
+  const uploadedImages = (listing.image_urls ?? []).filter(Boolean).slice(0, 1);
   const Icon =
     listing.game === "eFootball"
       ? Trophy
@@ -95,6 +108,42 @@ export default function ListingPhotoGrid({
         : listing.game === "Free Fire"
           ? UserRound
           : Sword;
+
+  if (size !== "guide" && uploadedImages.length > 0) {
+    const imageUrl = uploadedImages[0];
+
+    return (
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-[30px] border border-border/70 bg-slate-950 shadow-[0_28px_80px_-50px_rgba(2,10,24,0.9)]",
+          size === "card" && "aspect-[5/4]",
+          size === "detail" && "aspect-[16/10]",
+          className
+        )}
+      >
+        <div className="h-full bg-slate-950 p-1.5">
+          <div className="relative h-full overflow-hidden rounded-[22px] bg-slate-900">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt={`${listing.title} listing image`}
+              className="h-full w-full object-cover"
+            />
+          </div>
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between gap-3 p-4">
+          <span className="inline-flex rounded-full border border-white/16 bg-black/40 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/92 backdrop-blur-md sm:text-[11px]">
+            {listing.game}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-black/40 px-3 py-1 text-[10px] font-medium text-white/88 backdrop-blur-md sm:text-[11px]">
+            <Icon className="h-3.5 w-3.5" />
+            Seller grid image
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

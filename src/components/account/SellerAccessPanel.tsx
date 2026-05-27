@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { unlockSellerAccessAction } from "@/actions/account";
 import FormMessage from "@/components/auth/FormMessage";
+import KycReviewNoticeModal from "@/components/seller/KycReviewNoticeModal";
 import SubmitButton from "@/components/auth/SubmitButton";
 import Button from "@/components/ui/Button";
 import {
@@ -14,52 +15,80 @@ import {
   CardTitle
 } from "@/components/ui/Card";
 import { titleCase } from "@/lib/utils";
-import type { Profile } from "@/types";
+import type { KycSubmission, Profile } from "@/types";
 
 const initialState = {
   status: "idle",
   message: ""
 } as const;
 
-export default function SellerAccessPanel({ profile }: { profile: Profile }) {
+export default function SellerAccessPanel({
+  profile,
+  latestKycSubmission
+}: {
+  profile: Profile;
+  latestKycSubmission?: KycSubmission | null;
+}) {
   const [state, formAction] = useActionState(unlockSellerAccessAction, initialState);
+  const kycHelper =
+    profile.kyc_status === "approved"
+      ? "Your KYC is approved and upload access is fully unlocked."
+      : profile.kyc_status === "pending"
+        ? "Your KYC has already been submitted and is waiting for admin review."
+        : profile.kyc_status === "rejected"
+          ? "Your last KYC submission was rejected. Update your details and submit again."
+          : "Upload access opens only when your KYC review is approved.";
+  const kycButtonLabel =
+    profile.kyc_status === "pending"
+      ? "View KYC Status"
+      : profile.kyc_status === "approved"
+        ? "KYC Approved"
+        : "Complete KYC";
 
   if (profile.seller_enabled) {
     return (
-      <Card className="max-w-4xl">
-        <CardHeader>
-          <CardTitle>Seller access is active on your account.</CardTitle>
-          <CardDescription>
-            Your account can use the seller workspace. Complete KYC to unlock uploads,
-            then manage listings, orders, and wallet tools in the dedicated seller area.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="rounded-3xl bg-surface p-5">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-              Current KYC status
-            </p>
-            <p className="mt-3 text-2xl font-semibold text-foreground">
-              {titleCase(profile.kyc_status)}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Upload access opens only when your KYC review is approved.
-            </p>
-          </div>
+      <>
+        <KycReviewNoticeModal
+          submissionId={latestKycSubmission?.status === "rejected" ? latestKycSubmission.id : undefined}
+          rejectionReason={latestKycSubmission?.status === "rejected" ? latestKycSubmission.rejection_reason : undefined}
+        />
+        <Card className="max-w-4xl">
+          <CardHeader>
+            <CardTitle>Seller access is active on your account.</CardTitle>
+            <CardDescription>
+              Your account can use the seller workspace. Complete KYC to unlock uploads,
+              then manage listings, orders, and wallet tools in the dedicated seller area.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="rounded-3xl bg-surface p-5">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+                Current KYC status
+              </p>
+              <p className="mt-3 text-2xl font-semibold text-foreground">
+                {titleCase(profile.kyc_status)}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {kycHelper}
+              </p>
+            </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Link href="/seller/dashboard">
-              <Button>Open Seller Workspace</Button>
-            </Link>
-            <Link href="/seller/kyc">
-              <Button variant="secondary">Complete KYC</Button>
-            </Link>
-            <Link href="/account/dashboard">
-              <Button variant="subtle">Back to Account</Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link href="/seller/dashboard">
+                <Button>Open Seller Workspace</Button>
+              </Link>
+              <Link href="/seller/kyc">
+                <Button variant="secondary" disabled={profile.kyc_status === "approved"}>
+                  {kycButtonLabel}
+                </Button>
+              </Link>
+              <Link href="/account/dashboard">
+                <Button variant="subtle">Back to Account</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </>
     );
   }
 
@@ -69,7 +98,7 @@ export default function SellerAccessPanel({ profile }: { profile: Profile }) {
         <CardTitle>Unlock seller tools when you are ready to list.</CardTitle>
         <CardDescription>
           Every new account starts as a buyer. Seller access is a separate workspace,
-          and KYC is only required when you want to upload gaming accounts for review.
+          and KYC is only required when you want to publish gaming accounts in the marketplace.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -89,7 +118,7 @@ export default function SellerAccessPanel({ profile }: { profile: Profile }) {
           <div className="rounded-3xl bg-surface p-5">
             <p className="font-semibold text-foreground">Step 3</p>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Submit listings for admin review from the seller workspace.
+              Publish listings directly from the seller workspace when you are ready.
             </p>
           </div>
         </div>

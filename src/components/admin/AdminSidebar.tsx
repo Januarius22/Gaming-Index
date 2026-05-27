@@ -33,26 +33,39 @@ const navItems = [
 
 export default function AdminSidebar({
   profile,
+  collapsed = false,
   mobile = false,
   onNavigate
 }: {
   profile: Profile;
+  collapsed?: boolean;
   mobile?: boolean;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const collapsedDesktop = collapsed && !mobile;
 
   return (
     <aside
       className={cn(
-        "flex h-full min-h-0 flex-col overflow-y-auto bg-white",
+        "flex h-full min-h-0 flex-col overflow-y-auto bg-white transition-[width,padding] duration-300 ease-in-out",
         mobile ? "rounded-r-[32px]" : "border-r border-border/70"
       )}
     >
-      <div className="flex items-center justify-between border-b border-border/70 px-6 py-6">
+      <div
+        className={cn(
+          "flex items-center justify-between border-b border-border/70 py-6 transition-[padding] duration-300 ease-in-out",
+          collapsedDesktop ? "px-4" : "px-6"
+        )}
+      >
         <div className="flex items-center gap-3">
           <BrandMark className="h-11 w-11" />
-          <div>
+          <div
+            className={cn(
+              "overflow-hidden transition-all duration-300 ease-in-out",
+              collapsedDesktop ? "max-w-0 opacity-0" : "max-w-[12rem] opacity-100"
+            )}
+          >
             <p className="font-heading text-xl font-semibold text-foreground">Gaming Index</p>
             <p className="text-sm text-muted-foreground">Admin workspace</p>
           </div>
@@ -64,12 +77,36 @@ export default function AdminSidebar({
         ) : null}
       </div>
 
-      <div className="border-b border-border/70 px-6 py-5">
-        <p className="text-sm font-semibold text-foreground">{profile.full_name}</p>
-        <p className="mt-1 text-sm text-muted-foreground">@{profile.username}</p>
+      <div
+        className={cn(
+          "border-b border-border/70 py-5 transition-[padding] duration-300 ease-in-out",
+          collapsedDesktop ? "px-4" : "px-6"
+        )}
+      >
+        <p
+          className={cn(
+            "overflow-hidden text-sm font-semibold text-foreground transition-all duration-300 ease-in-out",
+            collapsedDesktop ? "max-h-0 max-w-0 opacity-0" : "max-h-10 max-w-[12rem] opacity-100"
+          )}
+        >
+          {profile.full_name}
+        </p>
+        <p
+          className={cn(
+            "mt-1 overflow-hidden text-sm text-muted-foreground transition-all duration-300 ease-in-out",
+            collapsedDesktop ? "max-h-0 max-w-0 opacity-0" : "max-h-10 max-w-[12rem] opacity-100"
+          )}
+        >
+          @{profile.username}
+        </p>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-6">
+      <nav
+        className={cn(
+          "flex-1 space-y-1 overflow-y-auto py-6 transition-[padding] duration-300 ease-in-out",
+          collapsedDesktop ? "px-3" : "px-4"
+        )}
+      >
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href;
@@ -78,25 +115,54 @@ export default function AdminSidebar({
               key={item.href}
               href={item.href}
               onClick={onNavigate}
+              title={collapsedDesktop ? item.label : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition",
+                "flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
+                collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
                 active
                   ? "bg-primary !text-white visited:!text-white hover:!text-white shadow-[0_18px_30px_-20px_rgba(0,87,255,0.8)]"
                   : "text-muted-foreground hover:bg-primary-soft hover:text-primary-dark"
               )}
             >
-              <Icon className="h-5 w-5" />
-              {item.label}
+              <Icon className={cn("h-5 w-5 shrink-0 transition-transform duration-300 ease-in-out", collapsedDesktop && "scale-105")} />
+              <span
+                className={cn(
+                  "overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out",
+                  collapsedDesktop ? "max-w-0 opacity-0" : "max-w-[10rem] opacity-100"
+                )}
+              >
+                {item.label}
+              </span>
             </Link>
           );
         })}
       </nav>
 
-      <div className="border-t border-border/70 p-4">
+      <div
+        className={cn(
+          "border-t border-border/70 transition-[padding] duration-300 ease-in-out",
+          collapsedDesktop ? "p-3" : "p-4"
+        )}
+      >
         <form action={logoutAction}>
-          <Button type="submit" variant="secondary" className="w-full justify-start">
-            <LogOut className="mr-3 h-4 w-4" />
-            Logout
+          <Button
+            type="submit"
+            variant="secondary"
+            title={collapsedDesktop ? "Logout" : undefined}
+            className={cn(
+              "w-full transition-all duration-300 ease-in-out",
+              collapsedDesktop ? "justify-center px-0" : "justify-start"
+            )}
+          >
+            <LogOut className={cn("h-4 w-4 shrink-0 transition-transform duration-300 ease-in-out", collapsedDesktop ? "" : "mr-3")} />
+            <span
+              className={cn(
+                "overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out",
+                collapsedDesktop ? "max-w-0 opacity-0" : "max-w-[8rem] opacity-100"
+              )}
+            >
+              Logout
+            </span>
           </Button>
         </form>
       </div>

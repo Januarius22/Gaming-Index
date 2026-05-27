@@ -1,4 +1,6 @@
+import { deleteOwnListingAction } from "@/actions/seller";
 import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { formatCurrency, formatDate, statusVariant } from "@/lib/utils";
 import type { Listing } from "@/types";
@@ -33,7 +35,7 @@ export default function SellerListingCard({ listing }: { listing: Listing }) {
             <span className="font-semibold text-foreground">{listing.login_method}</span>
           </div>
         </div>
-        <div className="flex items-end justify-between">
+        <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-sm text-muted-foreground">Price</p>
             <p className="font-heading text-3xl font-semibold text-foreground">
@@ -42,6 +44,12 @@ export default function SellerListingCard({ listing }: { listing: Listing }) {
           </div>
           <p className="text-sm text-muted-foreground">{formatDate(listing.created_at)}</p>
         </div>
+        <form action={deleteOwnListingAction}>
+          <input type="hidden" name="listingId" value={listing.id} />
+          <Button type="submit" variant="danger" size="sm">
+            Take Down Listing
+          </Button>
+        </form>
       </CardContent>
     </Card>
   );

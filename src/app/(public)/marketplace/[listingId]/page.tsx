@@ -1,17 +1,16 @@
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Star } from "lucide-react";
 import { notFound } from "next/navigation";
 import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
+import SellerRatingPanel from "@/components/public/SellerRatingPanel";
 import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { getCurrentProfile, getDashboardRoute } from "@/lib/auth";
-import { getMarketplaceListingById } from "@/lib/data";
+import { getMarketplaceListingById, getSellerRatingState } from "@/lib/data";
 import {
   formatCurrency,
-  formatDate,
-  statusVariant,
-  titleCase
+  formatDate
 } from "@/lib/utils";
 
 export default async function MarketplaceListingDetailPage({
@@ -26,6 +25,8 @@ export default async function MarketplaceListingDetailPage({
   if (!listing) {
     notFound();
   }
+
+  const ratingState = await getSellerRatingState(listing.seller_id, profile?.id);
 
   const ctaHref = profile ? getDashboardRoute(profile.role) : "/auth/login";
   const ctaLabel = profile
@@ -65,13 +66,32 @@ export default async function MarketplaceListingDetailPage({
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="rounded-3xl bg-surface p-5">
-                    <p className="text-sm font-semibold text-foreground">Seller</p>
-                    <p className="mt-2 text-lg font-semibold text-foreground">
-                      {listing.seller_name}
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      @{listing.seller_username}
-                    </p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Seller</p>
+                        <p className="mt-2 text-lg font-semibold text-foreground">
+                          {listing.seller_name}
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          @{listing.seller_username}
+                        </p>
+                      </div>
+                      {ratingState.tag === "top_seller" ? (
+                        <Badge variant="info" className="uppercase tracking-[0.12em]">
+                          Top Seller
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <div className="mt-4 flex items-center gap-2 text-amber-500">
+                      <Star className="h-4 w-4 fill-current" />
+                      <p className="text-sm font-semibold text-foreground">
+                        {ratingState.average.toFixed(1)}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        from {ratingState.reviews}{" "}
+                        {ratingState.reviews === 1 ? "buyer rating" : "buyer ratings"}
+                      </p>
+                    </div>
                   </div>
                   <div className="rounded-3xl bg-surface p-5">
                     <p className="text-sm font-semibold text-foreground">Posted</p>
@@ -79,10 +99,23 @@ export default async function MarketplaceListingDetailPage({
                       {formatDate(listing.created_at)}
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Marketplace review cleared
+                      {listing.status === "sold"
+                        ? "This account has already been sold."
+                        : "Listing is currently live in the marketplace."}
                     </p>
                   </div>
                 </div>
+
+                <SellerRatingPanel
+                  listingId={listing.id}
+                  sellerId={listing.seller_id}
+                  sellerName={listing.seller_name}
+                  average={ratingState.average}
+                  reviews={ratingState.reviews}
+                  tag={ratingState.tag}
+                  canRate={Boolean(profile && profile.role !== "admin")}
+                  currentRating={ratingState.buyerRating}
+                />
 
                 <div className="rounded-3xl border border-border/70 bg-white p-5 sm:p-6">
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
@@ -102,9 +135,17 @@ export default async function MarketplaceListingDetailPage({
                 <span className="inline-flex rounded-full bg-primary-soft px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-dark">
                   {listing.game}
                 </span>
-                <Badge variant={statusVariant(listing.status)} className="capitalize">
-                  {titleCase(listing.status)}
+                <Badge
+                  variant={listing.status === "sold" ? "danger" : "success"}
+                  className="capitalize"
+                >
+                  {listing.status === "sold" ? "Sold" : "Active"}
                 </Badge>
+                {listing.seller_tag === "top_seller" ? (
+                  <Badge variant="info" className="capitalize">
+                    Top Seller
+                  </Badge>
+                ) : null}
               </div>
 
               <div>
@@ -123,9 +164,15 @@ export default async function MarketplaceListingDetailPage({
                   <span className="text-muted-foreground">Account level</span>
                   <span className="font-semibold text-foreground">{listing.account_level}</span>
                 </div>
-                <div className="flex items-center justify-between gap-4 py-3 first:pt-0 last:border-b-0 last:pb-0">
+                <div className="flex items-center justify-between gap-4 border-b border-border/70 py-3 first:pt-0 last:border-b-0 last:pb-0">
                   <span className="text-muted-foreground">Seller</span>
                   <span className="font-semibold text-foreground">@{listing.seller_username}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4 py-3 first:pt-0 last:border-b-0 last:pb-0">
+                  <span className="text-muted-foreground">Seller rating</span>
+                  <span className="font-semibold text-foreground">
+                    {ratingState.average.toFixed(1)} / 5
+                  </span>
                 </div>
               </div>
 
@@ -137,7 +184,8 @@ export default async function MarketplaceListingDetailPage({
                   <div className="space-y-2">
                     <p className="font-semibold text-foreground">Reviewed marketplace listing</p>
                     <p className="text-sm leading-6 text-muted-foreground">
-                      This public page keeps the full account specs and seller notes in one place before checkout logic is added later.
+                      This page keeps the full account specs, seller notes, screenshots, and buyer
+                      rating signals in one place before checkout logic is added later.
                     </p>
                   </div>
                 </div>

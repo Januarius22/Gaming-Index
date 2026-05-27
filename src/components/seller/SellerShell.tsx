@@ -1,9 +1,10 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SellerSidebar from "@/components/seller/SellerSidebar";
 import SellerTopbar from "@/components/seller/SellerTopbar";
+import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 
 export default function SellerShell({
@@ -14,13 +15,37 @@ export default function SellerShell({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    const savedValue = window.localStorage.getItem("gi-seller-sidebar-collapsed");
+    setCollapsed(savedValue === "true");
+  }, []);
+
+  const toggleCollapsed = () => {
+    setCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem("gi-seller-sidebar-collapsed", String(next));
+      return next;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-surface">
       <div className="flex min-h-screen">
-        <div className="hidden w-80 shrink-0 lg:block">
-          <div className="fixed inset-y-0 w-80 overflow-y-auto">
-            <SellerSidebar profile={profile} />
+        <div
+          className={cn(
+            "hidden shrink-0 transition-[width] duration-300 ease-in-out lg:block",
+            collapsed ? "w-24" : "w-80"
+          )}
+        >
+          <div
+            className={cn(
+              "fixed inset-y-0 overflow-y-auto transition-[width] duration-300 ease-in-out",
+              collapsed ? "w-24" : "w-80"
+            )}
+          >
+            <SellerSidebar profile={profile} collapsed={collapsed} />
           </div>
         </div>
 
@@ -48,7 +73,12 @@ export default function SellerShell({
         </AnimatePresence>
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-          <SellerTopbar profile={profile} onMenuClick={() => setOpen(true)} />
+          <SellerTopbar
+            profile={profile}
+            collapsed={collapsed}
+            onCollapseToggle={toggleCollapsed}
+            onMenuClick={() => setOpen(true)}
+          />
           <div className="flex-1 px-4 py-6 sm:px-6">{children}</div>
         </div>
       </div>

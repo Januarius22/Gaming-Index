@@ -53,6 +53,21 @@ export function titleCase(value: string) {
     .join(" ");
 }
 
+export function isValidPhoneNumber(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return false;
+  }
+
+  if (!/^\+?[0-9\s()-]+$/.test(trimmed)) {
+    return false;
+  }
+
+  const digitsOnly = trimmed.replace(/\D/g, "");
+  return digitsOnly.length >= 7 && digitsOnly.length <= 15;
+}
+
 export interface PasswordStrengthResult {
   score: number;
   label: "Very Weak" | "Weak" | "Fair" | "Strong";
@@ -142,19 +157,29 @@ export function statusVariant(
 }
 
 export const gameOptions = [
-  "COD",
+  "CODM",
   "Free Fire",
   "PUBG Mobile",
   "Fortnite",
-  "eFootball"
+  "eFootball",
+  "DLS"
 ];
 
-export const platformOptions = ["Mobile", "Console", "PC"];
+export const platformOptions = ["Mobile"];
 
 export const loginMethodOptions = ["Email", "Facebook", "Google", "Apple", "Other"];
 
 export const documentTypeOptions = [
   "National ID",
   "Passport",
-  "Driver's License"
+  "Driver's License",
+  "Voter's Card",
+  "Residence Permit"
+];
+
+export const proofOfAddressOptions = [
+  "Utility Bill",
+  "Bank Statement",
+  "Government Letter",
+  "Rental Agreement"
 ];

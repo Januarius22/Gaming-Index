@@ -37,7 +37,7 @@ export default function RegisterForm() {
           <label htmlFor="username" className="text-sm font-semibold text-foreground">
             Username
           </label>
-          <Input id="username" name="username" placeholder="johnindex" />
+          <Input id="username" name="username" placeholder="shadowfrag" />
         </div>
 
         <div className="space-y-2">

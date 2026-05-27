@@ -1,34 +1,96 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { submitKycAction } from "@/actions/seller";
-import FormMessage from "@/components/auth/FormMessage";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { X } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import SubmitButton from "@/components/auth/SubmitButton";
+import KycReviewNoticeModal from "@/components/seller/KycReviewNoticeModal";
 import Button from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import Select from "@/components/ui/Select";
-import { documentTypeOptions, titleCase } from "@/lib/utils";
-import type { Profile } from "@/types";
+import Textarea from "@/components/ui/Textarea";
+import {
+  documentTypeOptions,
+  proofOfAddressOptions,
+  titleCase
+} from "@/lib/utils";
+import type { KycSubmission, Profile } from "@/types";
 
-const initialState = {
-  status: "idle",
-  message: ""
-} as const;
-
-export default function SellerKycPanel({ profile }: { profile: Profile }) {
-  const [open, setOpen] = useState(false);
-  const [state, formAction] = useActionState(submitKycAction, initialState);
+export default function SellerKycPanel({
+  profile,
+  latestKycSubmission = null,
+  initialOpen = false,
+  feedbackMessage = "",
+  feedbackTone = "error"
+}: {
+  profile: Profile;
+  latestKycSubmission?: KycSubmission | null;
+  initialOpen?: boolean;
+  feedbackMessage?: string;
+  feedbackTone?: "error" | "success";
+}) {
+  const [open, setOpen] = useState(initialOpen);
+  const [feedbackOpen, setFeedbackOpen] = useState(Boolean(feedbackMessage));
+  const router = useRouter();
+  const pathname = usePathname();
+  const statusLabel = titleCase(profile.kyc_status);
+  const canStartKyc = profile.kyc_status !== "approved" && profile.kyc_status !== "pending";
+  const feedbackStyles = useMemo(
+    () =>
+      feedbackTone === "success"
+        ? {
+            ring: "ring-emerald-200/80",
+            bg: "bg-emerald-50/95",
+            title: "text-emerald-700",
+            text: "text-emerald-800"
+          }
+        : {
+            ring: "ring-rose-200/80",
+            bg: "bg-rose-50/95",
+            title: "text-rose-700",
+            text: "text-rose-800"
+          },
+    [feedbackTone]
+  );
+  const ctaLabel =
+    profile.kyc_status === "approved"
+      ? "KYC Approved"
+      : profile.kyc_status === "pending"
+        ? "KYC Under Review"
+        : "Start KYC";
+  const helperMessage =
+    profile.kyc_status === "approved"
+      ? "Your KYC is approved and seller upload access is fully unlocked."
+      : profile.kyc_status === "pending"
+        ? "Your KYC has already been submitted and is waiting for admin review."
+        : profile.kyc_status === "rejected"
+          ? "Your last KYC submission was rejected. Update the details below and submit again."
+          : "Upload access is enabled only when your KYC status becomes approved.";
 
   useEffect(() => {
-    if (state.status === "success") {
-      setOpen(false);
+    if (!feedbackMessage) {
+      return;
     }
-  }, [state.status]);
+
+    setFeedbackOpen(true);
+    router.replace(pathname, { scroll: false });
+
+    const timer = window.setTimeout(() => {
+      setFeedbackOpen(false);
+    }, 4200);
+
+    return () => window.clearTimeout(timer);
+  }, [feedbackMessage, pathname, router]);
 
   return (
     <>
+      <KycReviewNoticeModal
+        submissionId={latestKycSubmission?.status === "rejected" ? latestKycSubmission.id : undefined}
+        rejectionReason={latestKycSubmission?.status === "rejected" ? latestKycSubmission.rejection_reason : undefined}
+      />
       <Card className="max-w-4xl">
         <CardHeader>
           <CardTitle>Complete your KYC verification to unlock selling features.</CardTitle>
@@ -43,64 +105,283 @@ export default function SellerKycPanel({ profile }: { profile: Profile }) {
               Current status
             </p>
             <p className="mt-3 text-2xl font-semibold text-foreground">
-              {titleCase(profile.kyc_status)}
+              {statusLabel}
             </p>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Upload access is enabled only when your KYC status becomes approved.
+              {helperMessage}
             </p>
           </div>
 
-          <FormMessage
-            message={state.message}
-            tone={state.status === "success" ? "success" : "error"}
-          />
-
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Button onClick={() => setOpen(true)} disabled={profile.kyc_status === "approved"}>
-              Start KYC
+            <Button onClick={() => setOpen(true)} disabled={!canStartKyc}>
+              {ctaLabel}
             </Button>
             <a href="/seller/dashboard">
-              <Button variant="secondary">Skip for Now</Button>
+              <Button variant="secondary">
+                {profile.kyc_status === "pending" ? "Back to Dashboard" : "Skip for Now"}
+              </Button>
             </a>
           </div>
         </CardContent>
       </Card>
 
+      <AnimatePresence>
+        {feedbackOpen && feedbackMessage ? (
+          <motion.div
+            initial={{ opacity: 0, y: -12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+            transition={{ duration: 0.22 }}
+            className="fixed right-4 top-4 z-[60] w-[min(92vw,28rem)]"
+          >
+            <div
+              className={`rounded-[24px] border border-white/70 ${feedbackStyles.bg} p-4 shadow-2xl ring-1 backdrop-blur ${feedbackStyles.ring}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className={`text-sm font-semibold ${feedbackStyles.title}`}>
+                    KYC submission issue
+                  </p>
+                  <p className={`text-sm leading-6 ${feedbackStyles.text}`}>{feedbackMessage}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFeedbackOpen(false)}
+                  className={`rounded-full p-2 transition hover:bg-white/70 ${feedbackStyles.title}`}
+                  aria-label="Dismiss feedback"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
       <Modal
         open={open}
         onClose={() => setOpen(false)}
         title="Submit KYC details"
-        description="Provide your identity information so the admin team can review your seller access."
+        description="Provide your identity information and upload the required files so the admin team can review your seller access."
       >
-        <form action={formAction} className="space-y-5">
-          <div className="space-y-2">
-            <label htmlFor="fullName" className="text-sm font-semibold text-foreground">
-              Full Name
-            </label>
-            <Input id="fullName" name="fullName" defaultValue={profile.full_name} />
+        <form
+          action="/seller/kyc/submit"
+          method="POST"
+          encType="multipart/form-data"
+          className="space-y-8"
+        >
+          <div className="rounded-[28px] border border-border bg-surface/70 p-5 md:p-6">
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-heading text-xl font-semibold text-foreground">Personal info</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Use the same legal identity details that appear on your document.
+                </p>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="space-y-2 md:col-span-2">
+                  <label htmlFor="fullName" className="text-sm font-semibold text-foreground">
+                    Full legal name
+                  </label>
+                  <Input id="fullName" name="fullName" defaultValue={profile.full_name} required />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="email" className="text-sm font-semibold text-foreground">
+                    Email address
+                  </label>
+                  <Input id="email" name="email" type="email" defaultValue={profile.email} required />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="phoneNumber" className="text-sm font-semibold text-foreground">
+                    Phone number
+                  </label>
+                  <Input
+                    id="phoneNumber"
+                    name="phoneNumber"
+                    type="tel"
+                    inputMode="tel"
+                    pattern="^\+?[0-9\s()-]{7,20}$"
+                    title="Use only numbers and optional +, spaces, hyphens, or parentheses."
+                    placeholder="+234 801 234 5678"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="dateOfBirth" className="text-sm font-semibold text-foreground">
+                    Date of birth
+                  </label>
+                  <Input id="dateOfBirth" name="dateOfBirth" type="date" required />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="country" className="text-sm font-semibold text-foreground">
+                    Country
+                  </label>
+                  <Input id="country" name="country" placeholder="Nigeria" required />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="state" className="text-sm font-semibold text-foreground">
+                    State
+                  </label>
+                  <Input id="state" name="state" placeholder="Lagos" required />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="city" className="text-sm font-semibold text-foreground">
+                    City
+                  </label>
+                  <Input id="city" name="city" placeholder="Lekki" required />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label htmlFor="residentialAddress" className="text-sm font-semibold text-foreground">
+                    Residential address
+                  </label>
+                  <Textarea
+                    id="residentialAddress"
+                    name="residentialAddress"
+                    className="min-h-28 rounded-2xl"
+                    placeholder="Enter your full residential address"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <label htmlFor="documentType" className="text-sm font-semibold text-foreground">
-              Document Type
-            </label>
-            <Select id="documentType" name="documentType" defaultValue="">
-              <option value="" disabled>
-                Select a document type
-              </option>
-              {documentTypeOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </Select>
+
+          <div className="rounded-[28px] border border-border bg-surface/70 p-5 md:p-6">
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-heading text-xl font-semibold text-foreground">Identification</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Upload the identification document you want the admin team to review.
+                </p>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label htmlFor="documentType" className="text-sm font-semibold text-foreground">
+                    Identification type
+                  </label>
+                  <Select id="documentType" name="documentType" defaultValue="" required>
+                    <option value="" disabled>
+                      Select a document type
+                    </option>
+                    {documentTypeOptions.map((option) => (
+                      <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="documentNumber" className="text-sm font-semibold text-foreground">
+                    Document number
+                  </label>
+                  <Input
+                    id="documentNumber"
+                    name="documentNumber"
+                    placeholder="Enter your ID number"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="documentFront" className="text-sm font-semibold text-foreground">
+                    ID front
+                  </label>
+                  <input
+                    id="documentFront"
+                    name="documentFront"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    required
+                    className="block w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-primary-soft file:px-4 file:py-2 file:font-semibold file:text-primary"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="documentBack" className="text-sm font-semibold text-foreground">
+                    ID back
+                  </label>
+                  <input
+                    id="documentBack"
+                    name="documentBack"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    required
+                    className="block w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-primary-soft file:px-4 file:py-2 file:font-semibold file:text-primary"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <label htmlFor="documentNumber" className="text-sm font-semibold text-foreground">
-              Document Number
-            </label>
-            <Input id="documentNumber" name="documentNumber" placeholder="Enter document number" />
+
+          <div className="rounded-[28px] border border-border bg-surface/70 p-5 md:p-6">
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-heading text-xl font-semibold text-foreground">Selfie verification</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Upload the selfie image you want included with this KYC submission.
+                </p>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="space-y-2 md:col-span-2">
+                  <label htmlFor="selfieFile" className="text-sm font-semibold text-foreground">
+                    Selfie image
+                  </label>
+                  <input
+                    id="selfieFile"
+                    name="selfieFile"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    required
+                    className="block w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-primary-soft file:px-4 file:py-2 file:font-semibold file:text-primary"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-          <FormMessage message={state.message} />
+
+          <div className="rounded-[28px] border border-border bg-surface/70 p-5 md:p-6">
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-heading text-xl font-semibold text-foreground">Address verification</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Provide one recent proof of address document.
+                </p>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label htmlFor="proofOfAddressType" className="text-sm font-semibold text-foreground">
+                    Proof of address type
+                  </label>
+                  <Select id="proofOfAddressType" name="proofOfAddressType" defaultValue="" required>
+                    <option value="" disabled>
+                      Select proof of address
+                    </option>
+                    {proofOfAddressOptions.map((option) => (
+                      <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="proofOfAddressFile" className="text-sm font-semibold text-foreground">
+                    Proof of address document
+                  </label>
+                  <input
+                    id="proofOfAddressFile"
+                    name="proofOfAddressFile"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp,.pdf"
+                    required
+                    className="block w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-primary-soft file:px-4 file:py-2 file:font-semibold file:text-primary"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="flex justify-end">
             <SubmitButton pendingLabel="Submitting...">Submit KYC</SubmitButton>
           </div>

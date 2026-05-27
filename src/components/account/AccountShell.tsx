@@ -1,9 +1,10 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AccountSidebar from "@/components/account/AccountSidebar";
 import AccountTopbar from "@/components/account/AccountTopbar";
+import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 
 export default function AccountShell({
@@ -14,13 +15,78 @@ export default function AccountShell({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [hoverPreviewOpen, setHoverPreviewOpen] = useState(false);
+  const [supportsHoverPreview, setSupportsHoverPreview] = useState(false);
+
+  useEffect(() => {
+    const savedValue = window.localStorage.getItem("gi-account-sidebar-collapsed");
+    setCollapsed(savedValue === "true");
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const syncSupport = () => {
+      setSupportsHoverPreview(mediaQuery.matches);
+    };
+
+    syncSupport();
+    mediaQuery.addEventListener("change", syncSupport);
+
+    return () => {
+      mediaQuery.removeEventListener("change", syncSupport);
+    };
+  }, []);
+
+  const toggleCollapsed = () => {
+    setCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem("gi-account-sidebar-collapsed", String(next));
+      return next;
+    });
+  };
+
+  const sidebarExpanded = !collapsed || (supportsHoverPreview && hoverPreviewOpen);
 
   return (
     <div className="min-h-screen bg-surface">
       <div className="flex min-h-screen">
-        <div className="hidden w-80 shrink-0 lg:block">
-          <div className="fixed inset-y-0 w-80 overflow-y-auto">
-            <AccountSidebar profile={profile} />
+        <div
+          className={cn(
+            "hidden shrink-0 transition-[width] duration-300 ease-in-out lg:block",
+            sidebarExpanded ? "w-80" : "w-24"
+          )}
+          onMouseEnter={() => {
+            if (collapsed && supportsHoverPreview) {
+              setHoverPreviewOpen(true);
+            }
+          }}
+          onMouseLeave={() => {
+            if (collapsed) {
+              setHoverPreviewOpen(false);
+            }
+          }}
+          onFocusCapture={() => {
+            if (collapsed && supportsHoverPreview) {
+              setHoverPreviewOpen(true);
+            }
+          }}
+          onBlurCapture={(event) => {
+            if (
+              collapsed &&
+              !event.currentTarget.contains(event.relatedTarget as Node | null)
+            ) {
+              setHoverPreviewOpen(false);
+            }
+          }}
+        >
+          <div
+            className={cn(
+              "fixed inset-y-0 overflow-y-auto transition-[width] duration-300 ease-in-out",
+              sidebarExpanded ? "w-80" : "w-24"
+            )}
+          >
+            <AccountSidebar profile={profile} collapsed={!sidebarExpanded} />
           </div>
         </div>
 
@@ -48,7 +114,12 @@ export default function AccountShell({
         </AnimatePresence>
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-          <AccountTopbar profile={profile} onMenuClick={() => setOpen(true)} />
+          <AccountTopbar
+            profile={profile}
+            collapsed={collapsed}
+            onCollapseToggle={toggleCollapsed}
+            onMenuClick={() => setOpen(true)}
+          />
           <div className="flex-1 px-4 py-6 sm:px-6">{children}</div>
         </div>
       </div>

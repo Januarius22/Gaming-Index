@@ -1,8 +1,13 @@
 import "server-only";
 import {
+  getCartListingIds,
+  getSavedListingIds
+} from "@/lib/buyerStore";
+import {
   getDemoKycSubmissions,
   getDemoListings,
-  getDemoProfiles
+  getDemoProfiles,
+  getDemoSellerRatings
 } from "@/lib/demoStore";
 import { normalizeProfile } from "@/lib/profile";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
@@ -13,8 +18,12 @@ import type {
   KycSubmission,
   Listing,
   Order,
-  Profile
+  Profile,
+  SellerRating
 } from "@/types";
+
+const KYC_STORAGE_BUCKET = "kyc-documents";
+const LISTING_STORAGE_BUCKET = "listing-media";
 
 const seededMarketplaceListings: Listing[] = [
   {
@@ -22,8 +31,8 @@ const seededMarketplaceListings: Listing[] = [
     seller_id: "seed-seller-1",
     seller_name: "Verified Seller",
     seller_username: "vxmarket",
-    game: "COD",
-    title: "COD Ranked Account with Premium Weapons",
+    game: "CODM",
+    title: "CODM Ranked Account with Premium Weapons",
     description: "Well-maintained account with competitive loadouts and full access.",
     price: 220,
     platform: "Mobile",
@@ -54,18 +63,41 @@ const seededMarketplaceListings: Listing[] = [
     seller_id: "seed-seller-3",
     seller_name: "Arena Vault",
     seller_username: "arenavault",
-    game: "Fortnite",
-    title: "Fortnite Locker Account",
-    description: "Clean locker account with legacy cosmetics and linked email access.",
-    price: 390,
-    platform: "Console",
+    game: "DLS",
+    title: "DLS Elite Squad Account",
+    description: "Strong Dream League squad with upgraded stadium progress and rare players.",
+    price: 190,
+    platform: "Mobile",
     account_level: "Level 112",
     login_method: "Email",
-    extra_notes: "Full recovery details provided after sale.",
-    status: "approved",
+    extra_notes: "Includes event progress and stacked coin balance.",
+    status: "sold",
     created_at: "2026-05-08T00:00:00.000Z"
+  },
+  {
+    id: "seed-4",
+    seller_id: "seed-seller-4",
+    seller_name: "Prime Arena",
+    seller_username: "primearena",
+    game: "PUBG Mobile",
+    title: "PUBG Ace Account with Premium Skins",
+    description: "Late-season account with mythic outfit pieces and premium inventory.",
+    price: 275,
+    platform: "Mobile",
+    account_level: "Level 96",
+    login_method: "Google",
+    extra_notes: "Season rewards fully unlocked.",
+    status: "approved",
+    created_at: "2026-05-11T00:00:00.000Z"
   }
 ];
+
+const seededSellerMetrics: Record<string, { rating: number; reviews: number }> = {
+  "seed-seller-1": { rating: 4.9, reviews: 18 },
+  "seed-seller-2": { rating: 4.8, reviews: 11 },
+  "seed-seller-3": { rating: 4.2, reviews: 6 },
+  "seed-seller-4": { rating: 4.7, reviews: 13 }
+};
 
 const seededActivity: ActivityItem[] = [
   {
@@ -81,6 +113,13 @@ const seededActivity: ActivityItem[] = [
     created_at: "2026-05-14T00:00:00.000Z"
   }
 ];
+
+function normalizeListing(listing: Listing): Listing {
+  return {
+    ...listing,
+    status: listing.status === "pending_review" ? "approved" : listing.status
+  };
+}
 
 async function getSupabaseProfiles() {
   const supabase = await getSupabaseServerClient();
@@ -109,7 +148,74 @@ async function getSupabaseListings() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  return (data as Listing[] | null) ?? [];
+  const listings = (data as Listing[] | null) ?? [];
+  const sellerIds = Array.from(
+    new Set(
+      listings
+        .map((listing) => listing.seller_id)
+        .filter((sellerId): sellerId is string => Boolean(sellerId))
+    )
+  );
+  const { data: profileRows } =
+    sellerIds.length > 0
+      ? await supabase
+          .from("profiles")
+          .select("id, full_name, username")
+          .in("id", sellerIds)
+      : { data: [] as Array<{ id: string; full_name: string; username: string }> };
+  const profileMap = new Map(
+    ((profileRows as Array<{ id: string; full_name: string; username: string }> | null) ?? []).map(
+      (profile) => [profile.id, profile]
+    )
+  );
+
+  return Promise.all(
+    listings.map(async (listing) => {
+      const normalizedListing = normalizeListing(listing);
+      const sellerProfile = profileMap.get(normalizedListing.seller_id);
+
+      return {
+        ...normalizedListing,
+        seller_name:
+          normalizedListing.seller_name ||
+          sellerProfile?.full_name ||
+          "Seller",
+        seller_username:
+          normalizedListing.seller_username ||
+          sellerProfile?.username ||
+          "seller",
+        image_urls: await getSignedListingAssetUrls(
+          supabase,
+          Array.isArray(listing.image_paths) ? listing.image_paths : []
+        )
+      };
+    })
+  );
+}
+
+async function enrichKycSubmissions(
+  submissions: KycSubmission[],
+  supabase: NonNullable<Awaited<ReturnType<typeof getSupabaseServerClient>>>
+) {
+  return Promise.all(
+    submissions.map(async (submission) => {
+      const [documentFrontUrl, documentBackUrl, selfieFileUrl, proofOfAddressUrl] =
+        await Promise.all([
+          getSignedKycAssetUrl(supabase, submission.document_front_path),
+          getSignedKycAssetUrl(supabase, submission.document_back_path),
+          getSignedKycAssetUrl(supabase, submission.selfie_file_path),
+          getSignedKycAssetUrl(supabase, submission.proof_of_address_path)
+        ]);
+
+      return {
+        ...submission,
+        document_front_url: documentFrontUrl,
+        document_back_url: documentBackUrl,
+        selfie_file_url: selfieFileUrl,
+        proof_of_address_url: proofOfAddressUrl
+      };
+    })
+  );
 }
 
 async function getSupabaseKycQueue() {
@@ -124,7 +230,55 @@ async function getSupabaseKycQueue() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  return (data as KycSubmission[] | null) ?? [];
+  const submissions = (data as KycSubmission[] | null) ?? [];
+
+  return enrichKycSubmissions(submissions, supabase);
+}
+
+async function getSignedKycAssetUrl(
+  supabase: NonNullable<Awaited<ReturnType<typeof getSupabaseServerClient>>>,
+  path?: string
+) {
+  if (!path) {
+    return "";
+  }
+
+  const { data, error } = await supabase.storage
+    .from(KYC_STORAGE_BUCKET)
+    .createSignedUrl(path, 60 * 60);
+
+  if (error) {
+    return "";
+  }
+
+  return data?.signedUrl ?? "";
+}
+
+async function getSignedListingAssetUrls(
+  supabase: NonNullable<Awaited<ReturnType<typeof getSupabaseServerClient>>>,
+  paths: string[]
+) {
+  const cleanedPaths = paths.filter(Boolean).slice(0, 1);
+
+  if (cleanedPaths.length === 0) {
+    return [];
+  }
+
+  const uploads = await Promise.all(
+    cleanedPaths.map(async (path) => {
+      const { data, error } = await supabase.storage
+        .from(LISTING_STORAGE_BUCKET)
+        .createSignedUrl(path, 60 * 60);
+
+      if (error) {
+        return "";
+      }
+
+      return data?.signedUrl ?? "";
+    })
+  );
+
+  return uploads.filter(Boolean);
 }
 
 async function getSupabaseOrders() {
@@ -142,46 +296,180 @@ async function getSupabaseOrders() {
   return (data as Order[] | null) ?? [];
 }
 
-async function getAllApprovedMarketplaceListings() {
+async function getSupabaseSellerRatings() {
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    return [];
+  }
+
+  const { data } = await supabase
+    .from("seller_ratings")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  return (data as SellerRating[] | null) ?? [];
+}
+
+function combineSellerMetrics(
+  sellerId: string,
+  liveRatings: SellerRating[]
+): { average: number; reviews: number; tag: "top_seller" | null } {
+  const fallback = seededSellerMetrics[sellerId] ?? { rating: 0, reviews: 0 };
+  const liveForSeller = liveRatings.filter((rating) => rating.seller_id === sellerId);
+  const liveReviews = liveForSeller.length;
+  const liveTotal = liveForSeller.reduce((sum, entry) => sum + entry.rating, 0);
+  const seededTotal = fallback.rating * fallback.reviews;
+  const combinedReviews = fallback.reviews + liveReviews;
+  const combinedAverage = combinedReviews > 0 ? (seededTotal + liveTotal) / combinedReviews : 0;
+  const tag = combinedAverage >= 4.7 && combinedReviews >= 5 ? "top_seller" : null;
+
+  return {
+    average: combinedAverage,
+    reviews: combinedReviews,
+    tag
+  };
+}
+
+function enrichMarketplaceListings(listings: Listing[], ratings: SellerRating[]) {
+  return listings.map((listing) => {
+    const metrics = combineSellerMetrics(listing.seller_id, ratings);
+
+    return {
+      ...listing,
+      seller_rating: Number(metrics.average.toFixed(1)),
+      seller_reviews: metrics.reviews,
+      seller_tag: metrics.tag
+    };
+  });
+}
+
+async function getAllMarketplaceListings() {
   if (!hasSupabaseEnv) {
-    const demoListings = (await getDemoListings()).filter(
-      (listing) => listing.status === "approved"
+    const [demoListings, demoRatings] = await Promise.all([
+      getDemoListings(),
+      getDemoSellerRatings()
+    ]);
+    const normalizedDemoListings = demoListings.map((listing) => normalizeListing(listing));
+    const visibleListings = normalizedDemoListings.filter(
+      (listing) => listing.status === "approved" || listing.status === "sold"
     );
-    return [...demoListings, ...seededMarketplaceListings].sort((left, right) =>
+    return enrichMarketplaceListings([...visibleListings, ...seededMarketplaceListings], demoRatings).sort((left, right) =>
       right.created_at.localeCompare(left.created_at)
     );
   }
 
   try {
-    const listings = (await getSupabaseListings()).filter(
-      (listing) => listing.status === "approved"
+    const [listings, ratings] = await Promise.all([
+      getSupabaseListings(),
+      getSupabaseSellerRatings()
+    ]);
+    const visibleListings = listings.filter(
+      (listing) => listing.status === "approved" || listing.status === "sold"
     );
+    const baseListings = visibleListings.length > 0 ? visibleListings : seededMarketplaceListings;
 
-    return (listings.length > 0 ? listings : seededMarketplaceListings).sort((left, right) =>
+    return enrichMarketplaceListings(baseListings, ratings).sort((left, right) =>
       right.created_at.localeCompare(left.created_at)
     );
   } catch {
-    return seededMarketplaceListings;
+    return enrichMarketplaceListings(seededMarketplaceListings, []);
   }
 }
 
 export async function getMarketplaceListings(limit = 6) {
-  const listings = await getAllApprovedMarketplaceListings();
+  const listings = await getAllMarketplaceListings();
   return listings.slice(0, limit);
 }
 
 export async function getMarketplaceCatalog() {
-  return getAllApprovedMarketplaceListings();
+  return getAllMarketplaceListings();
+}
+
+function orderListingsByIds(listings: Listing[], listingIds: string[]) {
+  const listingMap = new Map(listings.map((listing) => [listing.id, listing]));
+
+  return listingIds
+    .map((listingId) => listingMap.get(listingId))
+    .filter((listing): listing is Listing => Boolean(listing));
 }
 
 export async function getMarketplaceListingById(listingId: string) {
-  const listings = await getAllApprovedMarketplaceListings();
+  const listings = await getAllMarketplaceListings();
   return listings.find((listing) => listing.id === listingId) ?? null;
+}
+
+export async function getSavedMarketplaceListingIds() {
+  return getSavedListingIds();
+}
+
+export async function getCartMarketplaceListingIds() {
+  return getCartListingIds();
+}
+
+export async function getSavedMarketplaceListings() {
+  const [listingIds, listings] = await Promise.all([
+    getSavedListingIds(),
+    getAllMarketplaceListings()
+  ]);
+
+  return orderListingsByIds(listings, listingIds);
+}
+
+export async function getCartMarketplaceListings() {
+  const [listingIds, listings] = await Promise.all([
+    getCartListingIds(),
+    getAllMarketplaceListings()
+  ]);
+
+  return orderListingsByIds(listings, listingIds);
+}
+
+export async function getSellerRatingState(sellerId: string, buyerId?: string | null) {
+  if (!hasSupabaseEnv) {
+    const ratings = await getDemoSellerRatings();
+    const sellerRatings = ratings.filter((entry) => entry.seller_id === sellerId);
+    const metrics = combineSellerMetrics(sellerId, ratings);
+    const buyerRating =
+      buyerId ? sellerRatings.find((entry) => entry.buyer_id === buyerId) ?? null : null;
+
+    return {
+      average: Number(metrics.average.toFixed(1)),
+      reviews: metrics.reviews,
+      tag: metrics.tag,
+      buyerRating
+    };
+  }
+
+  try {
+    const ratings = await getSupabaseSellerRatings();
+    const sellerRatings = ratings.filter((entry) => entry.seller_id === sellerId);
+    const metrics = combineSellerMetrics(sellerId, ratings);
+    const buyerRating =
+      buyerId ? sellerRatings.find((entry) => entry.buyer_id === buyerId) ?? null : null;
+
+    return {
+      average: Number(metrics.average.toFixed(1)),
+      reviews: metrics.reviews,
+      tag: metrics.tag,
+      buyerRating
+    };
+  } catch {
+    const fallback = seededSellerMetrics[sellerId] ?? { rating: 0, reviews: 0 };
+    return {
+      average: Number(fallback.rating.toFixed(1)),
+      reviews: fallback.reviews,
+      tag: fallback.rating >= 4.7 && fallback.reviews >= 5 ? ("top_seller" as const) : null,
+      buyerRating: null
+    };
+  }
 }
 
 export async function getSellerDashboardStats(profile: Profile): Promise<DashboardStat[]> {
   if (!hasSupabaseEnv) {
-    const listings = (await getDemoListings()).filter(
+    const listings = (await getDemoListings())
+      .map((listing) => normalizeListing(listing))
+      .filter(
       (listing) => listing.seller_id === profile.id
     );
 
@@ -266,6 +554,11 @@ export async function getSellerDashboardStats(profile: Profile): Promise<Dashboa
 }
 
 export async function getAccountDashboardStats(profile: Profile): Promise<DashboardStat[]> {
+  const [savedListingIds, cartListingIds] = await Promise.all([
+    getSavedListingIds(),
+    getCartListingIds()
+  ]);
+
   return [
     {
       label: "Marketplace Access",
@@ -280,21 +573,23 @@ export async function getAccountDashboardStats(profile: Profile): Promise<Dashbo
         : "Unlock it to start KYC and list accounts"
     },
     {
-      label: "Active Orders",
-      value: "0",
-      helper: "Purchase history will appear here"
+      label: "Cart Items",
+      value: String(cartListingIds.length),
+      helper: "Accounts staged for checkout"
     },
     {
       label: "Saved Listings",
-      value: "0",
-      helper: "Bookmarks can live here later"
+      value: String(savedListingIds.length),
+      helper: "Buyer favorites ready for later"
     }
   ];
 }
 
 export async function getSellerListings(profile: Profile) {
   if (!hasSupabaseEnv) {
-    return (await getDemoListings()).filter((listing) => listing.seller_id === profile.id);
+    return (await getDemoListings())
+      .map((listing) => normalizeListing(listing))
+      .filter((listing) => listing.seller_id === profile.id);
   }
 
   try {
@@ -329,7 +624,7 @@ export async function getSellerOrders(profile: Profile) {
 export async function getAdminDashboardStats() {
   if (!hasSupabaseEnv) {
     const profiles = await getDemoProfiles();
-    const listings = await getDemoListings();
+    const listings = (await getDemoListings()).map((listing) => normalizeListing(listing));
     const kyc = await getDemoKycSubmissions();
 
     return {
@@ -346,11 +641,11 @@ export async function getAdminDashboardStats() {
           helper: "Awaiting review"
         },
         {
-          label: "Pending Listings",
+          label: "Live Listings",
           value: String(
-            listings.filter((listing) => listing.status === "pending_review").length
+            listings.filter((listing) => listing.status === "approved").length
           ),
-          helper: "Waiting for approval"
+          helper: "Published in marketplace"
         },
         { label: "Total Sales", value: "$0", helper: "Dummy transaction total" }
       ],
@@ -384,11 +679,11 @@ export async function getAdminDashboardStats() {
           helper: "Awaiting review"
         },
         {
-          label: "Pending Listings",
+          label: "Live Listings",
           value: String(
-            listings.filter((listing) => listing.status === "pending_review").length
+            listings.filter((listing) => listing.status === "approved").length
           ),
-          helper: "Waiting for approval"
+          helper: "Published in marketplace"
         },
         {
           label: "Total Sales",
@@ -404,7 +699,7 @@ export async function getAdminDashboardStats() {
         { label: "Total Users", value: "0", helper: "Registered users" },
         { label: "Total Sellers", value: "0", helper: "Seller-enabled users" },
         { label: "Pending KYC", value: "0", helper: "Awaiting review" },
-        { label: "Pending Listings", value: "0", helper: "Waiting for approval" },
+        { label: "Live Listings", value: "0", helper: "Published in marketplace" },
         { label: "Total Sales", value: "$0", helper: "Completed order value" }
       ],
       activity: seededActivity
@@ -441,9 +736,103 @@ export async function getAdminKycQueue() {
   }
 }
 
+export async function getAdminKycQueuePage(page = 1, perPage = 10) {
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const safePerPage = Number.isFinite(perPage) && perPage > 0 ? Math.floor(perPage) : 10;
+
+  if (!hasSupabaseEnv) {
+    const submissions = (await getDemoKycSubmissions()).sort((left, right) =>
+      right.created_at.localeCompare(left.created_at)
+    );
+    const totalCount = submissions.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / safePerPage));
+    const currentPage = Math.min(safePage, totalPages);
+    const startIndex = (currentPage - 1) * safePerPage;
+
+    return {
+      submissions: submissions.slice(startIndex, startIndex + safePerPage),
+      totalCount,
+      totalPages,
+      currentPage
+    };
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return {
+        submissions: [] as KycSubmission[],
+        totalCount: 0,
+        totalPages: 1,
+        currentPage: 1
+      };
+    }
+
+    const from = (safePage - 1) * safePerPage;
+    const to = from + safePerPage - 1;
+
+    const { data, count } = await supabase
+      .from("kyc_submissions")
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    const totalCount = count ?? 0;
+    const totalPages = Math.max(1, Math.ceil(totalCount / safePerPage));
+    const currentPage = Math.min(safePage, totalPages);
+    const submissions = (data as KycSubmission[] | null) ?? [];
+
+    return {
+      submissions: await enrichKycSubmissions(submissions, supabase),
+      totalCount,
+      totalPages,
+      currentPage
+    };
+  } catch {
+    return {
+      submissions: [] as KycSubmission[],
+      totalCount: 0,
+      totalPages: 1,
+      currentPage: 1
+    };
+  }
+}
+
+export async function getLatestSellerKycSubmission(sellerId: string) {
+  if (!hasSupabaseEnv) {
+    const submissions = await getDemoKycSubmissions();
+    return (
+      submissions
+        .filter((submission) => submission.seller_id === sellerId)
+        .sort((left, right) => right.created_at.localeCompare(left.created_at))[0] ?? null
+    );
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return null;
+    }
+
+    const { data } = await supabase
+      .from("kyc_submissions")
+      .select("*")
+      .eq("seller_id", sellerId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    return (data as KycSubmission | null) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getAdminListingQueue() {
   if (!hasSupabaseEnv) {
-    return getDemoListings();
+    return (await getDemoListings()).map((listing) => normalizeListing(listing));
   }
 
   try {

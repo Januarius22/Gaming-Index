@@ -1,17 +1,53 @@
 import Link from "next/link";
+import FormMessage from "@/components/auth/FormMessage";
+import KycReviewNoticeModal from "@/components/seller/KycReviewNoticeModal";
 import SellerStatsCards from "@/components/seller/SellerStatsCards";
 import Button from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
-import { getSellerDashboardStats } from "@/lib/data";
-import { requireSellerProfile } from "@/lib/auth";
+import { getLatestSellerKycSubmission, getSellerDashboardStats } from "@/lib/data";
+import { canUploadAccounts, requireSellerProfile } from "@/lib/auth";
 import { titleCase } from "@/lib/utils";
 
-export default async function SellerDashboardPage() {
+export default async function SellerDashboardPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ kyc?: string }>;
+}) {
   const profile = await requireSellerProfile();
   const stats = await getSellerDashboardStats(profile);
+  const latestKycSubmission = await getLatestSellerKycSubmission(profile.id);
+  const params = (await searchParams) ?? {};
+  const uploadUnlocked = canUploadAccounts(profile.kyc_status);
+  const kycHeading =
+    profile.kyc_status === "pending" ? "Pending review" : titleCase(profile.kyc_status);
+  const kycDescription =
+    profile.kyc_status === "approved"
+      ? "Your KYC is approved and upload access is fully enabled."
+      : profile.kyc_status === "pending"
+        ? "Your KYC has been submitted successfully and is now waiting for admin review."
+        : profile.kyc_status === "rejected"
+          ? "Your previous KYC submission was rejected. Update your details and submit again."
+          : "Complete KYC verification to unlock upload access and publish listings directly.";
+  const kycButtonLabel =
+    profile.kyc_status === "pending"
+      ? "View KYC Status"
+      : profile.kyc_status === "approved"
+        ? "KYC Approved"
+        : "Complete KYC";
 
   return (
     <div className="space-y-6">
+      <KycReviewNoticeModal
+        submissionId={latestKycSubmission?.status === "rejected" ? latestKycSubmission.id : undefined}
+        rejectionReason={latestKycSubmission?.status === "rejected" ? latestKycSubmission.rejection_reason : undefined}
+      />
+      {params.kyc === "submitted" ? (
+        <FormMessage
+          message="KYC submitted successfully. Your verification is now pending admin review."
+          tone="success"
+        />
+      ) : null}
+
       <SellerStatsCards stats={stats} />
 
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
@@ -28,10 +64,10 @@ export default async function SellerDashboardPage() {
                 KYC status
               </p>
               <p className="mt-3 text-3xl font-semibold text-foreground">
-                {titleCase(profile.kyc_status)}
+                {kycHeading}
               </p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Complete KYC verification to unlock upload access and move listings into the review queue.
+                {kycDescription}
               </p>
             </div>
             <div className="rounded-3xl border border-primary/12 bg-primary-soft/55 p-5">
@@ -43,14 +79,18 @@ export default async function SellerDashboardPage() {
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Link href="/seller/upload">
-                <Button>Upload Account</Button>
+              <Link href={uploadUnlocked ? "/seller/upload" : "/seller/kyc"}>
+                <Button variant={uploadUnlocked ? "primary" : "secondary"}>
+                  {uploadUnlocked ? "Upload Account" : "Upload Locked Until Approval"}
+                </Button>
               </Link>
               <Link href="/seller/listings">
                 <Button variant="secondary">View Listings</Button>
               </Link>
               <Link href="/seller/kyc">
-                <Button variant="subtle">Complete KYC</Button>
+                <Button variant="subtle" disabled={profile.kyc_status === "approved"}>
+                  {kycButtonLabel}
+                </Button>
               </Link>
             </div>
           </CardContent>
