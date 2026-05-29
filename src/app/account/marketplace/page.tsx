@@ -1,6 +1,5 @@
 import MarketplacePreview from "@/components/public/MarketplacePreview";
 import FormMessage from "@/components/auth/FormMessage";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import {
   getCartMarketplaceListingIds,
   getMarketplaceCatalog,
@@ -9,6 +8,11 @@ import {
 
 function getNoticeMessage(notice?: string) {
   switch (notice) {
+    case "buy-now-failed":
+      return {
+        message: "We could not start checkout for that listing right now.",
+        tone: "error" as const
+      };
     case "listing-saved":
       return { message: "Listing saved for later.", tone: "success" as const };
     case "listing-unsaved":
@@ -42,16 +46,6 @@ export default async function AccountMarketplacePage({
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Marketplace</CardTitle>
-          <CardDescription>
-            Browse live listings from inside your account workspace without jumping back to
-            the public landing flow.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
       <FormMessage message={noticeState.message} tone={noticeState.tone} />
 
       <MarketplacePreview
@@ -62,6 +56,7 @@ export default async function AccountMarketplacePage({
         context="account"
         savedListingIds={savedListingIds}
         cartListingIds={cartListingIds}
+        itemsPerPage={6}
         className="pb-0 pt-0"
       />
     </div>

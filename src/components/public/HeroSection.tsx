@@ -14,14 +14,17 @@ export default function HeroSection() {
       style={{ width: "100vw", minHeight: "100svh" }}
     >
       <Image
-        src="/images/hero-gaming-lounge.png"
-        alt="Gamers playing together in a premium gaming lounge"
+        src="/images/backgroud.jpg"
+        alt="Gaming Index hero background"
         fill
         priority
-        className="object-cover object-center"
+        className="scale-[1.03] object-cover object-center saturate-[0.9]"
       />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,20,44,0.28)_0%,rgba(6,20,44,0.46)_38%,rgba(6,20,44,0.72)_100%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,87,255,0.26),transparent_44%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(125deg,rgba(3,14,34,0.92)_0%,rgba(7,39,93,0.58)_38%,rgba(2,13,31,0.88)_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,110,255,0.34),transparent_42%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(84,196,255,0.24),transparent_24%)]" />
+      <div className="absolute inset-x-4 inset-y-6 rounded-[34px] border border-sky-200/15 bg-[linear-gradient(180deg,rgba(10,28,61,0.14),rgba(10,28,61,0.04))] shadow-[0_0_0_1px_rgba(15,99,255,0.12),0_34px_120px_-64px_rgba(0,102,255,0.75)] sm:inset-x-6 sm:inset-y-8 lg:inset-x-8 lg:inset-y-10" />
+      <div className="absolute inset-x-8 inset-y-10 rounded-[30px] border border-white/8 sm:inset-x-10 sm:inset-y-12 lg:inset-x-12 lg:inset-y-14" />
 
       <div className="relative mx-auto w-full max-w-6xl px-4 pb-20 pt-32 sm:px-6 lg:px-8 lg:pb-28 lg:pt-40">
         <motion.div

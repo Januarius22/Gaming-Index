@@ -33,7 +33,7 @@ export const buttonClassName = ({
   className?: string;
 }) =>
   cn(
-    "inline-flex items-center justify-center rounded-xl font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-60",
+    "inline-flex cursor-pointer items-center justify-center rounded-xl font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-60",
     buttonVariants[variant],
     buttonSizes[size],
     className

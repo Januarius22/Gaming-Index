@@ -4,14 +4,33 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminProfile } from "@/lib/auth";
 import {
-  removeDemoListing,
+  getDemoListings,
   updateDemoKycSubmissionStatus,
   updateDemoListingStatus
 } from "@/lib/demoStore";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
+import { getNigeriaTimestamp } from "@/lib/utils";
 
-const LISTING_STORAGE_BUCKET = "listing-media";
+function getSafeAdminReturnPath(value: string) {
+  return value.startsWith("/admin/") ? value : "/admin/listings";
+}
+
+function getAdminListingRedirectPath(
+  basePath: string,
+  notice: "listing-taken-down" | "listing-take-down-failed",
+  errorMessage?: string
+) {
+  const [pathname, existingQuery = ""] = basePath.split("?");
+  const searchParams = new URLSearchParams(existingQuery);
+  searchParams.set("notice", notice);
+
+  if (errorMessage) {
+    searchParams.set("error", errorMessage);
+  }
+
+  return `${pathname}?${searchParams.toString()}`;
+}
 
 export async function updateKycStatusAction(formData: FormData) {
   await requireAdminProfile();
@@ -76,7 +95,10 @@ export async function updateListingStatusAction(formData: FormData) {
   const listingId = String(formData.get("listingId") ?? "");
   const status = String(formData.get("status") ?? "");
 
-  if (!listingId || (status !== "approved" && status !== "rejected")) {
+  if (
+    !listingId ||
+    (status !== "approved" && status !== "rejected" && status !== "taken_down")
+  ) {
     return;
   }
 
@@ -84,87 +106,116 @@ export async function updateListingStatusAction(formData: FormData) {
     const supabase = await getSupabaseServerClient();
     await supabase!.from("listings").update({ status }).eq("id", listingId);
   } else {
-    await updateDemoListingStatus(listingId, status);
+    await updateDemoListingStatus(listingId, status as "approved" | "rejected" | "taken_down");
   }
 
   revalidatePath("/admin/listings");
+  revalidatePath("/admin/listing-history");
   revalidatePath("/seller/listings");
+  revalidatePath("/seller/history");
   revalidatePath("/marketplace");
 }
 
-export async function deleteListingAction(formData: FormData) {
-  await requireAdminProfile();
+export async function takeDownListingAction(formData: FormData) {
+  const admin = await requireAdminProfile();
   const listingId = String(formData.get("listingId") ?? "").trim();
+  const adminNote = String(formData.get("adminNote") ?? "").trim();
+  const returnTo = getSafeAdminReturnPath(String(formData.get("returnTo") ?? "").trim());
+  const adminActionAt = getNigeriaTimestamp();
 
-  if (!listingId) {
-    redirect("/admin/listings?notice=listing-remove-failed");
+  if (!listingId || !adminNote) {
+    redirect(
+      getAdminListingRedirectPath(
+        returnTo,
+        "listing-take-down-failed",
+        !adminNote ? "Add a note before taking down a listing." : undefined
+      )
+    );
   }
 
   if (hasSupabaseEnv) {
     const supabase = await getSupabaseServerClient();
     const { data: listing, error: listingError } = await supabase!
       .from("listings")
-      .select("id, image_paths")
+      .select("id, status")
       .eq("id", listingId)
       .maybeSingle();
 
     if (listingError || !listing) {
-      redirect("/admin/listings?notice=listing-remove-failed");
+      redirect(getAdminListingRedirectPath(returnTo, "listing-take-down-failed"));
     }
 
-    const imagePaths = Array.isArray(listing.image_paths)
-      ? listing.image_paths.filter(
-          (path): path is string => typeof path === "string" && path.length > 0
-        )
-      : [];
-
-    const {
-      data: deletedListing,
-      error: deleteError
-    } = await supabase!
+    const { data: updatedListing, error: updateError } = await supabase!
       .from("listings")
-      .delete()
+      .update({
+        status: "taken_down",
+        admin_note: adminNote,
+        admin_action_at: adminActionAt,
+        admin_action_by: admin.id
+      })
       .eq("id", listingId)
+      .eq("status", "approved")
       .select("id")
       .maybeSingle();
 
-    if (deleteError) {
-      console.error("Admin listing delete failed", {
+    if (updateError) {
+      console.error("Admin listing takedown failed", {
         listingId,
-        error: deleteError.message
+        error: updateError.message
       });
       redirect(
-        `/admin/listings?notice=listing-remove-failed&error=${encodeURIComponent(deleteError.message)}`
+        getAdminListingRedirectPath(
+          returnTo,
+          "listing-take-down-failed",
+          updateError.message
+        )
       );
     }
 
-    if (!deletedListing) {
+    if (!updatedListing) {
       redirect(
-        "/admin/listings?notice=listing-remove-failed&error=" +
-          encodeURIComponent(
-            "Supabase blocked the delete. Apply the latest listing delete policies from supabase/schema.sql."
-          )
+        getAdminListingRedirectPath(
+          returnTo,
+          "listing-take-down-failed",
+          "Only active unsold listings can be taken down."
+        )
       );
-    }
-
-    if (imagePaths.length > 0) {
-      await supabase!.storage.from(LISTING_STORAGE_BUCKET).remove(imagePaths);
     }
   } else {
-    const removedListing = await removeDemoListing(listingId);
+    const existingListing = (await getDemoListings()).find((listing) => listing.id === listingId);
 
-    if (!removedListing) {
-      redirect("/admin/listings?notice=listing-remove-failed");
+    if (!existingListing || existingListing.status !== "approved") {
+      redirect(
+        getAdminListingRedirectPath(
+          returnTo,
+          "listing-take-down-failed",
+          "Only active unsold listings can be taken down."
+        )
+      );
+    }
+
+    const takenDownListing = await updateDemoListingStatus(listingId, "taken_down", {
+      admin_note: adminNote,
+      admin_action_at: adminActionAt,
+      admin_action_by: admin.id
+    });
+
+    if (!takenDownListing) {
+      redirect(getAdminListingRedirectPath(returnTo, "listing-take-down-failed"));
     }
   }
 
   revalidatePath("/");
   revalidatePath("/marketplace");
   revalidatePath("/account/marketplace");
+  revalidatePath("/account/saved");
+  revalidatePath("/account/cart");
   revalidatePath("/seller/listings");
+  revalidatePath("/seller/history");
   revalidatePath("/seller/dashboard");
   revalidatePath("/admin/listings");
+  revalidatePath("/admin/listing-history");
   revalidatePath("/admin/dashboard");
 
-  redirect("/admin/listings?notice=listing-removed");
+  redirect(getAdminListingRedirectPath(returnTo, "listing-taken-down"));
 }

@@ -1,10 +1,25 @@
 import Badge from "@/components/ui/Badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import PaginationControls from "@/components/ui/PaginationControls";
 import { getAdminUsers } from "@/lib/data";
-import { formatDate } from "@/lib/utils";
+import { formatDate, paginateItems, parsePageParam } from "@/lib/utils";
 
-export default async function AdminUsersPage() {
+export default async function AdminUsersPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ page?: string }>;
+}) {
   const users = await getAdminUsers();
+  const params = (await searchParams) ?? {};
+  const requestedPage = parsePageParam(params.page);
+  const {
+    items: paginatedUsers,
+    currentPage,
+    totalPages,
+    totalCount,
+    pageStart,
+    pageEnd
+  } = paginateItems(users, requestedPage, 10);
 
   return (
     <Card>
@@ -14,7 +29,17 @@ export default async function AdminUsersPage() {
           All platform users with role, seller access, and account posture at a glance.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {pageStart}-{pageEnd} of {totalCount} users
+          </p>
+          <PaginationControls
+            pathname="/admin/users"
+            currentPage={currentPage}
+            totalPages={totalPages}
+          />
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -35,7 +60,7 @@ export default async function AdminUsersPage() {
                   </td>
                 </tr>
               ) : (
-                users.map((user) => (
+                paginatedUsers.map((user) => (
                   <tr key={user.id} className="border-b border-border/60">
                     <td className="px-4 py-4 font-medium text-foreground">{user.full_name}</td>
                     <td className="px-4 py-4">@{user.username}</td>

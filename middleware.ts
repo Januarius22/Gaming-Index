@@ -1,5 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type SetAllCookies } from "@supabase/ssr";
+import {
+  isInvalidRefreshTokenError,
+  isSupabaseAuthCookieName
+} from "@/lib/supabaseAuth";
+
+function clearSupabaseAuthCookies(request: NextRequest, response: NextResponse) {
+  request.cookies
+    .getAll()
+    .filter(({ name }) => isSupabaseAuthCookieName(name))
+    .forEach(({ name }) => {
+      request.cookies.delete(name);
+      response.cookies.delete(name);
+    });
+}
 
 export async function middleware(request: NextRequest) {
   if (
@@ -31,7 +45,16 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  try {
+    await supabase.auth.getUser();
+  } catch (error) {
+    if (isInvalidRefreshTokenError(error)) {
+      clearSupabaseAuthCookies(request, response);
+      return response;
+    }
+
+    throw error;
+  }
 
   return response;
 }

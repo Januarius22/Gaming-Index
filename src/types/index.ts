@@ -7,9 +7,12 @@ export type ListingStatus =
   | "pending_review"
   | "approved"
   | "rejected"
-  | "sold";
+  | "sold"
+  | "taken_down"
+  | "withdrawn";
 
 export type OrderStatus = "pending" | "processing" | "completed" | "cancelled";
+export type PaymentStatus = "pending" | "successful" | "failed";
 
 export interface Profile {
   id: string;
@@ -81,6 +84,24 @@ export interface Listing {
   seller_rating?: number;
   seller_reviews?: number;
   seller_tag?: "top_seller" | null;
+  sold_at?: string | null;
+  withdrawn_at?: string | null;
+  admin_note?: string;
+  admin_action_at?: string | null;
+  admin_action_by?: string | null;
+  created_at: string;
+}
+
+export interface ListingDeliveryDetails {
+  id: string;
+  listing_id: string;
+  seller_id: string;
+  account_login_id: string;
+  account_password: string;
+  recovery_details?: string;
+  transfer_note?: string;
+  ready_for_release_confirmed: boolean;
+  not_personal_confirmed: boolean;
   created_at: string;
 }
 
@@ -96,13 +117,21 @@ export interface SellerRating {
 
 export interface Order {
   id: string;
+  buyer_id?: string | null;
   buyer_name: string;
   buyer_email: string;
+  buyer_phone?: string;
   seller_id: string;
   listing_id: string;
   listing_title: string;
   amount: number;
   status: OrderStatus;
+  payment_status?: PaymentStatus;
+  payment_provider?: string;
+  payment_reference?: string;
+  payment_channel?: string;
+  payment_last4?: string;
+  paid_at?: string | null;
   created_at: string;
 }
 

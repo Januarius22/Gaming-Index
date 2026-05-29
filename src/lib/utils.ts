@@ -2,6 +2,7 @@ import type { KycStatus, ListingStatus, OrderStatus } from "@/types";
 
 export const APP_TIME_ZONE = "Africa/Lagos";
 export const APP_TIME_LABEL = "WAT";
+export const SOLD_LISTING_PUBLIC_VISIBILITY_HOURS = 5;
 
 export function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -44,6 +45,34 @@ export function getNigeriaTimestamp(date = new Date()) {
   );
 
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}+01:00`;
+}
+
+export function parsePageParam(value?: string) {
+  const parsedValue = Number(value ?? "1");
+
+  if (!Number.isFinite(parsedValue) || parsedValue < 1) {
+    return 1;
+  }
+
+  return Math.floor(parsedValue);
+}
+
+export function paginateItems<T>(items: T[], page: number, perPage: number) {
+  const safePerPage = Number.isFinite(perPage) && perPage > 0 ? Math.floor(perPage) : 10;
+  const totalCount = items.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / safePerPage));
+  const currentPage = Math.min(Math.max(1, Math.floor(page || 1)), totalPages);
+  const startIndex = (currentPage - 1) * safePerPage;
+  const endIndex = startIndex + safePerPage;
+
+  return {
+    items: items.slice(startIndex, endIndex),
+    totalCount,
+    totalPages,
+    currentPage,
+    pageStart: totalCount === 0 ? 0 : startIndex + 1,
+    pageEnd: totalCount === 0 ? 0 : Math.min(endIndex, totalCount)
+  };
 }
 
 export function titleCase(value: string) {
@@ -145,15 +174,78 @@ export function statusVariant(
     case "pending_review":
     case "processing":
       return "warning";
+    case "taken_down":
     case "rejected":
     case "cancelled":
       return "danger";
+    case "withdrawn":
     case "draft":
     case "not_started":
       return "neutral";
     default:
       return "info";
   }
+}
+
+export function isOrderPaymentConfirmed(status: OrderStatus) {
+  return status === "processing" || status === "completed";
+}
+
+export function getListingMarketplaceVisibilityEndsAt(listing: {
+  status: ListingStatus;
+  sold_at?: string | null;
+  created_at: string;
+}) {
+  if (listing.status !== "sold") {
+    return null;
+  }
+
+  const baseTimestamp = listing.sold_at || listing.created_at;
+  const soldAt = new Date(baseTimestamp);
+
+  if (Number.isNaN(soldAt.getTime())) {
+    return null;
+  }
+
+  return new Date(
+    soldAt.getTime() + SOLD_LISTING_PUBLIC_VISIBILITY_HOURS * 60 * 60 * 1000
+  );
+}
+
+export function isListingMarketplaceVisible(listing: {
+  status: ListingStatus;
+  sold_at?: string | null;
+  created_at: string;
+}) {
+  if (listing.status === "approved") {
+    return true;
+  }
+
+  if (listing.status !== "sold") {
+    return false;
+  }
+
+  const visibleUntil = getListingMarketplaceVisibilityEndsAt(listing);
+
+  if (!visibleUntil) {
+    return false;
+  }
+
+  return visibleUntil.getTime() > Date.now();
+}
+
+export function getListingHistoryTimestamp(listing: {
+  sold_at?: string | null;
+  withdrawn_at?: string | null;
+  admin_action_at?: string | null;
+  created_at: string;
+}) {
+  return (
+    listing.admin_action_at ||
+    listing.withdrawn_at ||
+    listing.sold_at ||
+    listing.created_at
+  );
 }
 
 export const gameOptions = [

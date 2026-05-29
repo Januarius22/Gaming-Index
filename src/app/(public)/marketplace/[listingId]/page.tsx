@@ -185,7 +185,8 @@ export default async function MarketplaceListingDetailPage({
                     <p className="font-semibold text-foreground">Reviewed marketplace listing</p>
                     <p className="text-sm leading-6 text-muted-foreground">
                       This page keeps the full account specs, seller notes, screenshots, and buyer
-                      rating signals in one place before checkout logic is added later.
+                      rating signals in one place before you move into your buyer dashboard and
+                      secure checkout flow.
                     </p>
                   </div>
                 </div>

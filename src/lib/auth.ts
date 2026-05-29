@@ -10,6 +10,7 @@ import {
   upsertDemoProfile
 } from "@/lib/demoStore";
 import { getPrimaryDashboardRoute, normalizeProfile } from "@/lib/profile";
+import { isInvalidRefreshTokenError } from "@/lib/supabaseAuth";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import type { AppRole, KycStatus, Profile } from "@/types";
@@ -43,21 +44,38 @@ export async function getCurrentProfile() {
     return null;
   }
 
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  try {
+    const {
+      data: { user },
+      error
+    } = await supabase.auth.getUser();
 
-  if (!user) {
-    return null;
+    if (error) {
+      if (isInvalidRefreshTokenError(error)) {
+        return null;
+      }
+
+      throw error;
+    }
+
+    if (!user) {
+      return null;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    return profile ? normalizeProfile(profile as Profile) : fallbackProfileFromUser(user);
+  } catch (error) {
+    if (isInvalidRefreshTokenError(error)) {
+      return null;
+    }
+
+    throw error;
   }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  return profile ? normalizeProfile(profile as Profile) : fallbackProfileFromUser(user);
 }
 
 export function getDashboardRoute(role: AppRole) {
@@ -125,7 +143,13 @@ export function canUploadAccounts(kycStatus: KycStatus) {
 export async function signOutServerSession() {
   if (hasSupabaseEnv) {
     const supabase = await getSupabaseServerClient();
-    await supabase?.auth.signOut();
+    try {
+      await supabase?.auth.signOut();
+    } catch (error) {
+      if (!isInvalidRefreshTokenError(error)) {
+        throw error;
+      }
+    }
   }
 
   await clearDemoSession();

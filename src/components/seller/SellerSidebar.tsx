@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   CreditCard,
   FileCheck2,
+  History,
   LayoutDashboard,
   ListChecks,
   LogOut,
@@ -25,6 +26,7 @@ const navItems = [
   { href: "/seller/kyc", label: "KYC Verification", icon: FileCheck2 },
   { href: "/seller/upload", label: "Upload Account", icon: Upload },
   { href: "/seller/listings", label: "My Listings", icon: ListChecks },
+  { href: "/seller/history", label: "Listing History", icon: History },
   { href: "/seller/orders", label: "Orders", icon: PackageCheck },
   { href: "/seller/wallet", label: "Wallet", icon: CreditCard },
   { href: "/seller/settings", label: "Settings", icon: Settings }

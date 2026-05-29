@@ -4,6 +4,8 @@ import {
   getSavedListingIds
 } from "@/lib/buyerStore";
 import {
+  getDemoOrders,
+  getDemoListingDeliveryDetails,
   getDemoKycSubmissions,
   getDemoListings,
   getDemoProfiles,
@@ -12,11 +14,17 @@ import {
 import { normalizeProfile } from "@/lib/profile";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
+import {
+  getListingHistoryTimestamp,
+  isListingMarketplaceVisible,
+  isOrderPaymentConfirmed
+} from "@/lib/utils";
 import type {
   ActivityItem,
   DashboardStat,
   KycSubmission,
   Listing,
+  ListingDeliveryDetails,
   Order,
   Profile,
   SellerRating
@@ -72,6 +80,11 @@ const seededMarketplaceListings: Listing[] = [
     login_method: "Email",
     extra_notes: "Includes event progress and stacked coin balance.",
     status: "sold",
+    sold_at: "2026-05-08T03:00:00.000Z",
+    withdrawn_at: null,
+    admin_note: "",
+    admin_action_at: null,
+    admin_action_by: null,
     created_at: "2026-05-08T00:00:00.000Z"
   },
   {
@@ -88,6 +101,11 @@ const seededMarketplaceListings: Listing[] = [
     login_method: "Google",
     extra_notes: "Season rewards fully unlocked.",
     status: "approved",
+    sold_at: null,
+    withdrawn_at: null,
+    admin_note: "",
+    admin_action_at: null,
+    admin_action_by: null,
     created_at: "2026-05-11T00:00:00.000Z"
   }
 ];
@@ -114,10 +132,19 @@ const seededActivity: ActivityItem[] = [
   }
 ];
 
+const visibleSeededMarketplaceListings = seededMarketplaceListings.filter((listing) =>
+  isListingMarketplaceVisible(normalizeListing(listing))
+);
+
 function normalizeListing(listing: Listing): Listing {
   return {
     ...listing,
-    status: listing.status === "pending_review" ? "approved" : listing.status
+    status: listing.status === "pending_review" ? "approved" : listing.status,
+    sold_at: listing.sold_at ?? null,
+    withdrawn_at: listing.withdrawn_at ?? null,
+    admin_note: listing.admin_note ?? "",
+    admin_action_at: listing.admin_action_at ?? null,
+    admin_action_by: listing.admin_action_by ?? null
   };
 }
 
@@ -296,6 +323,21 @@ async function getSupabaseOrders() {
   return (data as Order[] | null) ?? [];
 }
 
+function normalizeOrder(order: Order, listingTitle?: string | null): Order {
+  return {
+    ...order,
+    buyer_id: order.buyer_id ?? null,
+    buyer_phone: order.buyer_phone ?? "",
+    payment_status: order.payment_status ?? "pending",
+    payment_provider: order.payment_provider ?? "",
+    payment_reference: order.payment_reference ?? "",
+    payment_channel: order.payment_channel ?? "",
+    payment_last4: order.payment_last4 ?? "",
+    paid_at: order.paid_at ?? null,
+    listing_title: order.listing_title || listingTitle || "Listing"
+  };
+}
+
 async function getSupabaseSellerRatings() {
   const supabase = await getSupabaseServerClient();
 
@@ -309,6 +351,22 @@ async function getSupabaseSellerRatings() {
     .order("created_at", { ascending: false });
 
   return (data as SellerRating[] | null) ?? [];
+}
+
+async function getSupabaseListingDeliveryDetailsForListing(listingId: string) {
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    return null;
+  }
+
+  const { data } = await supabase
+    .from("listing_delivery_details")
+    .select("*")
+    .eq("listing_id", listingId)
+    .maybeSingle();
+
+  return (data as ListingDeliveryDetails | null) ?? null;
 }
 
 function combineSellerMetrics(
@@ -351,10 +409,10 @@ async function getAllMarketplaceListings() {
       getDemoSellerRatings()
     ]);
     const normalizedDemoListings = demoListings.map((listing) => normalizeListing(listing));
-    const visibleListings = normalizedDemoListings.filter(
-      (listing) => listing.status === "approved" || listing.status === "sold"
+    const visibleListings = normalizedDemoListings.filter((listing) =>
+      isListingMarketplaceVisible(listing)
     );
-    return enrichMarketplaceListings([...visibleListings, ...seededMarketplaceListings], demoRatings).sort((left, right) =>
+    return enrichMarketplaceListings([...visibleListings, ...visibleSeededMarketplaceListings], demoRatings).sort((left, right) =>
       right.created_at.localeCompare(left.created_at)
     );
   }
@@ -364,16 +422,16 @@ async function getAllMarketplaceListings() {
       getSupabaseListings(),
       getSupabaseSellerRatings()
     ]);
-    const visibleListings = listings.filter(
-      (listing) => listing.status === "approved" || listing.status === "sold"
+    const visibleListings = listings.filter((listing) =>
+      isListingMarketplaceVisible(listing)
     );
-    const baseListings = visibleListings.length > 0 ? visibleListings : seededMarketplaceListings;
+    const baseListings = visibleListings.length > 0 ? visibleListings : visibleSeededMarketplaceListings;
 
     return enrichMarketplaceListings(baseListings, ratings).sort((left, right) =>
       right.created_at.localeCompare(left.created_at)
     );
   } catch {
-    return enrichMarketplaceListings(seededMarketplaceListings, []);
+    return enrichMarketplaceListings(visibleSeededMarketplaceListings, []);
   }
 }
 
@@ -467,26 +525,33 @@ export async function getSellerRatingState(sellerId: string, buyerId?: string | 
 
 export async function getSellerDashboardStats(profile: Profile): Promise<DashboardStat[]> {
   if (!hasSupabaseEnv) {
-    const listings = (await getDemoListings())
+    const [listings, orders] = await Promise.all([
+      getDemoListings(),
+      getDemoOrders()
+    ]);
+    const sellerListings = listings
       .map((listing) => normalizeListing(listing))
-      .filter(
-      (listing) => listing.seller_id === profile.id
+      .filter((listing) => listing.seller_id === profile.id);
+    const pendingOrders = orders.filter(
+      (order) => order.seller_id === profile.id && order.status === "pending"
     );
 
     return [
       {
         label: "Total Listings",
-        value: String(listings.length),
+        value: String(sellerListings.length),
         helper: "All account listings"
       },
       {
         label: "Active Listings",
-        value: String(listings.filter((listing) => listing.status === "approved").length),
+        value: String(
+          sellerListings.filter((listing) => listing.status === "approved").length
+        ),
         helper: "Approved and live"
       },
       {
         label: "Pending Orders",
-        value: "0",
+        value: String(pendingOrders.length),
         helper: "Orders awaiting action"
       },
       {
@@ -589,12 +654,44 @@ export async function getSellerListings(profile: Profile) {
   if (!hasSupabaseEnv) {
     return (await getDemoListings())
       .map((listing) => normalizeListing(listing))
-      .filter((listing) => listing.seller_id === profile.id);
+      .filter(
+        (listing) => listing.seller_id === profile.id && listing.status === "approved"
+      );
   }
 
   try {
     const listings = await getSupabaseListings();
-    return listings.filter((listing) => listing.seller_id === profile.id);
+    return listings.filter(
+      (listing) => listing.seller_id === profile.id && listing.status === "approved"
+    );
+  } catch {
+    return [];
+  }
+}
+
+export async function getSellerListingHistory(profile: Profile) {
+  const sortListings = (listings: Listing[]) =>
+    [...listings].sort((left, right) =>
+      getListingHistoryTimestamp(right).localeCompare(getListingHistoryTimestamp(left))
+    );
+
+  if (!hasSupabaseEnv) {
+    return sortListings(
+      (await getDemoListings())
+        .map((listing) => normalizeListing(listing))
+        .filter(
+          (listing) => listing.seller_id === profile.id && listing.status !== "approved"
+        )
+    );
+  }
+
+  try {
+    const listings = await getSupabaseListings();
+    return sortListings(
+      listings.filter(
+        (listing) => listing.seller_id === profile.id && listing.status !== "approved"
+      )
+    );
   } catch {
     return [];
   }
@@ -602,7 +699,17 @@ export async function getSellerListings(profile: Profile) {
 
 export async function getSellerOrders(profile: Profile) {
   if (!hasSupabaseEnv) {
-    return [] as Order[];
+    const [orders, listings] = await Promise.all([
+      getDemoOrders(),
+      getDemoListings()
+    ]);
+    const listingMap = new Map(
+      listings.map((listing) => [listing.id, listing.title])
+    );
+
+    return orders
+      .filter((order) => order.seller_id === profile.id)
+      .map((order) => normalizeOrder(order, listingMap.get(order.listing_id)));
   }
 
   try {
@@ -612,12 +719,119 @@ export async function getSellerOrders(profile: Profile) {
 
     return orders
       .filter((order) => order.seller_id === profile.id)
-      .map((order) => ({
-        ...order,
-        listing_title: listingMap.get(order.listing_id) ?? "Listing"
-      }));
+      .map((order) => normalizeOrder(order, listingMap.get(order.listing_id)));
   } catch {
     return [] as Order[];
+  }
+}
+
+export async function getBuyerOrders(profile: Profile) {
+  if (!hasSupabaseEnv) {
+    const [orders, listings] = await Promise.all([
+      getDemoOrders(),
+      getDemoListings()
+    ]);
+    const listingMap = new Map(
+      listings.map((listing) => [listing.id, listing.title])
+    );
+
+    return orders
+      .filter(
+        (order) =>
+          order.buyer_id === profile.id ||
+          order.buyer_email.toLowerCase() === profile.email.toLowerCase()
+      )
+      .map((order) => normalizeOrder(order, listingMap.get(order.listing_id)));
+  }
+
+  try {
+    const orders = await getSupabaseOrders();
+    const listings = await getSupabaseListings();
+    const listingMap = new Map(listings.map((listing) => [listing.id, listing.title]));
+
+    return orders
+      .filter(
+        (order) =>
+          order.buyer_id === profile.id ||
+          order.buyer_email.toLowerCase() === profile.email.toLowerCase()
+      )
+      .map((order) => normalizeOrder(order, listingMap.get(order.listing_id)));
+  } catch {
+    return [] as Order[];
+  }
+}
+
+export async function getBuyerOrderDetail(
+  profile: Profile,
+  orderId: string,
+  options?: { includeDeliveryDetails?: boolean }
+) {
+  const includeDeliveryDetails = options?.includeDeliveryDetails ?? false;
+
+  if (!hasSupabaseEnv) {
+    const demoOrders = await getDemoOrders();
+    const order = demoOrders.find(
+      (entry) =>
+        entry.id === orderId &&
+        (entry.buyer_id === profile.id ||
+          entry.buyer_email.toLowerCase() === profile.email.toLowerCase())
+    );
+
+    if (!order) {
+      return null as {
+        order: Order;
+        listing: Listing | null;
+        paymentConfirmed: boolean;
+        deliveryAvailable: boolean;
+        deliveryDetails: ListingDeliveryDetails | null;
+      } | null;
+    }
+
+    const listings = (await getDemoListings()).map((listing) => normalizeListing(listing));
+    const listing = listings.find((entry) => entry.id === order.listing_id) ?? null;
+    const paymentConfirmed = isOrderPaymentConfirmed(order.status);
+    const demoDeliveryDetails = paymentConfirmed
+      ? (await getDemoListingDeliveryDetails()).find((entry) => entry.listing_id === order.listing_id) ?? null
+      : null;
+
+    return {
+      order: normalizeOrder(order, listing?.title),
+      listing,
+      paymentConfirmed,
+      deliveryAvailable: Boolean(demoDeliveryDetails),
+      deliveryDetails: includeDeliveryDetails ? demoDeliveryDetails : null
+    };
+  }
+
+  try {
+    const orders = await getSupabaseOrders();
+    const order = orders.find(
+      (entry) =>
+        entry.id === orderId &&
+        (entry.buyer_id === profile.id ||
+          entry.buyer_email.toLowerCase() === profile.email.toLowerCase())
+    );
+
+    if (!order) {
+      return null;
+    }
+
+    const listings = await getSupabaseListings();
+    const listing = listings.find((entry) => entry.id === order.listing_id) ?? null;
+    const paymentConfirmed = isOrderPaymentConfirmed(order.status);
+    const deliveryDetails = paymentConfirmed
+      ? await getSupabaseListingDeliveryDetailsForListing(order.listing_id)
+      : null;
+
+    return {
+      order: normalizeOrder(order, listing?.title),
+      listing,
+      paymentConfirmed,
+      deliveryAvailable: Boolean(deliveryDetails),
+      deliveryDetails: includeDeliveryDetails ? deliveryDetails : null
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -832,11 +1046,36 @@ export async function getLatestSellerKycSubmission(sellerId: string) {
 
 export async function getAdminListingQueue() {
   if (!hasSupabaseEnv) {
-    return (await getDemoListings()).map((listing) => normalizeListing(listing));
+    return (await getDemoListings())
+      .map((listing) => normalizeListing(listing))
+      .filter((listing) => listing.status === "approved");
   }
 
   try {
-    return await getSupabaseListings();
+    const listings = await getSupabaseListings();
+    return listings.filter((listing) => listing.status === "approved");
+  } catch {
+    return [];
+  }
+}
+
+export async function getAdminListingHistory() {
+  const sortListings = (listings: Listing[]) =>
+    [...listings].sort((left, right) =>
+      getListingHistoryTimestamp(right).localeCompare(getListingHistoryTimestamp(left))
+    );
+
+  if (!hasSupabaseEnv) {
+    return sortListings(
+      (await getDemoListings())
+        .map((listing) => normalizeListing(listing))
+        .filter((listing) => listing.status !== "approved")
+    );
+  }
+
+  try {
+    const listings = await getSupabaseListings();
+    return sortListings(listings.filter((listing) => listing.status !== "approved"));
   } catch {
     return [];
   }
@@ -844,7 +1083,13 @@ export async function getAdminListingQueue() {
 
 export async function getAdminOrders() {
   if (!hasSupabaseEnv) {
-    return [] as Order[];
+    const [orders, listings] = await Promise.all([
+      getDemoOrders(),
+      getDemoListings()
+    ]);
+    const listingMap = new Map(listings.map((listing) => [listing.id, listing.title]));
+
+    return orders.map((order) => normalizeOrder(order, listingMap.get(order.listing_id)));
   }
 
   try {
@@ -852,10 +1097,7 @@ export async function getAdminOrders() {
     const listings = await getSupabaseListings();
     const listingMap = new Map(listings.map((listing) => [listing.id, listing.title]));
 
-    return orders.map((order) => ({
-      ...order,
-      listing_title: listingMap.get(order.listing_id) ?? "Listing"
-    }));
+    return orders.map((order) => normalizeOrder(order, listingMap.get(order.listing_id)));
   } catch {
     return [] as Order[];
   }

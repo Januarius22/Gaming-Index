@@ -10,6 +10,7 @@ export default async function MarketplacePage() {
       showViewAll={false}
       showHeader={false}
       enableSearch
+      itemsPerPage={9}
       className="pb-16 pt-6"
     />
   );

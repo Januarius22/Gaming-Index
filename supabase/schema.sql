@@ -100,7 +100,12 @@ create table if not exists public.listings (
   extra_notes text,
   image_names jsonb not null default '[]'::jsonb,
   image_paths jsonb not null default '[]'::jsonb,
-  status text not null default 'approved' check (status in ('draft', 'pending_review', 'approved', 'rejected', 'sold')),
+  sold_at timestamp with time zone,
+  withdrawn_at timestamp with time zone,
+  admin_note text not null default '',
+  admin_action_at timestamp with time zone,
+  admin_action_by uuid references public.profiles(id) on delete set null,
+  status text not null default 'approved' check (status in ('draft', 'pending_review', 'approved', 'rejected', 'sold', 'taken_down', 'withdrawn')),
   created_at timestamp with time zone not null default now()
 );
 
@@ -111,6 +116,11 @@ alter table public.listings add column if not exists seller_username text not nu
 alter table public.listings add column if not exists account_level text not null default '';
 alter table public.listings add column if not exists login_method text not null default '';
 alter table public.listings add column if not exists extra_notes text;
+alter table public.listings add column if not exists sold_at timestamp with time zone;
+alter table public.listings add column if not exists withdrawn_at timestamp with time zone;
+alter table public.listings add column if not exists admin_note text not null default '';
+alter table public.listings add column if not exists admin_action_at timestamp with time zone;
+alter table public.listings add column if not exists admin_action_by uuid references public.profiles(id) on delete set null;
 update public.listings as listing
 set
   seller_name = coalesce(profile.full_name, listing.seller_name, ''),
@@ -133,6 +143,13 @@ set
     when jsonb_array_length(image_paths) > 1 then jsonb_build_array(image_paths->0)
     else image_paths
   end;
+update public.listings
+set sold_at = created_at
+where status = 'sold'
+  and sold_at is null;
+alter table public.listings drop constraint if exists listings_status_check;
+alter table public.listings add constraint listings_status_check
+  check (status in ('draft', 'pending_review', 'approved', 'rejected', 'sold', 'taken_down', 'withdrawn'));
 alter table public.listings drop constraint if exists listings_image_names_single_item_check;
 alter table public.listings add constraint listings_image_names_single_item_check
   check (jsonb_typeof(image_names) = 'array' and jsonb_array_length(image_names) <= 1);
@@ -142,16 +159,69 @@ alter table public.listings add constraint listings_image_paths_single_item_chec
 alter table public.listings alter column status set default 'approved';
 update public.listings set status = 'approved' where status = 'pending_review';
 
-create table if not exists public.orders (
+create table if not exists public.listing_delivery_details (
   id uuid primary key default gen_random_uuid(),
-  buyer_name text not null,
-  buyer_email text not null,
+  listing_id uuid not null unique references public.listings(id) on delete cascade,
   seller_id uuid not null references public.profiles(id) on delete cascade,
-  listing_id uuid not null references public.listings(id) on delete cascade,
-  amount numeric not null,
-  status text not null default 'pending' check (status in ('pending', 'processing', 'completed', 'cancelled')),
+  account_login_id text not null,
+  account_password text not null,
+  recovery_details text not null default '',
+  transfer_note text not null default '',
+  ready_for_release_confirmed boolean not null default false,
+  not_personal_confirmed boolean not null default false,
   created_at timestamp with time zone not null default now()
 );
+
+alter table public.listing_delivery_details add column if not exists account_login_id text not null default '';
+alter table public.listing_delivery_details add column if not exists account_password text not null default '';
+alter table public.listing_delivery_details add column if not exists recovery_details text not null default '';
+alter table public.listing_delivery_details add column if not exists transfer_note text not null default '';
+alter table public.listing_delivery_details add column if not exists ready_for_release_confirmed boolean not null default false;
+alter table public.listing_delivery_details add column if not exists not_personal_confirmed boolean not null default false;
+alter table public.listing_delivery_details add column if not exists created_at timestamp with time zone not null default now();
+
+create table if not exists public.orders (
+  id uuid primary key default gen_random_uuid(),
+  buyer_id uuid references public.profiles(id) on delete cascade,
+  buyer_name text not null,
+  buyer_email text not null,
+  buyer_phone text not null default '',
+  seller_id uuid not null references public.profiles(id) on delete cascade,
+  listing_id uuid not null references public.listings(id) on delete cascade,
+  listing_title text not null default '',
+  amount numeric not null,
+  status text not null default 'pending' check (status in ('pending', 'processing', 'completed', 'cancelled')),
+  payment_status text not null default 'pending' check (payment_status in ('pending', 'successful', 'failed')),
+  payment_provider text not null default '',
+  payment_reference text not null default '',
+  payment_channel text not null default '',
+  payment_last4 text not null default '',
+  paid_at timestamp with time zone,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.orders add column if not exists buyer_id uuid references public.profiles(id) on delete cascade;
+alter table public.orders add column if not exists buyer_phone text not null default '';
+alter table public.orders add column if not exists listing_title text not null default '';
+alter table public.orders add column if not exists payment_status text not null default 'pending';
+alter table public.orders add column if not exists payment_provider text not null default '';
+alter table public.orders add column if not exists payment_reference text not null default '';
+alter table public.orders add column if not exists payment_channel text not null default '';
+alter table public.orders add column if not exists payment_last4 text not null default '';
+alter table public.orders add column if not exists paid_at timestamp with time zone;
+alter table public.orders drop constraint if exists orders_payment_status_check;
+alter table public.orders add constraint orders_payment_status_check
+  check (payment_status in ('pending', 'successful', 'failed'));
+update public.orders as order_row
+set buyer_id = profile.id
+from public.profiles as profile
+where order_row.buyer_id is null
+  and lower(profile.email) = lower(order_row.buyer_email);
+update public.orders as order_row
+set listing_title = coalesce(listing.title, order_row.listing_title, '')
+from public.listings as listing
+where order_row.listing_id = listing.id
+  and order_row.listing_title = '';
 
 create table if not exists public.seller_ratings (
   id uuid primary key default gen_random_uuid(),
@@ -203,6 +273,7 @@ create trigger on_auth_user_created
 alter table public.profiles enable row level security;
 alter table public.kyc_submissions enable row level security;
 alter table public.listings enable row level security;
+alter table public.listing_delivery_details enable row level security;
 alter table public.orders enable row level security;
 alter table public.seller_ratings enable row level security;
 
@@ -308,17 +379,141 @@ create policy "admins can delete any listing"
     )
   );
 
-create policy "authenticated users can read orders"
+drop policy if exists "sellers can insert their own listing delivery details" on public.listing_delivery_details;
+create policy "sellers can insert their own listing delivery details"
+  on public.listing_delivery_details
+  for insert
+  to authenticated
+  with check (auth.uid() = seller_id);
+
+drop policy if exists "sellers can read their own listing delivery details" on public.listing_delivery_details;
+create policy "sellers can read their own listing delivery details"
+  on public.listing_delivery_details
+  for select
+  to authenticated
+  using (auth.uid() = seller_id);
+
+drop policy if exists "buyers can read paid order delivery details" on public.listing_delivery_details;
+create policy "buyers can read paid order delivery details"
+  on public.listing_delivery_details
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.orders as buyer_order
+      join public.profiles as buyer_profile
+        on buyer_profile.email = buyer_order.buyer_email
+      where buyer_profile.id = auth.uid()
+        and buyer_order.listing_id = public.listing_delivery_details.listing_id
+        and buyer_order.status in ('processing', 'completed')
+    )
+  );
+
+drop policy if exists "admins can read any listing delivery details" on public.listing_delivery_details;
+create policy "admins can read any listing delivery details"
+  on public.listing_delivery_details
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "sellers can update their own listing delivery details" on public.listing_delivery_details;
+create policy "sellers can update their own listing delivery details"
+  on public.listing_delivery_details
+  for update
+  to authenticated
+  using (auth.uid() = seller_id)
+  with check (auth.uid() = seller_id);
+
+drop policy if exists "authenticated users can read orders" on public.orders;
+create policy "buyers sellers and admins can read relevant orders"
   on public.orders
   for select
   to authenticated
-  using (true);
+  using (
+    auth.uid() = buyer_id
+    or auth.uid() = seller_id
+    or exists (
+      select 1
+      from public.profiles as buyer_profile
+      where buyer_profile.id = auth.uid()
+        and lower(buyer_profile.email) = lower(public.orders.buyer_email)
+    )
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
 
-create policy "authenticated users can insert orders"
+drop policy if exists "authenticated users can insert orders" on public.orders;
+create policy "buyers can insert their own orders"
   on public.orders
   for insert
   to authenticated
-  with check (true);
+  with check (
+    auth.uid() = buyer_id
+    or exists (
+      select 1
+      from public.profiles as buyer_profile
+      where buyer_profile.id = auth.uid()
+        and lower(buyer_profile.email) = lower(public.orders.buyer_email)
+    )
+  );
+
+drop policy if exists "buyers can update their own orders" on public.orders;
+create policy "buyers can update their own orders"
+  on public.orders
+  for update
+  to authenticated
+  using (
+    auth.uid() = buyer_id
+    or exists (
+      select 1
+      from public.profiles as buyer_profile
+      where buyer_profile.id = auth.uid()
+        and lower(buyer_profile.email) = lower(public.orders.buyer_email)
+    )
+  )
+  with check (
+    auth.uid() = buyer_id
+    or exists (
+      select 1
+      from public.profiles as buyer_profile
+      where buyer_profile.id = auth.uid()
+        and lower(buyer_profile.email) = lower(public.orders.buyer_email)
+    )
+  );
+
+drop policy if exists "admins can update any order" on public.orders;
+create policy "admins can update any order"
+  on public.orders
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
 
 create policy "seller ratings readable by everyone"
   on public.seller_ratings

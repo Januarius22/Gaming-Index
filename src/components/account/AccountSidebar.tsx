@@ -9,6 +9,7 @@ import {
   PackageCheck,
   Settings,
   ShieldPlus,
+  ShoppingCart,
   Store,
   X
 } from "lucide-react";
@@ -36,7 +37,8 @@ export default function AccountSidebar({
     { href: "/account/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/account/marketplace", label: "Marketplace", icon: Store },
     { href: "/account/saved", label: "Saved Listings", icon: Bookmark },
-    { href: "/account/orders", label: "Orders", icon: PackageCheck },
+    { href: "/account/cart", label: "Cart", icon: ShoppingCart },
+    { href: "/account/orders", label: "Order History", icon: PackageCheck },
     {
       href: "/account/seller",
       label: profile.seller_enabled ? "Seller Center" : "Become a Seller",

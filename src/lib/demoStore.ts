@@ -6,7 +6,9 @@ import type {
   KycSubmission,
   KycStatus,
   Listing,
+  ListingDeliveryDetails,
   ListingStatus,
+  Order,
   Profile,
   SellerRating
 } from "@/types";
@@ -15,6 +17,8 @@ const SESSION_COOKIE = "gi_demo_session";
 const PROFILES_COOKIE = "gi_demo_profiles";
 const KYC_COOKIE = "gi_demo_kyc";
 const LISTINGS_COOKIE = "gi_demo_listings";
+const LISTING_DELIVERY_COOKIE = "gi_demo_listing_delivery";
+const ORDERS_COOKIE = "gi_demo_orders";
 const SELLER_RATINGS_COOKIE = "gi_demo_seller_ratings";
 
 function encode(value: unknown) {
@@ -299,6 +303,11 @@ export async function addDemoListing({
     image_paths: [],
     image_urls: [],
     status: "approved",
+    sold_at: null,
+    withdrawn_at: null,
+    admin_note: "",
+    admin_action_at: null,
+    admin_action_by: null,
     created_at: getNigeriaTimestamp()
   };
 
@@ -308,14 +317,121 @@ export async function addDemoListing({
 
 export async function updateDemoListingStatus(
   listingId: string,
-  status: Extract<ListingStatus, "approved" | "rejected">
+  status: Extract<
+    ListingStatus,
+    "approved" | "rejected" | "sold" | "taken_down" | "withdrawn"
+  >,
+  updates: Partial<Listing> = {}
 ) {
   const listings = await getDemoListings();
   const nextListings = listings.map((listing) =>
-    listing.id === listingId ? { ...listing, status } : listing
+    listing.id === listingId ? { ...listing, ...updates, status } : listing
   );
   await saveDemoListings(nextListings);
   return nextListings.find((listing) => listing.id === listingId) ?? null;
+}
+
+export async function getDemoListingDeliveryDetails() {
+  return readCookieArray<ListingDeliveryDetails>(LISTING_DELIVERY_COOKIE);
+}
+
+export async function saveDemoListingDeliveryDetails(
+  deliveryDetails: ListingDeliveryDetails[]
+) {
+  await writeCookieValue(LISTING_DELIVERY_COOKIE, deliveryDetails);
+}
+
+export async function addDemoListingDeliveryDetails({
+  listingId,
+  sellerId,
+  accountLoginId,
+  accountPassword,
+  recoveryDetails,
+  transferNote,
+  readyForReleaseConfirmed,
+  notPersonalConfirmed
+}: {
+  listingId: string;
+  sellerId: string;
+  accountLoginId: string;
+  accountPassword: string;
+  recoveryDetails: string;
+  transferNote: string;
+  readyForReleaseConfirmed: boolean;
+  notPersonalConfirmed: boolean;
+}) {
+  const deliveryDetails = await getDemoListingDeliveryDetails();
+  const nextDetails: ListingDeliveryDetails = {
+    id: crypto.randomUUID(),
+    listing_id: listingId,
+    seller_id: sellerId,
+    account_login_id: accountLoginId,
+    account_password: accountPassword,
+    recovery_details: recoveryDetails,
+    transfer_note: transferNote,
+    ready_for_release_confirmed: readyForReleaseConfirmed,
+    not_personal_confirmed: notPersonalConfirmed,
+    created_at: getNigeriaTimestamp()
+  };
+
+  await saveDemoListingDeliveryDetails([nextDetails, ...deliveryDetails]);
+  return nextDetails;
+}
+
+export async function getDemoOrders() {
+  return readCookieArray<Order>(ORDERS_COOKIE);
+}
+
+export async function saveDemoOrders(orders: Order[]) {
+  await writeCookieValue(ORDERS_COOKIE, orders);
+}
+
+export async function addDemoOrder(
+  order: Omit<Order, "id" | "created_at"> & Partial<Pick<Order, "id" | "created_at">>
+) {
+  const orders = await getDemoOrders();
+  const nextOrder: Order = {
+    id: order.id ?? crypto.randomUUID(),
+    created_at: order.created_at ?? getNigeriaTimestamp(),
+    buyer_id: order.buyer_id ?? null,
+    buyer_name: order.buyer_name,
+    buyer_email: order.buyer_email,
+    buyer_phone: order.buyer_phone ?? "",
+    seller_id: order.seller_id,
+    listing_id: order.listing_id,
+    listing_title: order.listing_title,
+    amount: order.amount,
+    status: order.status,
+    payment_status: order.payment_status ?? "pending",
+    payment_provider: order.payment_provider ?? "",
+    payment_reference: order.payment_reference ?? "",
+    payment_channel: order.payment_channel ?? "",
+    payment_last4: order.payment_last4 ?? "",
+    paid_at: order.paid_at ?? null
+  };
+
+  await saveDemoOrders([nextOrder, ...orders]);
+  return nextOrder;
+}
+
+export async function updateDemoOrder(orderId: string, updates: Partial<Order>) {
+  const orders = await getDemoOrders();
+  const current = orders.find((order) => order.id === orderId) ?? null;
+
+  if (!current) {
+    return null;
+  }
+
+  const nextOrder: Order = {
+    ...current,
+    ...updates
+  };
+
+  await saveDemoOrders(
+    orders.map((order) => (order.id === orderId ? nextOrder : order))
+  );
+
+  return nextOrder;
 }
 
 export async function removeDemoListing(listingId: string) {
@@ -327,6 +443,11 @@ export async function removeDemoListing(listingId: string) {
   }
 
   await saveDemoListings(listings.filter((listing) => listing.id !== listingId));
+
+  const deliveryDetails = await getDemoListingDeliveryDetails();
+  await saveDemoListingDeliveryDetails(
+    deliveryDetails.filter((detail) => detail.listing_id !== listingId)
+  );
 
   const ratings = await getDemoSellerRatings();
   await saveDemoSellerRatings(

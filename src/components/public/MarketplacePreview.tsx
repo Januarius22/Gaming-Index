@@ -4,12 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowUpRight, Heart, ShoppingCart, Star } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  addToCartAction,
   buyNowAction,
-  toggleSavedListingAction
+  toggleCartListingInlineAction,
+  toggleSavedListingInlineAction
 } from "@/actions/account";
+import { useAccountShellState } from "@/components/account/AccountShellContext";
+import FormMessage from "@/components/auth/FormMessage";
 import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
 import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
@@ -29,6 +31,8 @@ interface MarketplaceFilters {
   sortBy: string;
 }
 
+const emptyListingIds: string[] = [];
+
 const defaultFilters: MarketplaceFilters = {
   minPrice: "",
   maxPrice: "",
@@ -47,8 +51,9 @@ export default function MarketplacePreview({
   showHeader = true,
   enableSearch = false,
   context = "public",
-  savedListingIds = [],
-  cartListingIds = [],
+  savedListingIds = emptyListingIds,
+  cartListingIds = emptyListingIds,
+  itemsPerPage = 6,
   className
 }: {
   listings: Listing[];
@@ -60,24 +65,47 @@ export default function MarketplacePreview({
   context?: "public" | "account";
   savedListingIds?: string[];
   cartListingIds?: string[];
+  itemsPerPage?: number;
   className?: string;
 }) {
   const pathname = usePathname();
+  const accountShellState = useAccountShellState();
+  const [accountListings, setAccountListings] = useState(listings);
+  const [localSavedListingIds, setLocalSavedListingIds] = useState(savedListingIds);
+  const [localCartListingIds, setLocalCartListingIds] = useState(cartListingIds);
+  const [actionMessage, setActionMessage] = useState("");
+  const [pendingSavedListingIds, setPendingSavedListingIds] = useState<string[]>([]);
+  const [pendingCartListingIds, setPendingCartListingIds] = useState<string[]>([]);
   const [draftFilters, setDraftFilters] = useState(defaultFilters);
   const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
+  const [currentPage, setCurrentPage] = useState(1);
+  const sourceListings = context === "account" ? accountListings : listings;
+  const isSavedCollectionPage = context === "account" && pathname === "/account/saved";
+
+  useEffect(() => {
+    setAccountListings(listings);
+  }, [listings]);
+
+  useEffect(() => {
+    setLocalSavedListingIds(savedListingIds);
+  }, [savedListingIds]);
+
+  useEffect(() => {
+    setLocalCartListingIds(cartListingIds);
+  }, [cartListingIds]);
 
   const vendorOptions = Array.from(
-    listings.reduce((map, listing) => {
+    sourceListings.reduce((map, listing) => {
       map.set(listing.seller_username, listing.seller_name);
       return map;
     }, new Map<string, string>())
   ).sort(([leftUsername], [rightUsername]) => leftUsername.localeCompare(rightUsername));
 
-  const gameOptions = Array.from(new Set(listings.map((listing) => listing.game))).sort((left, right) =>
-    left.localeCompare(right)
+  const gameOptions = Array.from(new Set(sourceListings.map((listing) => listing.game))).sort(
+    (left, right) => left.localeCompare(right)
   );
   const platformOptions = Array.from(
-    new Set(listings.map((listing) => listing.platform))
+    new Set(sourceListings.map((listing) => listing.platform))
   ).sort((left, right) => left.localeCompare(right));
 
   const minPrice = draftFilters.minPrice ? Number(draftFilters.minPrice) : null;
@@ -103,18 +131,84 @@ export default function MarketplacePreview({
 
   const applyFilters = () => {
     setAppliedFilters({ ...draftFilters });
+    setCurrentPage(1);
   };
 
   const resetFilters = () => {
     setDraftFilters(defaultFilters);
     setAppliedFilters(defaultFilters);
+    setCurrentPage(1);
   };
 
   const hasActiveFilters = Object.entries(appliedFilters).some(
     ([key, value]) => value !== defaultFilters[key as keyof MarketplaceFilters]
   );
 
-  const filteredListings = listings.filter((listing) => {
+  const toggleCart = async (listingId: string) => {
+    const previousCartListingIds = localCartListingIds;
+    const wasInCart = previousCartListingIds.includes(listingId);
+
+    setActionMessage("");
+    setPendingCartListingIds((current) => [...current, listingId]);
+    setLocalCartListingIds(
+      wasInCart
+        ? previousCartListingIds.filter((entry) => entry !== listingId)
+        : [listingId, ...previousCartListingIds]
+    );
+
+    const result = await toggleCartListingInlineAction(listingId);
+
+    setPendingCartListingIds((current) => current.filter((entry) => entry !== listingId));
+
+    if (!result.ok) {
+      setLocalCartListingIds(previousCartListingIds);
+      setActionMessage(result.message);
+      return;
+    }
+
+    setLocalCartListingIds((current) =>
+      result.inCart
+        ? (current.includes(listingId) ? current : [listingId, ...current])
+        : current.filter((entry) => entry !== listingId)
+    );
+  };
+
+  const toggleSaved = async (listingId: string) => {
+    const previousSavedListingIds = localSavedListingIds;
+    const previousListings = accountListings;
+    const wasSaved = previousSavedListingIds.includes(listingId);
+
+    setActionMessage("");
+    setPendingSavedListingIds((current) => [...current, listingId]);
+    setLocalSavedListingIds(
+      wasSaved
+        ? previousSavedListingIds.filter((entry) => entry !== listingId)
+        : [listingId, ...previousSavedListingIds]
+    );
+
+    if (isSavedCollectionPage && wasSaved) {
+      setAccountListings((current) => current.filter((listing) => listing.id !== listingId));
+    }
+
+    const result = await toggleSavedListingInlineAction(listingId);
+
+    setPendingSavedListingIds((current) => current.filter((entry) => entry !== listingId));
+
+    if (!result.ok) {
+      setLocalSavedListingIds(previousSavedListingIds);
+      setAccountListings(previousListings);
+      setActionMessage(result.message);
+      return;
+    }
+
+    setLocalSavedListingIds((current) =>
+      result.saved
+        ? (current.includes(listingId) ? current : [listingId, ...current])
+        : current.filter((entry) => entry !== listingId)
+    );
+  };
+
+  const filteredListings = sourceListings.filter((listing) => {
     const appliedMinPrice = appliedFilters.minPrice ? Number(appliedFilters.minPrice) : null;
     const appliedMaxPrice = appliedFilters.maxPrice ? Number(appliedFilters.maxPrice) : null;
 
@@ -162,10 +256,30 @@ export default function MarketplacePreview({
         return right.created_at.localeCompare(left.created_at);
     }
   });
+  const safeItemsPerPage = Number.isFinite(itemsPerPage) && itemsPerPage > 0 ? Math.floor(itemsPerPage) : 6;
+  const totalPages = Math.max(1, Math.ceil(sortedListings.length / safeItemsPerPage));
+  const activePage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (activePage - 1) * safeItemsPerPage;
+  const paginatedListings = sortedListings.slice(pageStartIndex, pageStartIndex + safeItemsPerPage);
+  const accountGridClassName = accountShellState?.sidebarExpanded
+    ? "grid gap-5 md:grid-cols-2 xl:grid-cols-2"
+    : "grid gap-5 md:grid-cols-2 xl:grid-cols-3";
+  const gridClassName =
+    context === "account"
+      ? accountGridClassName
+      : "grid gap-5 md:grid-cols-2 xl:grid-cols-3";
+
+  useEffect(() => {
+    setCurrentPage((existingPage) => (existingPage > totalPages ? totalPages : existingPage));
+  }, [totalPages]);
 
   return (
     <section className={cn("px-4 py-18 sm:px-6 lg:px-8", className)}>
       <div className="mx-auto max-w-7xl space-y-8">
+        {context === "account" ? (
+          <FormMessage message={actionMessage} tone="error" />
+        ) : null}
+
         {showHeader ? (
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-3">
@@ -327,8 +441,9 @@ export default function MarketplacePreview({
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {sortedListings.map((listing, index) => (
+          <div className="space-y-5">
+            <div className={gridClassName}>
+            {paginatedListings.map((listing, index) => (
               <motion.div
                 key={listing.id}
                 initial={{ opacity: 0, y: 16 }}
@@ -342,11 +457,13 @@ export default function MarketplacePreview({
                     context === "account"
                       ? `/account/marketplace/${listing.id}`
                       : `/marketplace/${listing.id}`;
-                  const isSaved = savedListingIds.includes(listing.id);
-                  const isInCart = cartListingIds.includes(listing.id);
+                  const isSaved = localSavedListingIds.includes(listing.id);
+                  const isInCart = localCartListingIds.includes(listing.id);
                   const isSold = listing.status === "sold";
+                  const isSaving = pendingSavedListingIds.includes(listing.id);
+                  const isUpdatingCart = pendingCartListingIds.includes(listing.id);
                   const actionButtonBase =
-                    "inline-flex h-12 w-12 items-center justify-center rounded-2xl border transition duration-200 disabled:cursor-not-allowed disabled:opacity-60";
+                    "inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-2xl border transition duration-200 disabled:cursor-not-allowed disabled:opacity-60";
                   const cartButtonClassName = cn(
                     actionButtonBase,
                     isInCart
@@ -404,70 +521,70 @@ export default function MarketplacePreview({
                             </p>
                           </div>
 
-                          <div className="mt-auto flex items-end justify-between gap-4 border-t border-border/70 pt-5">
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium text-muted-foreground">
-                                @{listing.seller_username}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {listing.seller_reviews ?? 0}{" "}
-                                {(listing.seller_reviews ?? 0) === 1 ? "buyer rating" : "buyer ratings"}
-                              </p>
-                              <p className="font-heading text-[2.15rem] font-semibold leading-none text-foreground">
-                                {formatCurrency(listing.price)}
-                              </p>
-                            </div>
+                          <div className="mt-auto border-t border-border/70 pt-5">
+                            <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+                              <div className="min-w-0 space-y-2">
+                                <p className="text-sm font-medium text-muted-foreground">
+                                  @{listing.seller_username}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {listing.seller_reviews ?? 0}{" "}
+                                  {(listing.seller_reviews ?? 0) === 1 ? "buyer rating" : "buyer ratings"}
+                                </p>
+                                <p className="font-heading text-[2.15rem] font-semibold leading-none text-foreground">
+                                  {formatCurrency(listing.price)}
+                                </p>
+                              </div>
 
-                            <div className="w-[10.75rem] shrink-0 space-y-2">
-                              <div className="flex items-center gap-2">
-                                <form action={addToCartAction}>
+                              <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  disabled={isSold || isUpdatingCart}
+                                  aria-label={isInCart ? "Remove from cart" : "Add to cart"}
+                                  title={isInCart ? "Remove from cart" : "Add to cart"}
+                                  className={cartButtonClassName}
+                                  onClick={() => {
+                                    void toggleCart(listing.id);
+                                  }}
+                                >
+                                  <ShoppingCart
+                                    className="h-[18px] w-[18px] shrink-0"
+                                    strokeWidth={isInCart ? 2.75 : 2.35}
+                                  />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isSaving}
+                                  aria-label={isSaved ? "Remove from saved listings" : "Save for later"}
+                                  title={isSaved ? "Saved for later" : "Save for later"}
+                                  className={saveButtonClassName}
+                                  onClick={() => {
+                                    void toggleSaved(listing.id);
+                                  }}
+                                >
+                                  <Heart
+                                    className={`h-[18px] w-[18px] shrink-0 ${isSaved ? "fill-current" : ""}`}
+                                    strokeWidth={isSaved ? 2.75 : 2.35}
+                                  />
+                                </button>
+                                <form action={buyNowAction} className="min-w-[10.25rem] flex-1">
                                   <input type="hidden" name="listingId" value={listing.id} />
                                   <input type="hidden" name="returnTo" value={pathname} />
                                   <button
                                     type="submit"
                                     disabled={isSold}
-                                    aria-label={isInCart ? "Remove from cart" : "Add to cart"}
-                                    title={isInCart ? "Remove from cart" : "Add to cart"}
-                                    className={cartButtonClassName}
+                                    className={buttonClassName({
+                                      variant: isSold ? "secondary" : "primary",
+                                      size: "md",
+                                      className:
+                                        "w-full justify-center rounded-2xl whitespace-nowrap px-5"
+                                    })}
                                   >
-                                    <ShoppingCart
-                                      className="h-[18px] w-[18px] shrink-0"
-                                      strokeWidth={isInCart ? 2.75 : 2.35}
-                                    />
-                                  </button>
-                                </form>
-                                <form action={toggleSavedListingAction}>
-                                  <input type="hidden" name="listingId" value={listing.id} />
-                                  <input type="hidden" name="returnTo" value={pathname} />
-                                  <button
-                                    type="submit"
-                                    aria-label={isSaved ? "Remove from saved listings" : "Save for later"}
-                                    title={isSaved ? "Saved for later" : "Save for later"}
-                                    className={saveButtonClassName}
-                                  >
-                                    <Heart
-                                      className={`h-[18px] w-[18px] shrink-0 ${isSaved ? "fill-current" : ""}`}
-                                      strokeWidth={isSaved ? 2.75 : 2.35}
-                                    />
+                                    {isSold ? "Sold Out" : "Buy Now"}
+                                    <ArrowUpRight className="h-4 w-4 shrink-0" />
                                   </button>
                                 </form>
                               </div>
-                              <form action={buyNowAction}>
-                                <input type="hidden" name="listingId" value={listing.id} />
-                                <button
-                                  type="submit"
-                                  disabled={isSold}
-                                  className={buttonClassName({
-                                    variant: isSold ? "secondary" : "primary",
-                                    size: "md",
-                                    className:
-                                      "w-full justify-center rounded-2xl whitespace-nowrap px-5"
-                                  })}
-                                >
-                                  {isSold ? "Sold Out" : "Buy Now"}
-                                  <ArrowUpRight className="h-4 w-4 shrink-0" />
-                                </button>
-                              </form>
                             </div>
                           </div>
                         </CardContent>
@@ -550,6 +667,71 @@ export default function MarketplacePreview({
                 })()}
               </motion.div>
             ))}
+          </div>
+            {totalPages > 1 ? (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Showing {sortedListings.length === 0 ? 0 : pageStartIndex + 1}-
+                  {Math.min(pageStartIndex + safeItemsPerPage, sortedListings.length)} of{" "}
+                  {sortedListings.length} listings
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    disabled={activePage === 1}
+                    className={buttonClassName({
+                      variant: "secondary",
+                      size: "sm",
+                      className: "disabled:cursor-not-allowed disabled:opacity-60"
+                    })}
+                  >
+                    Previous
+                  </button>
+                  {Array.from({ length: totalPages }, (_, index) => index + 1)
+                    .filter(
+                      (pageNumber) =>
+                        Math.abs(pageNumber - activePage) <= 2 ||
+                        pageNumber === 1 ||
+                        pageNumber === totalPages
+                    )
+                    .map((pageNumber, index, visiblePages) => {
+                      const previousPage = visiblePages[index - 1];
+                      const showGap = previousPage && pageNumber - previousPage > 1;
+
+                      return (
+                        <div key={pageNumber} className="flex items-center gap-2">
+                          {showGap ? (
+                            <span className="px-1 text-sm text-muted-foreground">...</span>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => setCurrentPage(pageNumber)}
+                            className={buttonClassName({
+                              variant: pageNumber === activePage ? "primary" : "secondary",
+                              size: "sm"
+                            })}
+                          >
+                            {pageNumber}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    disabled={activePage === totalPages}
+                    className={buttonClassName({
+                      variant: "secondary",
+                      size: "sm",
+                      className: "disabled:cursor-not-allowed disabled:opacity-60"
+                    })}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </div>

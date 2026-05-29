@@ -8,6 +8,7 @@ import SubmitButton from "@/components/auth/SubmitButton";
 import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
+import PasswordInput from "@/components/ui/PasswordInput";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import { gameOptions, loginMethodOptions, platformOptions } from "@/lib/utils";
@@ -148,9 +149,104 @@ export default function SellerUploadForm({
             </div>
             <div className="space-y-2">
               <label htmlFor="extraNotes" className="text-sm font-semibold text-foreground">
-                Extra Notes
+                Extra Notes <span className="font-normal text-muted-foreground">(Optional)</span>
               </label>
               <Input id="extraNotes" name="extraNotes" placeholder="Any extra notes for buyers" />
+            </div>
+          </div>
+
+          <div className="space-y-5 rounded-[30px] border border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,250,235,0.95),rgba(255,255,255,0.98))] p-6">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700">
+                Private delivery details
+              </p>
+              <h3 className="font-heading text-2xl font-semibold text-foreground">
+                These details stay hidden from the marketplace.
+              </h3>
+              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+                Enter the login details that should only be released to the buyer after successful
+                payment. Do not use a personal inbox or private login you still want to keep for
+                yourself. If possible, switch the account to a transfer-safe email before
+                publishing.
+              </p>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="deliveryLoginId" className="text-sm font-semibold text-foreground">
+                  Account login email or username
+                </label>
+                <Input
+                  id="deliveryLoginId"
+                  name="deliveryLoginId"
+                  placeholder="login@example.com or account username"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="deliveryPassword" className="text-sm font-semibold text-foreground">
+                  Account password
+                </label>
+                <PasswordInput
+                  id="deliveryPassword"
+                  name="deliveryPassword"
+                  placeholder="Password the buyer will receive"
+                  required
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label htmlFor="deliveryRecoveryInfo" className="text-sm font-semibold text-foreground">
+                  Recovery details or backup codes{" "}
+                  <span className="font-normal text-muted-foreground">(Optional)</span>
+                </label>
+                <Textarea
+                  id="deliveryRecoveryInfo"
+                  name="deliveryRecoveryInfo"
+                  className="min-h-28"
+                  placeholder="Add linked recovery info, backup codes, or any access steps the buyer may need."
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label htmlFor="deliveryTransferNote" className="text-sm font-semibold text-foreground">
+                  Transfer note for the buyer{" "}
+                  <span className="font-normal text-muted-foreground">(Optional)</span>
+                </label>
+                <Textarea
+                  id="deliveryTransferNote"
+                  name="deliveryTransferNote"
+                  className="min-h-24"
+                  placeholder="Example: log in first, then change password and recovery email immediately."
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              <label className="flex items-start gap-3 rounded-2xl border border-amber-200/80 bg-white/85 px-4 py-3 text-sm text-foreground shadow-sm">
+                <input
+                  type="checkbox"
+                  name="deliveryReleaseConfirmed"
+                  value="yes"
+                  required
+                  className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                />
+                <span>
+                  I understand these private delivery details will be released to the buyer after a
+                  successful payment flow.
+                </span>
+              </label>
+              <label className="flex items-start gap-3 rounded-2xl border border-amber-200/80 bg-white/85 px-4 py-3 text-sm text-foreground shadow-sm">
+                <input
+                  type="checkbox"
+                  name="deliveryNotPersonalConfirmed"
+                  value="yes"
+                  required
+                  className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                />
+                <span>
+                  I confirm I am not submitting a personal inbox or private login I still want to
+                  keep for myself outside this sale.
+                </span>
+              </label>
             </div>
           </div>
 

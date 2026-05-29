@@ -89,6 +89,7 @@ export default async function AccountSavedPage({
           context="account"
           savedListingIds={savedListingIds}
           cartListingIds={cartListingIds}
+          itemsPerPage={6}
           className="pb-0 pt-0"
         />
       )}

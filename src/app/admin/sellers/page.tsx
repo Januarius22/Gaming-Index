@@ -1,10 +1,25 @@
 import Badge from "@/components/ui/Badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import PaginationControls from "@/components/ui/PaginationControls";
 import { getAdminSellers } from "@/lib/data";
-import { formatDate, statusVariant } from "@/lib/utils";
+import { formatDate, paginateItems, parsePageParam, statusVariant } from "@/lib/utils";
 
-export default async function AdminSellersPage() {
+export default async function AdminSellersPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ page?: string }>;
+}) {
   const sellers = await getAdminSellers();
+  const params = (await searchParams) ?? {};
+  const requestedPage = parsePageParam(params.page);
+  const {
+    items: paginatedSellers,
+    currentPage,
+    totalPages,
+    totalCount,
+    pageStart,
+    pageEnd
+  } = paginateItems(sellers, requestedPage, 10);
 
   return (
     <Card>
@@ -14,7 +29,17 @@ export default async function AdminSellersPage() {
           Users who unlocked seller tools, their verification posture, and onboarding recency.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {pageStart}-{pageEnd} of {totalCount} sellers
+          </p>
+          <PaginationControls
+            pathname="/admin/sellers"
+            currentPage={currentPage}
+            totalPages={totalPages}
+          />
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -34,7 +59,7 @@ export default async function AdminSellersPage() {
                   </td>
                 </tr>
               ) : (
-                sellers.map((seller) => (
+                paginatedSellers.map((seller) => (
                   <tr key={seller.id} className="border-b border-border/60">
                     <td className="px-4 py-4 font-medium text-foreground">{seller.full_name}</td>
                     <td className="px-4 py-4">@{seller.username}</td>

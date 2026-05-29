@@ -95,8 +95,7 @@ export default function SellerKycPanel({
         <CardHeader>
           <CardTitle>Complete your KYC verification to unlock selling features.</CardTitle>
           <CardDescription>
-            You can skip this step for now, but you must complete and get approved before
-            uploading any gaming account.
+            Complete and get approved before uploading any gaming account to the marketplace.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -116,11 +115,6 @@ export default function SellerKycPanel({
             <Button onClick={() => setOpen(true)} disabled={!canStartKyc}>
               {ctaLabel}
             </Button>
-            <a href="/seller/dashboard">
-              <Button variant="secondary">
-                {profile.kyc_status === "pending" ? "Back to Dashboard" : "Skip for Now"}
-              </Button>
-            </a>
           </div>
         </CardContent>
       </Card>

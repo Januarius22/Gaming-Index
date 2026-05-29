@@ -1,12 +1,27 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import PaginationControls from "@/components/ui/PaginationControls";
 import { getSellerOrders } from "@/lib/data";
 import { requireSellerProfile } from "@/lib/auth";
-import { formatCurrency, formatDate, statusVariant } from "@/lib/utils";
+import { formatCurrency, formatDate, paginateItems, parsePageParam, statusVariant } from "@/lib/utils";
 import Badge from "@/components/ui/Badge";
 
-export default async function SellerOrdersPage() {
+export default async function SellerOrdersPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ page?: string }>;
+}) {
   const profile = await requireSellerProfile();
   const orders = await getSellerOrders(profile);
+  const params = (await searchParams) ?? {};
+  const requestedPage = parsePageParam(params.page);
+  const {
+    items: paginatedOrders,
+    currentPage,
+    totalPages,
+    totalCount,
+    pageStart,
+    pageEnd
+  } = paginateItems(orders, requestedPage, 10);
 
   return (
     <Card>
@@ -14,7 +29,17 @@ export default async function SellerOrdersPage() {
         <CardTitle>Orders</CardTitle>
         <CardDescription>Track buyer orders connected to your approved gaming accounts.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {pageStart}-{pageEnd} of {totalCount} orders
+          </p>
+          <PaginationControls
+            pathname="/seller/orders"
+            currentPage={currentPage}
+            totalPages={totalPages}
+          />
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -35,7 +60,7 @@ export default async function SellerOrdersPage() {
                   </td>
                 </tr>
               ) : (
-                orders.map((order) => (
+                paginatedOrders.map((order) => (
                   <tr key={order.id} className="border-b border-border/60">
                     <td className="px-4 py-4 font-medium text-foreground">{order.id.slice(0, 8)}</td>
                     <td className="px-4 py-4">{order.buyer_name}</td>

@@ -1,10 +1,25 @@
 import Badge from "@/components/ui/Badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import PaginationControls from "@/components/ui/PaginationControls";
 import { getAdminOrders } from "@/lib/data";
-import { formatCurrency, formatDate, statusVariant } from "@/lib/utils";
+import { formatCurrency, formatDate, paginateItems, parsePageParam, statusVariant } from "@/lib/utils";
 
-export default async function AdminOrdersPage() {
+export default async function AdminOrdersPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ page?: string }>;
+}) {
   const orders = await getAdminOrders();
+  const params = (await searchParams) ?? {};
+  const requestedPage = parsePageParam(params.page);
+  const {
+    items: paginatedOrders,
+    currentPage,
+    totalPages,
+    totalCount,
+    pageStart,
+    pageEnd
+  } = paginateItems(orders, requestedPage, 10);
 
   return (
     <Card>
@@ -12,7 +27,17 @@ export default async function AdminOrdersPage() {
         <CardTitle>Orders</CardTitle>
         <CardDescription>Marketplace transaction records will appear here as payment logic is expanded.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {pageStart}-{pageEnd} of {totalCount} orders
+          </p>
+          <PaginationControls
+            pathname="/admin/orders"
+            currentPage={currentPage}
+            totalPages={totalPages}
+          />
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -33,7 +58,7 @@ export default async function AdminOrdersPage() {
                   </td>
                 </tr>
               ) : (
-                orders.map((order) => (
+                paginatedOrders.map((order) => (
                   <tr key={order.id} className="border-b border-border/60">
                     <td className="px-4 py-4 font-medium text-foreground">{order.id.slice(0, 8)}</td>
                     <td className="px-4 py-4">{order.buyer_name}</td>

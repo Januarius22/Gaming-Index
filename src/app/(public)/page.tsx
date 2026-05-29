@@ -1,15 +1,15 @@
 import HeroSection from "@/components/public/HeroSection";
 import HowItWorks from "@/components/public/HowItWorks";
 import MarketplacePreview from "@/components/public/MarketplacePreview";
-import { getMarketplaceListings } from "@/lib/data";
+import { getMarketplaceCatalog } from "@/lib/data";
 
 export default async function HomePage() {
-  const listings = await getMarketplaceListings();
+  const listings = await getMarketplaceCatalog();
 
   return (
     <>
       <HeroSection />
-      <MarketplacePreview listings={listings} className="pt-16 lg:pt-20" />
+      <MarketplacePreview listings={listings} itemsPerPage={3} className="pt-16 lg:pt-20" />
       <HowItWorks />
     </>
   );

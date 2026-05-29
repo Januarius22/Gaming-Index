@@ -10,8 +10,15 @@ export default function PublicFooter() {
             tagline="Buy and sell verified gaming accounts safely."
             markClassName="h-10 w-10"
           />
+          <p className="max-w-md text-sm leading-6 text-muted-foreground">
+            Marketplace workflows, seller verification, and buyer account tools built for account
+            trading teams that want clearer trust signals.
+          </p>
+          <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+            © 2026 Gaming Index
+          </p>
         </div>
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
           <div className="space-y-3">
             <p className="text-sm font-semibold text-foreground">Explore</p>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
@@ -32,6 +39,13 @@ export default function PublicFooter() {
               <p>Seller onboarding</p>
               <p>Admin reviews</p>
               <p>Verified listings</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-foreground">Legal</p>
+            <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+              <Link href="/privacy-policy">Privacy Policy</Link>
+              <Link href="/terms">Terms &amp; Conditions</Link>
             </div>
           </div>
         </div>

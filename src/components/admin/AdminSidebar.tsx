@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   FileCheck2,
+  History,
   LayoutDashboard,
   ListOrdered,
   LogOut,
@@ -25,6 +26,7 @@ const navItems = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/sellers", label: "Sellers", icon: UserSquare2 },
   { href: "/admin/listings", label: "Listings", icon: Store },
+  { href: "/admin/listing-history", label: "Listing History", icon: History },
   { href: "/admin/kyc", label: "KYC Reviews", icon: FileCheck2 },
   { href: "/admin/orders", label: "Orders", icon: ListOrdered },
   { href: "/admin/disputes", label: "Disputes", icon: ShieldAlert },

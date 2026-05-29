@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { AccountShellProvider } from "@/components/account/AccountShellContext";
 import AccountSidebar from "@/components/account/AccountSidebar";
 import AccountTopbar from "@/components/account/AccountTopbar";
 import { cn } from "@/lib/utils";
@@ -49,80 +50,87 @@ export default function AccountShell({
   const sidebarExpanded = !collapsed || (supportsHoverPreview && hoverPreviewOpen);
 
   return (
-    <div className="min-h-screen bg-surface">
-      <div className="flex min-h-screen">
-        <div
-          className={cn(
-            "hidden shrink-0 transition-[width] duration-300 ease-in-out lg:block",
-            sidebarExpanded ? "w-80" : "w-24"
-          )}
-          onMouseEnter={() => {
-            if (collapsed && supportsHoverPreview) {
-              setHoverPreviewOpen(true);
-            }
-          }}
-          onMouseLeave={() => {
-            if (collapsed) {
-              setHoverPreviewOpen(false);
-            }
-          }}
-          onFocusCapture={() => {
-            if (collapsed && supportsHoverPreview) {
-              setHoverPreviewOpen(true);
-            }
-          }}
-          onBlurCapture={(event) => {
-            if (
-              collapsed &&
-              !event.currentTarget.contains(event.relatedTarget as Node | null)
-            ) {
-              setHoverPreviewOpen(false);
-            }
-          }}
-        >
+    <AccountShellProvider
+      value={{
+        sidebarExpanded,
+        sidebarCollapsed: !sidebarExpanded
+      }}
+    >
+      <div className="min-h-screen bg-surface">
+        <div className="flex min-h-screen">
           <div
             className={cn(
-              "fixed inset-y-0 overflow-y-auto transition-[width] duration-300 ease-in-out",
+              "hidden shrink-0 transition-[width] duration-300 ease-in-out lg:block",
               sidebarExpanded ? "w-80" : "w-24"
             )}
+            onMouseEnter={() => {
+              if (collapsed && supportsHoverPreview) {
+                setHoverPreviewOpen(true);
+              }
+            }}
+            onMouseLeave={() => {
+              if (collapsed) {
+                setHoverPreviewOpen(false);
+              }
+            }}
+            onFocusCapture={() => {
+              if (collapsed && supportsHoverPreview) {
+                setHoverPreviewOpen(true);
+              }
+            }}
+            onBlurCapture={(event) => {
+              if (
+                collapsed &&
+                !event.currentTarget.contains(event.relatedTarget as Node | null)
+              ) {
+                setHoverPreviewOpen(false);
+              }
+            }}
           >
-            <AccountSidebar profile={profile} collapsed={!sidebarExpanded} />
+            <div
+              className={cn(
+                "fixed inset-y-0 overflow-y-auto transition-[width] duration-300 ease-in-out",
+                sidebarExpanded ? "w-80" : "w-24"
+              )}
+            >
+              <AccountSidebar profile={profile} collapsed={!sidebarExpanded} />
+            </div>
+          </div>
+
+          <AnimatePresence>
+            {open ? (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 bg-slate-950/35 lg:hidden"
+                onClick={() => setOpen(false)}
+              >
+                <motion.div
+                  initial={{ x: "-100%" }}
+                  animate={{ x: 0 }}
+                  exit={{ x: "-100%" }}
+                  transition={{ duration: 0.22 }}
+                  className="h-full w-[84%] max-w-xs overflow-y-auto"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <AccountSidebar profile={profile} mobile onNavigate={() => setOpen(false)} />
+                </motion.div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+
+          <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+            <AccountTopbar
+              profile={profile}
+              collapsed={collapsed}
+              onCollapseToggle={toggleCollapsed}
+              onMenuClick={() => setOpen(true)}
+            />
+            <div className="flex-1 px-4 py-6 sm:px-6">{children}</div>
           </div>
         </div>
-
-        <AnimatePresence>
-          {open ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-slate-950/35 lg:hidden"
-              onClick={() => setOpen(false)}
-            >
-              <motion.div
-                initial={{ x: "-100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "-100%" }}
-                transition={{ duration: 0.22 }}
-                className="h-full w-[84%] max-w-xs overflow-y-auto"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <AccountSidebar profile={profile} mobile onNavigate={() => setOpen(false)} />
-              </motion.div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-
-        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-          <AccountTopbar
-            profile={profile}
-            collapsed={collapsed}
-            onCollapseToggle={toggleCollapsed}
-            onMenuClick={() => setOpen(true)}
-          />
-          <div className="flex-1 px-4 py-6 sm:px-6">{children}</div>
-        </div>
       </div>
-    </div>
+    </AccountShellProvider>
   );
 }

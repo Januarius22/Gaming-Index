@@ -5,13 +5,14 @@ import { redirect } from "next/navigation";
 import { requireSellerProfile } from "@/lib/auth";
 import {
   addDemoKycSubmission,
+  addDemoListingDeliveryDetails,
   addDemoListing,
   getDemoListings,
-  removeDemoListing
+  updateDemoListingStatus
 } from "@/lib/demoStore";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
-import { isValidPhoneNumber } from "@/lib/utils";
+import { getNigeriaTimestamp, isValidPhoneNumber } from "@/lib/utils";
 import type { KycActionState, ListingActionState, Profile } from "@/types";
 
 const KYC_STORAGE_BUCKET = "kyc-documents";
@@ -173,16 +174,19 @@ async function uploadListingAsset({
 }
 
 function getListingRemovalRedirectPath(
-  notice: "listing-removed" | "listing-remove-failed",
+  basePath: string,
+  notice: "listing-withdrawn" | "listing-withdraw-failed",
   errorMessage?: string
 ) {
-  const searchParams = new URLSearchParams({ notice });
+  const [pathname, existingQuery = ""] = basePath.split("?");
+  const searchParams = new URLSearchParams(existingQuery);
+  searchParams.set("notice", notice);
 
   if (errorMessage) {
     searchParams.set("error", errorMessage);
   }
 
-  return `/seller/listings?${searchParams.toString()}`;
+  return `${pathname}?${searchParams.toString()}`;
 }
 
 export async function saveKycSubmission({
@@ -450,6 +454,14 @@ export async function saveListingSubmission({
   const accountLevel = String(formData.get("accountLevel") ?? "").trim();
   const loginMethod = String(formData.get("loginMethod") ?? "").trim();
   const extraNotes = String(formData.get("extraNotes") ?? "").trim();
+  const deliveryLoginId = String(formData.get("deliveryLoginId") ?? "").trim();
+  const deliveryPassword = String(formData.get("deliveryPassword") ?? "").trim();
+  const deliveryRecoveryInfo = String(formData.get("deliveryRecoveryInfo") ?? "").trim();
+  const deliveryTransferNote = String(formData.get("deliveryTransferNote") ?? "").trim();
+  const deliveryReleaseConfirmed =
+    String(formData.get("deliveryReleaseConfirmed") ?? "").trim() === "yes";
+  const deliveryNotPersonalConfirmed =
+    String(formData.get("deliveryNotPersonalConfirmed") ?? "").trim() === "yes";
   const price = Number(formData.get("price") ?? 0);
   const listingImageEntries = formData.getAll("listingImage");
   const listingImageFiles = listingImageEntries
@@ -468,6 +480,20 @@ export async function saveListingSubmission({
     return {
       status: "error",
       message: "Please complete all required listing fields."
+    };
+  }
+
+  if (!deliveryLoginId || !deliveryPassword) {
+    return {
+      status: "error",
+      message: "Please complete the private delivery login and password fields."
+    };
+  }
+
+  if (!deliveryReleaseConfirmed || !deliveryNotPersonalConfirmed) {
+    return {
+      status: "error",
+      message: "Please confirm the private delivery release warnings before publishing."
     };
   }
 
@@ -528,7 +554,9 @@ export async function saveListingSubmission({
       };
     }
 
-    const { error } = await supabase!.from("listings").insert({
+    const { data: createdListing, error } = await supabase!
+      .from("listings")
+      .insert({
       seller_id: seller.id,
       seller_name: seller.full_name,
       seller_username: seller.username,
@@ -543,12 +571,44 @@ export async function saveListingSubmission({
       image_names: [uploadedImage.name],
       image_paths: [uploadedImage.path],
       status: "approved"
-    });
+      })
+      .select("id")
+      .maybeSingle();
 
     if (error) {
       return {
         status: "error",
         message: error.message
+      };
+    }
+
+    if (!createdListing?.id) {
+      return {
+        status: "error",
+        message: "Listing was created without an ID. Please try again."
+      };
+    }
+
+    const { error: deliveryInsertError } = await supabase!
+      .from("listing_delivery_details")
+      .insert({
+        listing_id: createdListing.id,
+        seller_id: seller.id,
+        account_login_id: deliveryLoginId,
+        account_password: deliveryPassword,
+        recovery_details: deliveryRecoveryInfo,
+        transfer_note: deliveryTransferNote,
+        ready_for_release_confirmed: deliveryReleaseConfirmed,
+        not_personal_confirmed: deliveryNotPersonalConfirmed
+      });
+
+    if (deliveryInsertError) {
+      await supabase!.from("listings").delete().eq("id", createdListing.id).eq("seller_id", seller.id);
+      await supabase!.storage.from(LISTING_STORAGE_BUCKET).remove([uploadedImage.path]);
+
+      return {
+        status: "error",
+        message: `Private delivery details could not be saved: ${deliveryInsertError.message}`
       };
     }
 
@@ -560,11 +620,11 @@ export async function saveListingSubmission({
 
     return {
       status: "success",
-      message: "Listing published successfully and is now live in the marketplace."
+      message: "Listing published successfully. Private delivery details were saved separately."
     };
   }
 
-  await addDemoListing({
+  const demoListing = await addDemoListing({
     seller,
     game,
     title,
@@ -577,6 +637,17 @@ export async function saveListingSubmission({
     imageNames: [listingImageFile.name.trim()]
   });
 
+  await addDemoListingDeliveryDetails({
+    listingId: demoListing.id,
+    sellerId: seller.id,
+    accountLoginId: deliveryLoginId,
+    accountPassword: deliveryPassword,
+    recoveryDetails: deliveryRecoveryInfo,
+    transferNote: deliveryTransferNote,
+    readyForReleaseConfirmed: deliveryReleaseConfirmed,
+    notPersonalConfirmed: deliveryNotPersonalConfirmed
+  });
+
   revalidatePath("/seller/listings");
   revalidatePath("/seller/dashboard");
   revalidatePath("/admin/listings");
@@ -585,90 +656,101 @@ export async function saveListingSubmission({
 
   return {
     status: "success",
-    message: "Listing published successfully and is now live in the marketplace."
+    message: "Listing published successfully. Private delivery details were saved separately."
   };
 }
 
-export async function deleteOwnListingAction(formData: FormData) {
+export async function withdrawOwnListingAction(formData: FormData) {
   const seller = await requireSellerProfile();
   const listingId = String(formData.get("listingId") ?? "").trim();
+  const returnTo = String(formData.get("returnTo") ?? "").trim();
+  const safeReturnTo = returnTo.startsWith("/seller/") ? returnTo : "/seller/listings";
+  const withdrawnAt = getNigeriaTimestamp();
 
   if (!listingId) {
-    redirect(getListingRemovalRedirectPath("listing-remove-failed"));
+    redirect(getListingRemovalRedirectPath(safeReturnTo, "listing-withdraw-failed"));
   }
 
   if (hasSupabaseEnv) {
     const supabase = await getSupabaseServerClient();
     const { data: listing, error: listingError } = await supabase!
       .from("listings")
-      .select("id, image_paths")
+      .select("id, status")
       .eq("id", listingId)
       .eq("seller_id", seller.id)
       .maybeSingle();
 
     if (listingError || !listing) {
-      redirect(getListingRemovalRedirectPath("listing-remove-failed"));
+      redirect(getListingRemovalRedirectPath(safeReturnTo, "listing-withdraw-failed"));
     }
 
-    const imagePaths = Array.isArray(listing.image_paths)
-      ? listing.image_paths.filter(
-          (path): path is string => typeof path === "string" && path.length > 0
-        )
-      : [];
-
-    const {
-      data: deletedListing,
-      error: deleteError
-    } = await supabase!
+    const { data: updatedListing, error: updateError } = await supabase!
       .from("listings")
-      .delete()
+      .update({
+        status: "withdrawn",
+        withdrawn_at: withdrawnAt
+      })
       .eq("id", listingId)
       .eq("seller_id", seller.id)
+      .eq("status", "approved")
       .select("id")
       .maybeSingle();
 
-    if (deleteError) {
-      console.error("Seller listing delete failed", {
+    if (updateError) {
+      console.error("Seller listing withdraw failed", {
         listingId,
         sellerId: seller.id,
-        error: deleteError.message
+        error: updateError.message
       });
-      redirect(getListingRemovalRedirectPath("listing-remove-failed", deleteError.message));
-    }
-
-    if (!deletedListing) {
       redirect(
         getListingRemovalRedirectPath(
-          "listing-remove-failed",
-          "Supabase blocked the delete. Apply the latest listing delete policies from supabase/schema.sql."
+          safeReturnTo,
+          "listing-withdraw-failed",
+          updateError.message
         )
       );
     }
 
-    if (imagePaths.length > 0) {
-      await supabase!.storage.from(LISTING_STORAGE_BUCKET).remove(imagePaths);
+    if (!updatedListing) {
+      redirect(
+        getListingRemovalRedirectPath(
+          safeReturnTo,
+          "listing-withdraw-failed",
+          "Only active unsold listings can be withdrawn."
+        )
+      );
     }
   } else {
     const existingListing = (await getDemoListings()).find((listing) => listing.id === listingId);
 
-    if (!existingListing || existingListing.seller_id !== seller.id) {
-      redirect(getListingRemovalRedirectPath("listing-remove-failed"));
+    if (
+      !existingListing ||
+      existingListing.seller_id !== seller.id ||
+      existingListing.status !== "approved"
+    ) {
+      redirect(getListingRemovalRedirectPath(safeReturnTo, "listing-withdraw-failed"));
     }
 
-    const removedListing = await removeDemoListing(listingId);
+    const withdrawnListing = await updateDemoListingStatus(listingId, "withdrawn", {
+      withdrawn_at: withdrawnAt
+    });
 
-    if (!removedListing) {
-      redirect(getListingRemovalRedirectPath("listing-remove-failed"));
+    if (!withdrawnListing) {
+      redirect(getListingRemovalRedirectPath(safeReturnTo, "listing-withdraw-failed"));
     }
   }
 
   revalidatePath("/");
   revalidatePath("/marketplace");
   revalidatePath("/account/marketplace");
+  revalidatePath("/account/saved");
+  revalidatePath("/account/cart");
   revalidatePath("/seller/listings");
+  revalidatePath("/seller/history");
   revalidatePath("/seller/dashboard");
   revalidatePath("/admin/listings");
+  revalidatePath("/admin/listing-history");
   revalidatePath("/admin/dashboard");
 
-  redirect(getListingRemovalRedirectPath("listing-removed"));
+  redirect(getListingRemovalRedirectPath(safeReturnTo, "listing-withdrawn"));
 }
