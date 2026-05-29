@@ -1,0 +1,424 @@
+import Link from "next/link";
+import { ArrowLeft, CreditCard, LockKeyhole, ShieldCheck } from "lucide-react";
+import { completeCheckoutAction } from "@/actions/account";
+import FormMessage from "@/components/auth/FormMessage";
+import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
+import Badge from "@/components/ui/Badge";
+import Button, { buttonClassName } from "@/components/ui/Button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import Input from "@/components/ui/Input";
+import { requireAccountProfile } from "@/lib/auth";
+import { getBuyerOrderDetail } from "@/lib/data";
+import { formatCurrency, formatDate, statusVariant } from "@/lib/utils";
+
+function getNoticeMessage(notice?: string) {
+  switch (notice) {
+    case "checkout-resumed":
+      return {
+        message: "You already had an unfinished checkout for this listing, so we brought you back here.",
+        tone: "success" as const
+      };
+    case "payment-invalid":
+      return {
+        message: "Please review the payment details and try again.",
+        tone: "error" as const
+      };
+    case "payment-failed":
+      return {
+        message: "We could not complete payment right now. Please try again.",
+        tone: "error" as const
+      };
+    case "checkout-unavailable":
+      return {
+        message: "This checkout is no longer available for the current listing state.",
+        tone: "error" as const
+      };
+    default:
+      return {
+        message: "",
+        tone: "success" as const
+      };
+  }
+}
+
+export default async function AccountCheckoutPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ orderId: string }>;
+  searchParams?: Promise<{ notice?: string }>;
+}) {
+  const profile = await requireAccountProfile();
+  const [{ orderId }, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams ?? Promise.resolve<{ notice?: string }>({})
+  ]);
+  const orderDetail = await getBuyerOrderDetail(profile, orderId);
+  const noticeState = getNoticeMessage(resolvedSearchParams.notice);
+
+  if (!orderDetail) {
+    return (
+      <Card className="max-w-4xl">
+        <CardContent>
+          <div className="flex flex-col items-center justify-center rounded-[32px] border border-dashed border-border bg-surface px-6 py-14 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-primary shadow-sm">
+              <CreditCard className="h-6 w-6" />
+            </div>
+            <h2 className="mt-5 font-heading text-2xl font-semibold text-foreground">
+              Checkout not found
+            </h2>
+            <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">
+              We could not find that checkout record inside your buyer workspace.
+            </p>
+            <Link
+              href="/account/orders"
+              className={buttonClassName({ className: "mt-6 rounded-2xl" })}
+            >
+              Back to Order History
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const { order, listing, paymentConfirmed } = orderDetail;
+  const checkoutBlocked =
+    order.status === "cancelled" || !listing || (!paymentConfirmed && listing.status !== "approved");
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <Link
+          href="/account/orders"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-primary transition hover:text-primary-dark"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to order history
+        </Link>
+        <Card>
+          <CardHeader>
+            <CardTitle>Secure checkout</CardTitle>
+            <CardDescription>
+              Review this order, complete payment, and then unlock the seller delivery vault from
+              your order page.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+
+      <FormMessage message={noticeState.message} tone={noticeState.tone} />
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.02fr)_minmax(360px,0.98fr)]">
+        <Card className="border-border/70">
+          <CardContent className="grid gap-6 p-5 lg:grid-cols-[minmax(240px,320px)_1fr] lg:p-6">
+            {listing ? (
+              <Link href={`/account/marketplace/${listing.id}`} className="block">
+                <ListingPhotoGrid listing={listing} className="rounded-[28px]" />
+              </Link>
+            ) : (
+              <div className="rounded-[28px] border border-dashed border-border bg-surface p-8 text-sm text-muted-foreground">
+                This listing snapshot is no longer available.
+              </div>
+            )}
+
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-wrap items-center gap-3">
+                {listing ? (
+                  <span className="inline-flex rounded-full bg-primary-soft px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-dark">
+                    {listing.game}
+                  </span>
+                ) : null}
+                <Badge variant={statusVariant(order.status)}>{order.status}</Badge>
+                {paymentConfirmed ? (
+                  <Badge variant="success">Payment confirmed</Badge>
+                ) : (
+                  <Badge variant="warning">Awaiting payment</Badge>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <h1 className="font-heading text-3xl font-semibold text-foreground">
+                  {order.listing_title}
+                </h1>
+                <p className="text-sm leading-7 text-muted-foreground">
+                  {listing?.description ||
+                    "This order record still exists, but the original listing preview is no longer available."}
+                </p>
+              </div>
+
+              <div className="grid gap-3 rounded-3xl bg-surface p-5 text-sm sm:grid-cols-2">
+                <div>
+                  <p className="text-muted-foreground">Seller</p>
+                  <p className="mt-1 font-semibold text-foreground">
+                    {listing ? `@${listing.seller_username}` : "Unknown seller"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Price</p>
+                  <p className="mt-1 font-heading text-2xl font-semibold text-foreground">
+                    {formatCurrency(order.amount)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Order created</p>
+                  <p className="mt-1 font-semibold text-foreground">{formatDate(order.created_at)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Login method</p>
+                  <p className="mt-1 font-semibold text-foreground">
+                    {listing?.login_method || "Not available"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-primary/10 bg-primary-soft/55 p-5">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-2xl bg-white p-3 text-primary shadow-sm">
+                    <LockKeyhole className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">Delivery stays protected until payment</p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      Once this checkout is completed, your order page will unlock the seller’s
+                      delivery details so you can take over the account immediately.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href={`/account/orders/${order.id}`}
+                  className={buttonClassName({
+                    variant: "secondary",
+                    className: "rounded-2xl"
+                  })}
+                >
+                  View Order
+                </Link>
+                {listing ? (
+                  <Link
+                    href={`/account/marketplace/${listing.id}`}
+                    className={buttonClassName({
+                      variant: "ghost",
+                      className: "rounded-2xl"
+                    })}
+                  >
+                    View Listing
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-6">
+          {paymentConfirmed ? (
+            <Card className="border-border/70">
+              <CardHeader>
+                <CardTitle>Payment complete</CardTitle>
+                <CardDescription>
+                  This order has already been paid and is ready on the buyer side.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-2xl bg-white p-3 text-emerald-700 shadow-sm">
+                      <ShieldCheck className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground">Your order is ready</p>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        Open the order record to reveal delivery details and secure the account
+                        immediately after handoff.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <Link
+                  href={`/account/orders/${order.id}?notice=payment-already-confirmed`}
+                  className={buttonClassName({ className: "w-full rounded-2xl" })}
+                >
+                  Open Order Details
+                </Link>
+              </CardContent>
+            </Card>
+          ) : checkoutBlocked ? (
+            <Card className="border-border/70">
+              <CardHeader>
+                <CardTitle>Checkout unavailable</CardTitle>
+                <CardDescription>
+                  This order can no longer move forward from the current listing state.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-muted-foreground">
+                  The listing is no longer ready for payment, so this checkout has been paused.
+                  You can return to the order record or head back into the marketplace.
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    href={`/account/orders/${order.id}?notice=checkout-unavailable`}
+                    className={buttonClassName({
+                      variant: "secondary",
+                      className: "rounded-2xl"
+                    })}
+                  >
+                    Open Order
+                  </Link>
+                  <Link
+                    href="/account/marketplace"
+                    className={buttonClassName({
+                      className: "rounded-2xl"
+                    })}
+                  >
+                    Browse Marketplace
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-border/70">
+              <CardHeader>
+                <CardTitle>Payment details</CardTitle>
+                <CardDescription>
+                  Complete this secure card checkout to unlock delivery from the seller.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={completeCheckoutAction} className="space-y-5">
+                  <input type="hidden" name="orderId" value={order.id} />
+
+                  <div className="grid gap-4">
+                    <div>
+                      <label
+                        htmlFor="buyerPhone"
+                        className="mb-2 block text-sm font-medium text-foreground"
+                      >
+                        Phone number
+                      </label>
+                      <Input
+                        id="buyerPhone"
+                        name="buyerPhone"
+                        type="tel"
+                        autoComplete="tel"
+                        defaultValue={order.buyer_phone || ""}
+                        placeholder="+234 801 234 5678"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="buyerEmail"
+                        className="mb-2 block text-sm font-medium text-foreground"
+                      >
+                        Email address
+                      </label>
+                      <Input
+                        id="buyerEmail"
+                        defaultValue={profile.email}
+                        readOnly
+                        className="bg-surface"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="cardholderName"
+                        className="mb-2 block text-sm font-medium text-foreground"
+                      >
+                        Cardholder name
+                      </label>
+                      <Input
+                        id="cardholderName"
+                        name="cardholderName"
+                        autoComplete="cc-name"
+                        placeholder="Enter the name on the card"
+                        defaultValue={profile.full_name}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="cardNumber"
+                        className="mb-2 block text-sm font-medium text-foreground"
+                      >
+                        Card number
+                      </label>
+                      <Input
+                        id="cardNumber"
+                        name="cardNumber"
+                        autoComplete="cc-number"
+                        inputMode="numeric"
+                        placeholder="4084 0840 8408 4081"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label
+                          htmlFor="expiry"
+                          className="mb-2 block text-sm font-medium text-foreground"
+                        >
+                          Expiry
+                        </label>
+                        <Input
+                          id="expiry"
+                          name="expiry"
+                          autoComplete="cc-exp"
+                          placeholder="MM/YY"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="cvv"
+                          className="mb-2 block text-sm font-medium text-foreground"
+                        >
+                          CVV
+                        </label>
+                        <Input
+                          id="cvv"
+                          name="cvv"
+                          type="password"
+                          autoComplete="cc-csc"
+                          inputMode="numeric"
+                          placeholder="123"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl bg-surface p-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Amount to charge</p>
+                        <p className="mt-2 font-heading text-4xl font-semibold text-foreground">
+                          {formatCurrency(order.amount)}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-white p-3 text-primary shadow-sm">
+                        <CreditCard className="h-5 w-5" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button type="submit" size="lg" className="w-full rounded-2xl">
+                    Pay {formatCurrency(order.amount)}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
