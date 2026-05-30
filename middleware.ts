@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type SetAllCookies } from "@supabase/ssr";
 import {
-  isInvalidRefreshTokenError,
+  isRecoverableAuthSessionError,
   isSupabaseAuthCookieName
 } from "@/lib/supabaseAuth";
 
@@ -48,7 +48,7 @@ export async function middleware(request: NextRequest) {
   try {
     await supabase.auth.getUser();
   } catch (error) {
-    if (isInvalidRefreshTokenError(error)) {
+    if (isRecoverableAuthSessionError(error)) {
       clearSupabaseAuthCookies(request, response);
       return response;
     }

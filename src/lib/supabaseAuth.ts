@@ -23,3 +23,18 @@ export function isInvalidRefreshTokenError(error: unknown) {
     message.includes("refresh token not found")
   );
 }
+
+export function isMissingAuthSessionError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const authError = error as SupabaseAuthErrorLike;
+  const message = typeof authError.message === "string" ? authError.message.toLowerCase() : "";
+
+  return message.includes("auth session missing");
+}
+
+export function isRecoverableAuthSessionError(error: unknown) {
+  return isInvalidRefreshTokenError(error) || isMissingAuthSessionError(error);
+}

@@ -10,7 +10,7 @@ import {
   upsertDemoProfile
 } from "@/lib/demoStore";
 import { getPrimaryDashboardRoute, normalizeProfile } from "@/lib/profile";
-import { isInvalidRefreshTokenError } from "@/lib/supabaseAuth";
+import { isRecoverableAuthSessionError } from "@/lib/supabaseAuth";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import type { AppRole, KycStatus, Profile } from "@/types";
@@ -51,7 +51,7 @@ export async function getCurrentProfile() {
     } = await supabase.auth.getUser();
 
     if (error) {
-      if (isInvalidRefreshTokenError(error)) {
+      if (isRecoverableAuthSessionError(error)) {
         return null;
       }
 
@@ -70,7 +70,7 @@ export async function getCurrentProfile() {
 
     return profile ? normalizeProfile(profile as Profile) : fallbackProfileFromUser(user);
   } catch (error) {
-    if (isInvalidRefreshTokenError(error)) {
+    if (isRecoverableAuthSessionError(error)) {
       return null;
     }
 
@@ -146,7 +146,7 @@ export async function signOutServerSession() {
     try {
       await supabase?.auth.signOut();
     } catch (error) {
-      if (!isInvalidRefreshTokenError(error)) {
+      if (!isRecoverableAuthSessionError(error)) {
         throw error;
       }
     }
