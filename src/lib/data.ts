@@ -226,20 +226,18 @@ async function enrichKycSubmissions(
 ) {
   return Promise.all(
     submissions.map(async (submission) => {
-      const [documentFrontUrl, documentBackUrl, selfieFileUrl, proofOfAddressUrl] =
-        await Promise.all([
-          getSignedKycAssetUrl(supabase, submission.document_front_path),
-          getSignedKycAssetUrl(supabase, submission.document_back_path),
-          getSignedKycAssetUrl(supabase, submission.selfie_file_path),
-          getSignedKycAssetUrl(supabase, submission.proof_of_address_path)
-        ]);
+      const [documentFrontUrl, documentBackUrl, selfieFileUrl] = await Promise.all([
+        getSignedKycAssetUrl(supabase, submission.document_front_path),
+        getSignedKycAssetUrl(supabase, submission.document_back_path),
+        getSignedKycAssetUrl(supabase, submission.selfie_file_path)
+      ]);
 
       return {
         ...submission,
         document_front_url: documentFrontUrl,
         document_back_url: documentBackUrl,
         selfie_file_url: selfieFileUrl,
-        proof_of_address_url: proofOfAddressUrl
+        proof_of_address_url: ""
       };
     })
   );

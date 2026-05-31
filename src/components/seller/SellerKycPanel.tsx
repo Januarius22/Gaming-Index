@@ -12,11 +12,7 @@ import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
-import {
-  documentTypeOptions,
-  proofOfAddressOptions,
-  titleCase
-} from "@/lib/utils";
+import { documentTypeOptions, titleCase } from "@/lib/utils";
 import type { KycSubmission, Profile } from "@/types";
 
 export default function SellerKycPanel({
@@ -285,10 +281,13 @@ export default function SellerKycPanel({
                     id="documentFront"
                     name="documentFront"
                     type="file"
-                    accept=".jpg,.jpeg,.png,.webp"
+                    accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
                     required
                     className="block w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-primary-soft file:px-4 file:py-2 file:font-semibold file:text-primary"
                   />
+                  <p className="text-xs leading-6 text-muted-foreground">
+                    JPG, PNG, WEBP, HEIC, or HEIF up to 20MB.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <label htmlFor="documentBack" className="text-sm font-semibold text-foreground">
@@ -298,10 +297,13 @@ export default function SellerKycPanel({
                     id="documentBack"
                     name="documentBack"
                     type="file"
-                    accept=".jpg,.jpeg,.png,.webp"
+                    accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
                     required
                     className="block w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-primary-soft file:px-4 file:py-2 file:font-semibold file:text-primary"
                   />
+                  <p className="text-xs leading-6 text-muted-foreground">
+                    JPG, PNG, WEBP, HEIC, or HEIF up to 20MB.
+                  </p>
                 </div>
               </div>
             </div>
@@ -325,52 +327,13 @@ export default function SellerKycPanel({
                     id="selfieFile"
                     name="selfieFile"
                     type="file"
-                    accept=".jpg,.jpeg,.png,.webp"
+                    accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
                     required
                     className="block w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-primary-soft file:px-4 file:py-2 file:font-semibold file:text-primary"
                   />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-border bg-surface/70 p-5 md:p-6">
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-heading text-xl font-semibold text-foreground">Address verification</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Provide one recent proof of address document.
-                </p>
-              </div>
-
-              <div className="grid gap-5 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label htmlFor="proofOfAddressType" className="text-sm font-semibold text-foreground">
-                    Proof of address type
-                  </label>
-                  <Select id="proofOfAddressType" name="proofOfAddressType" defaultValue="" required>
-                    <option value="" disabled>
-                      Select proof of address
-                    </option>
-                    {proofOfAddressOptions.map((option) => (
-                      <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="proofOfAddressFile" className="text-sm font-semibold text-foreground">
-                    Proof of address document
-                  </label>
-                  <input
-                    id="proofOfAddressFile"
-                    name="proofOfAddressFile"
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.webp,.pdf"
-                    required
-                    className="block w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-primary-soft file:px-4 file:py-2 file:font-semibold file:text-primary"
-                  />
+                  <p className="text-xs leading-6 text-muted-foreground">
+                    JPG, PNG, WEBP, HEIC, or HEIF up to 20MB.
+                  </p>
                 </div>
               </div>
             </div>

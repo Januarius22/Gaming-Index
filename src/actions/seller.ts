@@ -17,12 +17,11 @@ import type { KycActionState, ListingActionState, Profile } from "@/types";
 
 const KYC_STORAGE_BUCKET = "kyc-documents";
 const LISTING_STORAGE_BUCKET = "listing-media";
-const MAX_KYC_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_KYC_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_LISTING_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_LISTING_IMAGES = 1;
-const IMAGE_KYC_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
+const IMAGE_KYC_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
 const LISTING_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
-const PROOF_OF_ADDRESS_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "pdf"]);
 
 function getUploadedFileName(value: FormDataEntryValue | null) {
   if (!(value instanceof File) || value.size <= 0) {
@@ -70,6 +69,10 @@ function inferContentType(file: File) {
       return "image/png";
     case "webp":
       return "image/webp";
+    case "heic":
+      return "image/heic";
+    case "heif":
+      return "image/heif";
     case "pdf":
       return "application/pdf";
     default:
@@ -91,7 +94,7 @@ function validateKycUpload({
   }
 
   if (file.size > MAX_KYC_FILE_BYTES) {
-    return `${fieldLabel} must be 10MB or smaller.`;
+    return `${fieldLabel} must be ${Math.floor(MAX_KYC_FILE_BYTES / (1024 * 1024))}MB or smaller.`;
   }
 
   const extension = getFileExtension(file.name);
@@ -220,15 +223,12 @@ export async function saveKycSubmission({
   const residentialAddress = String(formData.get("residentialAddress") ?? "").trim();
   const documentType = String(formData.get("documentType") ?? "").trim();
   const documentNumber = String(formData.get("documentNumber") ?? "").trim();
-  const proofOfAddressType = String(formData.get("proofOfAddressType") ?? "").trim();
   const documentFrontFile = getUploadedFile(formData.get("documentFront"));
   const documentBackFile = getUploadedFile(formData.get("documentBack"));
   const selfieFile = getUploadedFile(formData.get("selfieFile"));
-  const proofOfAddressFile = getUploadedFile(formData.get("proofOfAddressFile"));
   const documentFrontName = getUploadedFileName(documentFrontFile);
   const documentBackName = getUploadedFileName(documentBackFile);
   const selfieFileName = getUploadedFileName(selfieFile);
-  const proofOfAddressName = getUploadedFileName(proofOfAddressFile);
   const stateCity = `${state} / ${city}`.trim();
 
   const missingFields = [
@@ -241,8 +241,7 @@ export async function saveKycSubmission({
     !city && "City",
     !residentialAddress && "Residential address",
     !documentType && "Identification type",
-    !documentNumber && "Document number",
-    !proofOfAddressType && "Proof of address type"
+    !documentNumber && "Document number"
   ].filter(Boolean);
 
   if (missingFields.length > 0) {
@@ -262,8 +261,7 @@ export async function saveKycSubmission({
   const missingUploads = [
     !documentFrontName && "ID front",
     !documentBackName && "ID back",
-    !selfieFileName && "Selfie image",
-    !proofOfAddressName && "Proof of address document"
+    !selfieFileName && "Selfie image"
   ].filter(Boolean);
 
   if (missingUploads.length > 0) {
@@ -288,11 +286,6 @@ export async function saveKycSubmission({
       file: selfieFile,
       fieldLabel: "Selfie image",
       allowedExtensions: IMAGE_KYC_EXTENSIONS
-    }) ||
-    validateKycUpload({
-      file: proofOfAddressFile,
-      fieldLabel: "Proof of address",
-      allowedExtensions: PROOF_OF_ADDRESS_EXTENSIONS
     });
 
   if (uploadValidationError) {
@@ -304,7 +297,7 @@ export async function saveKycSubmission({
 
   if (hasSupabaseEnv) {
     const supabase = await getSupabaseServerClient();
-    const [frontUpload, backUpload, selfieUpload, proofUpload] = await Promise.all([
+    const [frontUpload, backUpload, selfieUpload] = await Promise.all([
       uploadKycAsset({
         supabase: supabase!,
         sellerId: seller.id,
@@ -322,20 +315,13 @@ export async function saveKycSubmission({
         sellerId: seller.id,
         fieldName: "selfie",
         file: selfieFile!
-      }),
-      uploadKycAsset({
-        supabase: supabase!,
-        sellerId: seller.id,
-        fieldName: "proof_of_address",
-        file: proofOfAddressFile!
       })
     ]);
 
     const uploadError =
       ("error" in frontUpload && frontUpload.error) ||
       ("error" in backUpload && backUpload.error) ||
-      ("error" in selfieUpload && selfieUpload.error) ||
-      ("error" in proofUpload && proofUpload.error);
+      ("error" in selfieUpload && selfieUpload.error);
 
     if (uploadError) {
       return {
@@ -362,9 +348,9 @@ export async function saveKycSubmission({
       document_front_path: frontUpload.path,
       document_back_name: backUpload.name,
       document_back_path: backUpload.path,
-      proof_of_address_type: proofOfAddressType,
-      proof_of_address_name: proofUpload.name,
-      proof_of_address_path: proofUpload.path,
+      proof_of_address_type: "",
+      proof_of_address_name: "",
+      proof_of_address_path: "",
       selfie_file_name: selfieUpload.name,
       selfie_file_path: selfieUpload.path,
       status: "pending"
@@ -404,8 +390,6 @@ export async function saveKycSubmission({
       documentNumber,
       documentFrontName,
       documentBackName,
-      proofOfAddressType,
-      proofOfAddressName,
       selfieFileName
     });
   }

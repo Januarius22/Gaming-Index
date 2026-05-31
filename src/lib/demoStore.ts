@@ -170,8 +170,6 @@ export async function addDemoKycSubmission({
   documentNumber,
   documentFrontName,
   documentBackName,
-  proofOfAddressType,
-  proofOfAddressName,
   selfieFileName
 }: {
   seller: Profile;
@@ -188,8 +186,6 @@ export async function addDemoKycSubmission({
   documentNumber: string;
   documentFrontName: string;
   documentBackName: string;
-  proofOfAddressType: string;
-  proofOfAddressName: string;
   selfieFileName: string;
 }) {
   const submissions = await getDemoKycSubmissions();
@@ -212,8 +208,8 @@ export async function addDemoKycSubmission({
     document_front_path: "",
     document_back_name: documentBackName,
     document_back_path: "",
-    proof_of_address_type: proofOfAddressType,
-    proof_of_address_name: proofOfAddressName,
+    proof_of_address_type: "",
+    proof_of_address_name: "",
     proof_of_address_path: "",
     selfie_file_name: selfieFileName,
     selfie_file_path: "",

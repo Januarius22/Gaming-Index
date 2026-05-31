@@ -242,22 +242,15 @@ export default function KycReviewTable({
 
             <section className="rounded-3xl bg-surface p-5">
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">
-                Address verification
+                Submission summary
               </p>
               <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                <p>Proof Type: {selectedSubmission.proof_of_address_type || "Not provided"}</p>
                 <p>Submitted: {formatDate(selectedSubmission.created_at)}</p>
                 <p>Status: {selectedSubmission.status}</p>
+                <p>Address provided: {selectedSubmission.residential_address ? "Yes" : "No"}</p>
                 {selectedSubmission.rejection_reason ? (
                   <p>Admin note: {selectedSubmission.rejection_reason}</p>
                 ) : null}
-              </div>
-              <div className="mt-4">
-                <UploadedAssetPreview
-                  label="Proof of address"
-                  fileName={selectedSubmission.proof_of_address_name}
-                  assetUrl={selectedSubmission.proof_of_address_url}
-                />
               </div>
             </section>
           </div>
@@ -286,7 +279,7 @@ export default function KycReviewTable({
               <Textarea
                 id="rejectionReason"
                 name="rejectionReason"
-                placeholder="Example: The ID back image was blurry and the proof of address did not show the full document."
+                placeholder="Example: The ID back image was blurry and the selfie did not clearly match the document photo."
                 required
               />
             </div>

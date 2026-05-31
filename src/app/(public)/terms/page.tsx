@@ -76,11 +76,11 @@ export default function TermsPage() {
         </ul>
       </Section>
 
-      <Section title="6. KYC, Moderation, and Enforcement">
-        <p>
-          Gaming Index may request identity verification, proof of address, selfies, or related
-          materials from sellers and may use admins or automated checks to review listings, seller
-          status, or marketplace activity. We may remove, suspend, limit, hide, reject, or take
+        <Section title="6. KYC, Moderation, and Enforcement">
+          <p>
+            Gaming Index may request identity verification, residential address details, selfies, or related
+            materials from sellers and may use admins or automated checks to review listings, seller
+            status, or marketplace activity. We may remove, suspend, limit, hide, reject, or take
           down listings or accounts at any time when needed for safety, policy enforcement, or
           legal risk management.
         </p>
