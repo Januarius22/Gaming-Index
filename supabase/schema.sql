@@ -551,6 +551,16 @@ create policy "authenticated users can read kyc files"
   to authenticated
   using (bucket_id = 'kyc-documents');
 
+drop policy if exists "authenticated users can delete their own kyc files" on storage.objects;
+create policy "authenticated users can delete their own kyc files"
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'kyc-documents'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
 drop policy if exists "authenticated users can upload their own listing media" on storage.objects;
 create policy "authenticated users can upload their own listing media"
   on storage.objects

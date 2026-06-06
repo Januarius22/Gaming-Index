@@ -12,15 +12,21 @@ import {
 } from "@/lib/demoStore";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
+import {
+  IMAGE_KYC_EXTENSIONS,
+  inferContentType,
+  KYC_STORAGE_BUCKET,
+  MAX_KYC_FILE_BYTES,
+  sanitizeFileName,
+  validateFileUpload,
+  validateUploadedStorageAsset
+} from "@/lib/storageUploads";
 import { getNigeriaTimestamp, isValidPhoneNumber } from "@/lib/utils";
 import type { KycActionState, ListingActionState, Profile } from "@/types";
 
-const KYC_STORAGE_BUCKET = "kyc-documents";
 const LISTING_STORAGE_BUCKET = "listing-media";
-const MAX_KYC_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_LISTING_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_LISTING_IMAGES = 1;
-const IMAGE_KYC_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
 const LISTING_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
 
 function getUploadedFileName(value: FormDataEntryValue | null) {
@@ -39,73 +45,17 @@ function getUploadedFile(value: FormDataEntryValue | null) {
   return value;
 }
 
-function sanitizeFileName(value: string) {
-  return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-}
+async function removeKycAssets(
+  supabase: NonNullable<Awaited<ReturnType<typeof getSupabaseServerClient>>>,
+  assetPaths: string[]
+) {
+  const paths = assetPaths.filter(Boolean);
 
-function getFileExtension(fileName: string) {
-  const sanitized = fileName.trim().toLowerCase();
-  const segments = sanitized.split(".");
-
-  if (segments.length < 2) {
-    return "";
+  if (paths.length === 0) {
+    return;
   }
 
-  return segments.at(-1) ?? "";
-}
-
-function inferContentType(file: File) {
-  if (file.type) {
-    return file.type;
-  }
-
-  const extension = getFileExtension(file.name);
-
-  switch (extension) {
-    case "jpg":
-    case "jpeg":
-      return "image/jpeg";
-    case "png":
-      return "image/png";
-    case "webp":
-      return "image/webp";
-    case "heic":
-      return "image/heic";
-    case "heif":
-      return "image/heif";
-    case "pdf":
-      return "application/pdf";
-    default:
-      return "application/octet-stream";
-  }
-}
-
-function validateKycUpload({
-  file,
-  fieldLabel,
-  allowedExtensions
-}: {
-  file: File | null;
-  fieldLabel: string;
-  allowedExtensions: Set<string>;
-}) {
-  if (!file) {
-    return `${fieldLabel} is required.`;
-  }
-
-  if (file.size > MAX_KYC_FILE_BYTES) {
-    return `${fieldLabel} must be ${Math.floor(MAX_KYC_FILE_BYTES / (1024 * 1024))}MB or smaller.`;
-  }
-
-  const extension = getFileExtension(file.name);
-
-  if (!allowedExtensions.has(extension)) {
-    return `${fieldLabel} must be a ${Array.from(allowedExtensions)
-      .map((value) => value.toUpperCase())
-      .join(", ")} file.`;
-  }
-
-  return "";
+  await supabase.storage.from(KYC_STORAGE_BUCKET).remove(paths);
 }
 
 async function uploadKycAsset({
@@ -223,12 +173,18 @@ export async function saveKycSubmission({
   const residentialAddress = String(formData.get("residentialAddress") ?? "").trim();
   const documentType = String(formData.get("documentType") ?? "").trim();
   const documentNumber = String(formData.get("documentNumber") ?? "").trim();
+  const documentFrontUploadedName = String(formData.get("documentFrontUploadedName") ?? "").trim();
+  const documentFrontUploadedPath = String(formData.get("documentFrontUploadedPath") ?? "").trim();
+  const documentBackUploadedName = String(formData.get("documentBackUploadedName") ?? "").trim();
+  const documentBackUploadedPath = String(formData.get("documentBackUploadedPath") ?? "").trim();
+  const selfieUploadedName = String(formData.get("selfieUploadedName") ?? "").trim();
+  const selfieUploadedPath = String(formData.get("selfieUploadedPath") ?? "").trim();
   const documentFrontFile = getUploadedFile(formData.get("documentFront"));
   const documentBackFile = getUploadedFile(formData.get("documentBack"));
   const selfieFile = getUploadedFile(formData.get("selfieFile"));
-  const documentFrontName = getUploadedFileName(documentFrontFile);
-  const documentBackName = getUploadedFileName(documentBackFile);
-  const selfieFileName = getUploadedFileName(selfieFile);
+  const documentFrontName = documentFrontUploadedName || getUploadedFileName(documentFrontFile);
+  const documentBackName = documentBackUploadedName || getUploadedFileName(documentBackFile);
+  const selfieFileName = selfieUploadedName || getUploadedFileName(selfieFile);
   const stateCity = `${state} / ${city}`.trim();
 
   const missingFields = [
@@ -272,21 +228,48 @@ export async function saveKycSubmission({
   }
 
   const uploadValidationError =
-    validateKycUpload({
-      file: documentFrontFile,
-      fieldLabel: "ID front",
-      allowedExtensions: IMAGE_KYC_EXTENSIONS
-    }) ||
-    validateKycUpload({
-      file: documentBackFile,
-      fieldLabel: "ID back",
-      allowedExtensions: IMAGE_KYC_EXTENSIONS
-    }) ||
-    validateKycUpload({
-      file: selfieFile,
-      fieldLabel: "Selfie image",
-      allowedExtensions: IMAGE_KYC_EXTENSIONS
-    });
+    (documentFrontUploadedPath
+      ? validateUploadedStorageAsset({
+          fileName: documentFrontName,
+          filePath: documentFrontUploadedPath,
+          fieldLabel: "ID front",
+          allowedExtensions: IMAGE_KYC_EXTENSIONS,
+          expectedOwnerId: seller.id
+        })
+      : validateFileUpload({
+          file: documentFrontFile,
+          fieldLabel: "ID front",
+          allowedExtensions: IMAGE_KYC_EXTENSIONS,
+          maxBytes: MAX_KYC_FILE_BYTES
+        })) ||
+    (documentBackUploadedPath
+      ? validateUploadedStorageAsset({
+          fileName: documentBackName,
+          filePath: documentBackUploadedPath,
+          fieldLabel: "ID back",
+          allowedExtensions: IMAGE_KYC_EXTENSIONS,
+          expectedOwnerId: seller.id
+        })
+      : validateFileUpload({
+          file: documentBackFile,
+          fieldLabel: "ID back",
+          allowedExtensions: IMAGE_KYC_EXTENSIONS,
+          maxBytes: MAX_KYC_FILE_BYTES
+        })) ||
+    (selfieUploadedPath
+      ? validateUploadedStorageAsset({
+          fileName: selfieFileName,
+          filePath: selfieUploadedPath,
+          fieldLabel: "Selfie image",
+          allowedExtensions: IMAGE_KYC_EXTENSIONS,
+          expectedOwnerId: seller.id
+        })
+      : validateFileUpload({
+          file: selfieFile,
+          fieldLabel: "Selfie image",
+          allowedExtensions: IMAGE_KYC_EXTENSIONS,
+          maxBytes: MAX_KYC_FILE_BYTES
+        }));
 
   if (uploadValidationError) {
     return {
@@ -297,38 +280,57 @@ export async function saveKycSubmission({
 
   if (hasSupabaseEnv) {
     const supabase = await getSupabaseServerClient();
-    const [frontUpload, backUpload, selfieUpload] = await Promise.all([
-      uploadKycAsset({
-        supabase: supabase!,
-        sellerId: seller.id,
-        fieldName: "document_front",
-        file: documentFrontFile!
-      }),
-      uploadKycAsset({
-        supabase: supabase!,
-        sellerId: seller.id,
-        fieldName: "document_back",
-        file: documentBackFile!
-      }),
-      uploadKycAsset({
-        supabase: supabase!,
-        sellerId: seller.id,
-        fieldName: "selfie",
-        file: selfieFile!
-      })
-    ]);
+    const directUploadsReady =
+      Boolean(documentFrontUploadedPath && documentBackUploadedPath && selfieUploadedPath);
+    const uploadedAssetPaths: string[] = [];
+    const [frontUpload, backUpload, selfieUpload] = directUploadsReady
+      ? [
+          {
+            path: documentFrontUploadedPath,
+            name: documentFrontName
+          },
+          {
+            path: documentBackUploadedPath,
+            name: documentBackName
+          },
+          {
+            path: selfieUploadedPath,
+            name: selfieFileName
+          }
+        ]
+      : await Promise.all([
+          uploadKycAsset({
+            supabase: supabase!,
+            sellerId: seller.id,
+            fieldName: "document_front",
+            file: documentFrontFile!
+          }),
+          uploadKycAsset({
+            supabase: supabase!,
+            sellerId: seller.id,
+            fieldName: "document_back",
+            file: documentBackFile!
+          }),
+          uploadKycAsset({
+            supabase: supabase!,
+            sellerId: seller.id,
+            fieldName: "selfie",
+            file: selfieFile!
+          })
+        ]);
 
-    const uploadError =
-      ("error" in frontUpload && frontUpload.error) ||
-      ("error" in backUpload && backUpload.error) ||
-      ("error" in selfieUpload && selfieUpload.error);
-
-    if (uploadError) {
+    if ("error" in frontUpload || "error" in backUpload || "error" in selfieUpload) {
       return {
         status: "error",
-        message: uploadError
+        message:
+          ("error" in frontUpload && frontUpload.error) ||
+          ("error" in backUpload && backUpload.error) ||
+          ("error" in selfieUpload && selfieUpload.error) ||
+          "KYC file upload failed."
       };
     }
+
+    uploadedAssetPaths.push(frontUpload.path, backUpload.path, selfieUpload.path);
 
     const { error: submissionError } = await supabase!.from("kyc_submissions").insert({
       seller_id: seller.id,
@@ -357,6 +359,8 @@ export async function saveKycSubmission({
     });
 
     if (submissionError) {
+      await removeKycAssets(supabase!, uploadedAssetPaths);
+
       return {
         status: "error",
         message: submissionError.message
@@ -502,10 +506,11 @@ export async function saveListingSubmission({
     };
   }
 
-  const imageValidationError = validateKycUpload({
+  const imageValidationError = validateFileUpload({
     file: listingImageFile,
     fieldLabel: "Final grid image",
-    allowedExtensions: LISTING_IMAGE_EXTENSIONS
+    allowedExtensions: LISTING_IMAGE_EXTENSIONS,
+    maxBytes: MAX_LISTING_IMAGE_BYTES
   });
 
   if (imageValidationError) {

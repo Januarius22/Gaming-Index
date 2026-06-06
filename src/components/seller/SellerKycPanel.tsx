@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import SubmitButton from "@/components/auth/SubmitButton";
+import FormMessage from "@/components/auth/FormMessage";
 import KycReviewNoticeModal from "@/components/seller/KycReviewNoticeModal";
 import Button from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -12,6 +12,15 @@ import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
+import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabaseClient";
+import {
+  IMAGE_KYC_EXTENSIONS,
+  inferContentType,
+  KYC_STORAGE_BUCKET,
+  MAX_KYC_FILE_BYTES,
+  sanitizeFileName,
+  validateFileUpload
+} from "@/lib/storageUploads";
 import { documentTypeOptions, titleCase } from "@/lib/utils";
 import type { KycSubmission, Profile } from "@/types";
 
@@ -30,10 +39,14 @@ export default function SellerKycPanel({
 }) {
   const [open, setOpen] = useState(initialOpen);
   const [feedbackOpen, setFeedbackOpen] = useState(Boolean(feedbackMessage));
+  const [modalFeedback, setModalFeedback] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitPhase, setSubmitPhase] = useState<"idle" | "uploading" | "submitting">("idle");
   const router = useRouter();
   const pathname = usePathname();
   const statusLabel = titleCase(profile.kyc_status);
   const canStartKyc = profile.kyc_status !== "approved" && profile.kyc_status !== "pending";
+  const directUploadEnabled = hasSupabaseEnv;
   const feedbackStyles = useMemo(
     () =>
       feedbackTone === "success"
@@ -64,7 +77,13 @@ export default function SellerKycPanel({
         ? "Your KYC has already been submitted and is waiting for admin review."
         : profile.kyc_status === "rejected"
           ? "Your last KYC submission was rejected. Update the details below and submit again."
-          : "Upload access is enabled only when your KYC status becomes approved.";
+        : "Upload access is enabled only when your KYC status becomes approved.";
+  const submitLabel =
+    submitPhase === "uploading"
+      ? "Uploading KYC files..."
+      : submitPhase === "submitting"
+        ? "Saving KYC details..."
+        : "Submit KYC";
 
   useEffect(() => {
     if (!feedbackMessage) {
@@ -80,6 +99,189 @@ export default function SellerKycPanel({
 
     return () => window.clearTimeout(timer);
   }, [feedbackMessage, pathname, router]);
+
+  async function uploadKycAssetDirect({
+    sellerId,
+    fieldName,
+    file
+  }: {
+    sellerId: string;
+    fieldName: string;
+    file: File;
+  }) {
+    const supabase = getSupabaseBrowserClient();
+
+    if (!supabase) {
+      throw new Error("Supabase storage is not available right now. Please refresh and try again.");
+    }
+
+    const safeName = sanitizeFileName(file.name || `${fieldName}.bin`) || `${fieldName}.bin`;
+    const filePath = `${sellerId}/${crypto.randomUUID()}-${fieldName}-${safeName}`;
+    const { error } = await supabase.storage.from(KYC_STORAGE_BUCKET).upload(filePath, file, {
+      contentType: inferContentType(file),
+      upsert: false
+    });
+
+    if (error) {
+      throw new Error(`KYC file upload failed for ${fieldName.replace(/_/g, " ")}: ${error.message}`);
+    }
+
+    return {
+      path: filePath,
+      name: file.name.trim()
+    };
+  }
+
+  async function removeUploadedKycAssets(paths: string[]) {
+    const supabase = getSupabaseBrowserClient();
+
+    if (!supabase) {
+      return;
+    }
+
+    const assetPaths = paths.filter(Boolean);
+
+    if (assetPaths.length === 0) {
+      return;
+    }
+
+    await supabase.storage.from(KYC_STORAGE_BUCKET).remove(assetPaths);
+  }
+
+  async function handleDirectSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canStartKyc || submitting) {
+      return;
+    }
+
+    const form = event.currentTarget;
+
+    if (!form.reportValidity()) {
+      return;
+    }
+
+    const formData = new FormData(form);
+    const documentFrontFile = formData.get("documentFront");
+    const documentBackFile = formData.get("documentBack");
+    const selfieFile = formData.get("selfieFile");
+
+    const validationError =
+      validateFileUpload({
+        file: documentFrontFile instanceof File ? documentFrontFile : null,
+        fieldLabel: "ID front",
+        allowedExtensions: IMAGE_KYC_EXTENSIONS,
+        maxBytes: MAX_KYC_FILE_BYTES
+      }) ||
+      validateFileUpload({
+        file: documentBackFile instanceof File ? documentBackFile : null,
+        fieldLabel: "ID back",
+        allowedExtensions: IMAGE_KYC_EXTENSIONS,
+        maxBytes: MAX_KYC_FILE_BYTES
+      }) ||
+      validateFileUpload({
+        file: selfieFile instanceof File ? selfieFile : null,
+        fieldLabel: "Selfie image",
+        allowedExtensions: IMAGE_KYC_EXTENSIONS,
+        maxBytes: MAX_KYC_FILE_BYTES
+      });
+
+    if (validationError) {
+      setModalFeedback(validationError);
+      return;
+    }
+
+    const uploadedPaths: string[] = [];
+    setModalFeedback("");
+    setSubmitting(true);
+    setSubmitPhase("uploading");
+
+    try {
+      const [frontUpload, backUpload, selfieUpload] = await Promise.all([
+        uploadKycAssetDirect({
+          sellerId: profile.id,
+          fieldName: "document_front",
+          file: documentFrontFile as File
+        }),
+        uploadKycAssetDirect({
+          sellerId: profile.id,
+          fieldName: "document_back",
+          file: documentBackFile as File
+        }),
+        uploadKycAssetDirect({
+          sellerId: profile.id,
+          fieldName: "selfie",
+          file: selfieFile as File
+        })
+      ]);
+
+      uploadedPaths.push(frontUpload.path, backUpload.path, selfieUpload.path);
+
+      formData.delete("documentFront");
+      formData.delete("documentBack");
+      formData.delete("selfieFile");
+      formData.append("documentFrontUploadedName", frontUpload.name);
+      formData.append("documentFrontUploadedPath", frontUpload.path);
+      formData.append("documentBackUploadedName", backUpload.name);
+      formData.append("documentBackUploadedPath", backUpload.path);
+      formData.append("selfieUploadedName", selfieUpload.name);
+      formData.append("selfieUploadedPath", selfieUpload.path);
+
+      setSubmitPhase("submitting");
+
+      const response = await fetch("/seller/kyc/submit", {
+        method: "POST",
+        body: formData,
+        credentials: "same-origin"
+      });
+
+      const responseUrl = new URL(response.url, window.location.origin);
+      const target = `${responseUrl.pathname}${responseUrl.search}`;
+
+      if (response.redirected) {
+        if (responseUrl.pathname === "/seller/dashboard") {
+          setOpen(false);
+          router.push(target);
+          router.refresh();
+          return;
+        }
+
+        if (responseUrl.pathname === "/seller/kyc") {
+          await removeUploadedKycAssets(uploadedPaths);
+          setModalFeedback(
+            responseUrl.searchParams.get("error") ||
+              "We could not submit your KYC right now. Please try again."
+          );
+          return;
+        }
+
+        await removeUploadedKycAssets(uploadedPaths);
+        router.push(target);
+        router.refresh();
+        return;
+      }
+
+      if (!response.ok) {
+        await removeUploadedKycAssets(uploadedPaths);
+        setModalFeedback("We could not submit your KYC right now. Please try again.");
+        return;
+      }
+
+      setOpen(false);
+      router.push("/seller/dashboard?kyc=submitted");
+      router.refresh();
+    } catch (error) {
+      await removeUploadedKycAssets(uploadedPaths);
+      setModalFeedback(
+        error instanceof Error
+          ? error.message
+          : "We could not submit your KYC right now. Please try again."
+      );
+    } finally {
+      setSubmitting(false);
+      setSubmitPhase("idle");
+    }
+  }
 
   return (
     <>
@@ -150,7 +352,14 @@ export default function SellerKycPanel({
 
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          if (submitting) {
+            return;
+          }
+
+          setModalFeedback("");
+          setOpen(false);
+        }}
         title="Submit KYC details"
         description="Provide your identity information and upload the required files so the admin team can review your seller access."
       >
@@ -158,6 +367,7 @@ export default function SellerKycPanel({
           action="/seller/kyc/submit"
           method="POST"
           encType="multipart/form-data"
+          onSubmit={directUploadEnabled ? handleDirectSubmit : undefined}
           className="space-y-8"
         >
           <div className="rounded-[28px] border border-border bg-surface/70 p-5 md:p-6">
@@ -339,8 +549,17 @@ export default function SellerKycPanel({
             </div>
           </div>
 
-          <div className="flex justify-end">
-            <SubmitButton pendingLabel="Submitting...">Submit KYC</SubmitButton>
+          <FormMessage message={modalFeedback} />
+
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs leading-6 text-muted-foreground">
+              {directUploadEnabled
+                ? "Large KYC images upload directly to secure storage before submission."
+                : "Your KYC files will be submitted together with this form."}
+            </p>
+            <Button type="submit" disabled={submitting}>
+              {submitLabel}
+            </Button>
           </div>
         </form>
       </Modal>
