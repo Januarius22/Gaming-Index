@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Heart, ShoppingCart, Star } from "lucide-react";
+import { ArrowUpRight, Heart, ShoppingCart, SlidersHorizontal, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   buyNowAction,
@@ -24,11 +24,7 @@ import type { Listing } from "@/types";
 interface MarketplaceFilters {
   minPrice: string;
   maxPrice: string;
-  vendor: string;
   game: string;
-  platform: string;
-  status: string;
-  sortBy: string;
 }
 
 const emptyListingIds: string[] = [];
@@ -36,11 +32,7 @@ const emptyListingIds: string[] = [];
 const defaultFilters: MarketplaceFilters = {
   minPrice: "",
   maxPrice: "",
-  vendor: "all",
-  game: "all",
-  platform: "all",
-  status: "all",
-  sortBy: "latest"
+  game: "all"
 };
 
 export default function MarketplacePreview({
@@ -94,23 +86,14 @@ export default function MarketplacePreview({
     setLocalCartListingIds(cartListingIds);
   }, [cartListingIds]);
 
-  const vendorOptions = Array.from(
-    sourceListings.reduce((map, listing) => {
-      map.set(listing.seller_username, listing.seller_name);
-      return map;
-    }, new Map<string, string>())
-  ).sort(([leftUsername], [rightUsername]) => leftUsername.localeCompare(rightUsername));
-
   const gameOptions = Array.from(new Set(sourceListings.map((listing) => listing.game))).sort(
     (left, right) => left.localeCompare(right)
   );
-  const platformOptions = Array.from(
-    new Set(sourceListings.map((listing) => listing.platform))
-  ).sort((left, right) => left.localeCompare(right));
-
   const minPrice = draftFilters.minPrice ? Number(draftFilters.minPrice) : null;
   const maxPrice = draftFilters.maxPrice ? Number(draftFilters.maxPrice) : null;
-  const minPriceInvalid = draftFilters.minPrice !== "" && (minPrice === null || Number.isNaN(minPrice) || minPrice < 0);
+  const minPriceInvalid =
+    draftFilters.minPrice !== "" &&
+    (minPrice === null || Number.isNaN(minPrice) || minPrice < 0);
   const maxPriceInvalid =
     draftFilters.maxPrice !== "" &&
     (maxPrice === null ||
@@ -120,7 +103,6 @@ export default function MarketplacePreview({
 
   const updateDraftFilter = <Key extends keyof MarketplaceFilters>(
     key: Key,
-    
     value: MarketplaceFilters[Key]
   ) => {
     setDraftFilters((current) => ({
@@ -133,16 +115,6 @@ export default function MarketplacePreview({
     setAppliedFilters({ ...draftFilters });
     setCurrentPage(1);
   };
-
-  const resetFilters = () => {
-    setDraftFilters(defaultFilters);
-    setAppliedFilters(defaultFilters);
-    setCurrentPage(1);
-  };
-
-  const hasActiveFilters = Object.entries(appliedFilters).some(
-    ([key, value]) => value !== defaultFilters[key as keyof MarketplaceFilters]
-  );
 
   const toggleCart = async (listingId: string) => {
     const previousCartListingIds = localCartListingIds;
@@ -212,15 +184,19 @@ export default function MarketplacePreview({
     const appliedMinPrice = appliedFilters.minPrice ? Number(appliedFilters.minPrice) : null;
     const appliedMaxPrice = appliedFilters.maxPrice ? Number(appliedFilters.maxPrice) : null;
 
-    if (appliedMinPrice !== null && !Number.isNaN(appliedMinPrice) && listing.price < appliedMinPrice) {
+    if (
+      appliedMinPrice !== null &&
+      !Number.isNaN(appliedMinPrice) &&
+      listing.price < appliedMinPrice
+    ) {
       return false;
     }
 
-    if (appliedMaxPrice !== null && !Number.isNaN(appliedMaxPrice) && listing.price > appliedMaxPrice) {
-      return false;
-    }
-
-    if (appliedFilters.vendor !== "all" && listing.seller_username !== appliedFilters.vendor) {
+    if (
+      appliedMaxPrice !== null &&
+      !Number.isNaN(appliedMaxPrice) &&
+      listing.price > appliedMaxPrice
+    ) {
       return false;
     }
 
@@ -228,34 +204,11 @@ export default function MarketplacePreview({
       return false;
     }
 
-    if (appliedFilters.platform !== "all" && listing.platform !== appliedFilters.platform) {
-      return false;
-    }
-
-    if (appliedFilters.status === "active" && listing.status !== "approved") {
-      return false;
-    }
-
-    if (appliedFilters.status === "sold" && listing.status !== "sold") {
-      return false;
-    }
-
     return true;
   });
-  const sortedListings = [...filteredListings].sort((left, right) => {
-    switch (appliedFilters.sortBy) {
-      case "lowest_price":
-        return left.price - right.price;
-      case "highest_price":
-        return right.price - left.price;
-      case "most_rated":
-        return (right.seller_reviews ?? 0) - (left.seller_reviews ?? 0);
-      case "top_sellers":
-        return (right.seller_rating ?? 0) - (left.seller_rating ?? 0);
-      default:
-        return right.created_at.localeCompare(left.created_at);
-    }
-  });
+  const sortedListings = [...filteredListings].sort((left, right) =>
+    right.created_at.localeCompare(left.created_at)
+  );
   const safeItemsPerPage = Number.isFinite(itemsPerPage) && itemsPerPage > 0 ? Math.floor(itemsPerPage) : 6;
   const totalPages = Math.max(1, Math.ceil(sortedListings.length / safeItemsPerPage));
   const activePage = Math.min(currentPage, totalPages);
@@ -304,15 +257,20 @@ export default function MarketplacePreview({
         ) : null}
 
         {enableSearch ? (
-          <div className="rounded-[30px] border border-border/70 bg-white p-4 shadow-[0_18px_50px_-40px_rgba(6,43,99,0.35)] sm:p-5">
+          <div className="rounded-[28px] border border-border/70 bg-white p-4 shadow-[0_18px_50px_-40px_rgba(6,43,99,0.35)] sm:p-5">
             <form
               onSubmit={(event) => {
                 event.preventDefault();
                 applyFilters();
               }}
-              className="space-y-3"
+              className="space-y-4"
             >
-              <div className="grid gap-3 xl:grid-cols-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                <SlidersHorizontal className="h-4 w-4 text-primary" />
+                Marketplace filters
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)]">
                 <Input
                   value={draftFilters.minPrice}
                   onChange={(event) => updateDraftFilter("minPrice", event.target.value)}
@@ -334,24 +292,11 @@ export default function MarketplacePreview({
                 />
 
                 <Select
-                  value={draftFilters.vendor}
-                  onChange={(event) => updateDraftFilter("vendor", event.target.value)}
-                  className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
-                >
-                  <option value="all">Vendors</option>
-                  {vendorOptions.map(([username, sellerName]) => (
-                    <option key={username} value={username}>
-                      {sellerName} (@{username})
-                    </option>
-                  ))}
-                </Select>
-
-                <Select
                   value={draftFilters.game}
                   onChange={(event) => updateDraftFilter("game", event.target.value)}
                   className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
                 >
-                    <option value="all">All Accounts</option>
+                  <option value="all">All Accounts</option>
                   {gameOptions.map((game) => (
                     <option key={game} value={game}>
                       {game}
@@ -360,70 +305,17 @@ export default function MarketplacePreview({
                 </Select>
               </div>
 
-              <div className="grid gap-3 xl:grid-cols-5">
-                <Select
-                  value={draftFilters.platform}
-                  onChange={(event) => updateDraftFilter("platform", event.target.value)}
-                  className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
-                >
-                  <option value="all">All Platforms</option>
-                  {platformOptions.map((platform) => (
-                    <option key={platform} value={platform}>
-                      {platform}
-                    </option>
-                  ))}
-                </Select>
-
-                <Select
-                  value={draftFilters.status}
-                  onChange={(event) => updateDraftFilter("status", event.target.value)}
-                  className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="active">Active</option>
-                  <option value="sold">Sold</option>
-                </Select>
-
-                <Select
-                  value={draftFilters.sortBy}
-                  onChange={(event) => updateDraftFilter("sortBy", event.target.value)}
-                  className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
-                >
-                  <option value="latest">Latest</option>
-                  <option value="lowest_price">Lowest price</option>
-                  <option value="highest_price">Highest price</option>
-                  <option value="most_rated">Most rated</option>
-                  <option value="top_sellers">Top sellers</option>
-                </Select>
-
+              <div className="flex justify-end">
                 <button
                   type="submit"
                   className={buttonClassName({
                     size: "lg",
-                    className: "h-14 w-full rounded-2xl"
+                    className: "h-14 w-full rounded-2xl px-10 lg:w-auto"
                   })}
                   disabled={minPriceInvalid || maxPriceInvalid}
                 >
                   Filter
                 </button>
-
-                <div className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3 text-sm xl:col-span-2">
-                  <span className="text-muted-foreground">
-                    {sortedListings.length}{" "}
-                    {sortedListings.length === 1 ? "listing found" : "listings found"}
-                  </span>
-                  {hasActiveFilters ? (
-                    <button
-                      type="button"
-                      onClick={resetFilters}
-                      className="font-semibold text-primary transition hover:text-primary-dark"
-                    >
-                      Clear all
-                    </button>
-                  ) : (
-                    <span className="font-medium text-muted-foreground">Live marketplace filters</span>
-                  )}
-                </div>
               </div>
             </form>
           </div>
@@ -436,7 +328,7 @@ export default function MarketplacePreview({
                 No listings match these filters.
               </h3>
               <p className="mt-3 text-sm leading-7 text-muted-foreground">
-                Try a wider price range or switch to a different vendor, game, or platform.
+                Try a wider price range or switch to a different account type.
               </p>
             </CardContent>
           </Card>

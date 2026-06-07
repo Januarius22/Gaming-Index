@@ -111,9 +111,9 @@ export default async function AccountCheckoutPage({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.02fr)_minmax(360px,0.98fr)]">
         <Card className="border-border/70">
-          <CardContent className="grid gap-6 p-5 lg:grid-cols-[minmax(240px,320px)_1fr] lg:p-6">
+          <CardContent className="space-y-6 p-5 lg:p-6">
             {listing ? (
-              <Link href={`/account/marketplace/${listing.id}`} className="block">
+              <Link href={`/account/marketplace/${listing.id}`} className="mx-auto block max-w-xl">
                 <ListingPhotoGrid listing={listing} className="rounded-[28px]" />
               </Link>
             ) : (
@@ -147,24 +147,24 @@ export default async function AccountCheckoutPage({
                 </p>
               </div>
 
-              <div className="grid gap-3 rounded-3xl bg-surface p-5 text-sm sm:grid-cols-2">
-                <div>
+              <div className="grid gap-4 rounded-3xl bg-surface p-5 text-sm sm:grid-cols-2">
+                <div className="min-w-0">
                   <p className="text-muted-foreground">Seller</p>
-                  <p className="mt-1 font-semibold text-foreground">
+                  <p className="mt-1 break-words font-semibold text-foreground">
                     {listing ? `@${listing.seller_username}` : "Unknown seller"}
                   </p>
                 </div>
-                <div>
+                <div className="min-w-0 sm:text-right">
                   <p className="text-muted-foreground">Price</p>
-                  <p className="mt-1 font-heading text-2xl font-semibold text-foreground">
+                  <p className="mt-1 break-words font-heading text-2xl font-semibold text-foreground">
                     {formatCurrency(order.amount)}
                   </p>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-muted-foreground">Order created</p>
                   <p className="mt-1 font-semibold text-foreground">{formatDate(order.created_at)}</p>
                 </div>
-                <div>
+                <div className="min-w-0 sm:text-right">
                   <p className="text-muted-foreground">Login method</p>
                   <p className="mt-1 font-semibold text-foreground">
                     {listing?.login_method || "Not available"}
@@ -282,14 +282,15 @@ export default async function AccountCheckoutPage({
           ) : (
             <Card className="border-border/70">
               <CardHeader>
-                <CardTitle>Payment details</CardTitle>
+                <CardTitle>Secure payment</CardTitle>
                 <CardDescription>
-                  Complete this secure card checkout to unlock delivery from the seller.
+                  Complete this test checkout through the future provider-style flow.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form action={completeCheckoutAction} className="space-y-5">
                   <input type="hidden" name="orderId" value={order.id} />
+                  <input type="hidden" name="paymentMode" value="paystack_mock" />
 
                   <div className="grid gap-4">
                     <div>
@@ -324,94 +325,54 @@ export default async function AccountCheckoutPage({
                         className="bg-surface"
                       />
                     </div>
-
-                    <div>
-                      <label
-                        htmlFor="cardholderName"
-                        className="mb-2 block text-sm font-medium text-foreground"
-                      >
-                        Cardholder name
-                      </label>
-                      <Input
-                        id="cardholderName"
-                        name="cardholderName"
-                        autoComplete="cc-name"
-                        placeholder="Enter the name on the card"
-                        defaultValue={profile.full_name}
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="cardNumber"
-                        className="mb-2 block text-sm font-medium text-foreground"
-                      >
-                        Card number
-                      </label>
-                      <Input
-                        id="cardNumber"
-                        name="cardNumber"
-                        autoComplete="cc-number"
-                        inputMode="numeric"
-                        placeholder="4084 0840 8408 4081"
-                        required
-                      />
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <label
-                          htmlFor="expiry"
-                          className="mb-2 block text-sm font-medium text-foreground"
-                        >
-                          Expiry
-                        </label>
-                        <Input
-                          id="expiry"
-                          name="expiry"
-                          autoComplete="cc-exp"
-                          placeholder="MM/YY"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label
-                          htmlFor="cvv"
-                          className="mb-2 block text-sm font-medium text-foreground"
-                        >
-                          CVV
-                        </label>
-                        <Input
-                          id="cvv"
-                          name="cvv"
-                          type="password"
-                          autoComplete="cc-csc"
-                          inputMode="numeric"
-                          placeholder="123"
-                          required
-                        />
-                      </div>
-                    </div>
                   </div>
 
-                  <div className="rounded-3xl bg-surface p-5">
-                    <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-5 rounded-3xl bg-surface p-5">
+                    <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Amount to charge</p>
+                        <p className="text-sm text-muted-foreground">Amount payable</p>
                         <p className="mt-2 font-heading text-4xl font-semibold text-foreground">
                           {formatCurrency(order.amount)}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                          Dummy test payment. Real card, bank transfer, and USSD options will
+                          happen on Paystack when it is connected.
                         </p>
                       </div>
                       <div className="rounded-2xl bg-white p-3 text-primary shadow-sm">
                         <CreditCard className="h-5 w-5" />
                       </div>
                     </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {["Card", "Bank transfer", "USSD"].map((method) => (
+                        <div
+                          key={method}
+                          className="rounded-2xl border border-border/80 bg-white px-4 py-3 text-center text-sm font-semibold text-foreground"
+                        >
+                          {method}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-primary/10 bg-primary-soft/55 p-5">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-2xl bg-white p-3 text-primary shadow-sm">
+                        <ShieldCheck className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground">Provider checkout preview</p>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                          This button completes the dummy order now. Later, the same button will
+                          open Paystack and payment will be confirmed by webhook.
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
                   <Button type="submit" size="lg" className="w-full rounded-2xl">
-                    Pay {formatCurrency(order.amount)}
+                    Pay securely with Paystack
                   </Button>
                 </form>
               </CardContent>

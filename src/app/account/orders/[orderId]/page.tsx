@@ -146,9 +146,9 @@ export default async function AccountOrderDetailPage({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)]">
         <Card className="border-border/70">
-          <CardContent className="grid gap-6 p-5 lg:grid-cols-[minmax(240px,320px)_1fr] lg:p-6">
+          <CardContent className="space-y-6 p-5 lg:p-6">
             {listing ? (
-              <Link href={`/account/marketplace/${listing.id}`} className="block">
+              <Link href={`/account/marketplace/${listing.id}`} className="mx-auto block max-w-xl">
                 <ListingPhotoGrid listing={listing} className="rounded-[28px]" />
               </Link>
             ) : (
@@ -183,28 +183,28 @@ export default async function AccountOrderDetailPage({
                 )}
               </div>
 
-              <div className="grid gap-3 rounded-3xl bg-surface p-5 text-sm sm:grid-cols-2">
-                <div>
+              <div className="grid gap-4 rounded-3xl bg-surface p-5 text-sm sm:grid-cols-2">
+                <div className="min-w-0">
                   <p className="text-muted-foreground">Seller</p>
-                  <p className="mt-1 font-semibold text-foreground">
+                  <p className="mt-1 break-words font-semibold text-foreground">
                     {listing ? `@${listing.seller_username}` : "Unknown seller"}
                   </p>
                 </div>
-                <div>
+                <div className="min-w-0 sm:text-right">
                   <p className="text-muted-foreground">Login method</p>
-                  <p className="mt-1 font-semibold text-foreground">
+                  <p className="mt-1 break-words font-semibold text-foreground">
                     {listing?.login_method || "Not available"}
                   </p>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-muted-foreground">Platform</p>
-                  <p className="mt-1 font-semibold text-foreground">
+                  <p className="mt-1 break-words font-semibold text-foreground">
                     {listing?.platform || "Not available"}
                   </p>
                 </div>
-                <div>
+                <div className="min-w-0 sm:text-right">
                   <p className="text-muted-foreground">Account level</p>
-                  <p className="mt-1 font-semibold text-foreground">
+                  <p className="mt-1 break-words font-semibold text-foreground">
                     {listing?.account_level || "Not available"}
                   </p>
                 </div>
@@ -215,7 +215,7 @@ export default async function AccountOrderDetailPage({
                   href={returnToHistory}
                   className={buttonClassName({
                     variant: "secondary",
-                    className: "rounded-2xl"
+                    className: "flex-1 rounded-2xl sm:flex-none"
                   })}
                 >
                   Back to Order History
@@ -225,7 +225,7 @@ export default async function AccountOrderDetailPage({
                     href={`/account/marketplace/${listing.id}`}
                     className={buttonClassName({
                       variant: "ghost",
-                      className: "rounded-2xl"
+                      className: "flex-1 rounded-2xl sm:flex-none"
                     })}
                   >
                     View Listing
@@ -235,7 +235,7 @@ export default async function AccountOrderDetailPage({
                   <Link
                     href={`/account/checkout/${order.id}`}
                     className={buttonClassName({
-                      className: "rounded-2xl"
+                      className: "flex-1 rounded-2xl sm:flex-none"
                     })}
                   >
                     Continue Checkout

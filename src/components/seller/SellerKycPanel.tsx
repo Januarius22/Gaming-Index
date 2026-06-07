@@ -495,9 +495,6 @@ export default function SellerKycPanel({
                     required
                     className="block w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-primary-soft file:px-4 file:py-2 file:font-semibold file:text-primary"
                   />
-                  <p className="text-xs leading-6 text-muted-foreground">
-                    JPG, PNG, WEBP, HEIC, or HEIF up to 20MB.
-                  </p>
                 </div>
                 <div className="space-y-2">
                   <label htmlFor="documentBack" className="text-sm font-semibold text-foreground">
@@ -511,9 +508,6 @@ export default function SellerKycPanel({
                     required
                     className="block w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-primary-soft file:px-4 file:py-2 file:font-semibold file:text-primary"
                   />
-                  <p className="text-xs leading-6 text-muted-foreground">
-                    JPG, PNG, WEBP, HEIC, or HEIF up to 20MB.
-                  </p>
                 </div>
               </div>
             </div>
@@ -541,9 +535,6 @@ export default function SellerKycPanel({
                     required
                     className="block w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-primary-soft file:px-4 file:py-2 file:font-semibold file:text-primary"
                   />
-                  <p className="text-xs leading-6 text-muted-foreground">
-                    JPG, PNG, WEBP, HEIC, or HEIF up to 20MB.
-                  </p>
                 </div>
               </div>
             </div>
@@ -551,12 +542,7 @@ export default function SellerKycPanel({
 
           <FormMessage message={modalFeedback} />
 
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-xs leading-6 text-muted-foreground">
-              {directUploadEnabled
-                ? "Large KYC images upload directly to secure storage before submission."
-                : "Your KYC files will be submitted together with this form."}
-            </p>
+          <div className="flex justify-end">
             <Button type="submit" disabled={submitting}>
               {submitLabel}
             </Button>

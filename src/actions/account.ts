@@ -181,13 +181,17 @@ async function markOrderPaid({
   listingId,
   buyerPhone,
   paymentReference,
-  paymentLast4
+  paymentLast4,
+  paymentProvider = "secure_checkout",
+  paymentChannel = "card"
 }: {
   orderId: string;
   listingId: string;
   buyerPhone: string;
   paymentReference: string;
   paymentLast4: string;
+  paymentProvider?: string;
+  paymentChannel?: string;
 }) {
   const paidAt = getNigeriaTimestamp();
 
@@ -204,9 +208,9 @@ async function markOrderPaid({
       buyer_phone: buyerPhone,
       status: "completed",
       payment_status: "successful",
-      payment_provider: "secure_checkout",
+      payment_provider: paymentProvider,
       payment_reference: paymentReference,
-      payment_channel: "card",
+      payment_channel: paymentChannel,
       payment_last4: paymentLast4,
       paid_at: paidAt
     });
@@ -240,14 +244,14 @@ async function markOrderPaid({
   const { error: orderError } = await supabase
     .from("orders")
     .update({
-      buyer_phone: buyerPhone,
-      status: "completed",
-      payment_status: "successful",
-      payment_provider: "secure_checkout",
-      payment_reference: paymentReference,
-      payment_channel: "card",
-      payment_last4: paymentLast4,
-      paid_at: paidAt
+    buyer_phone: buyerPhone,
+    status: "completed",
+    payment_status: "successful",
+    payment_provider: paymentProvider,
+    payment_reference: paymentReference,
+    payment_channel: paymentChannel,
+    payment_last4: paymentLast4,
+    paid_at: paidAt
     })
     .eq("id", orderId);
 
@@ -504,11 +508,13 @@ export async function revealOrderDeliveryAction(formData: FormData) {
 export async function completeCheckoutAction(formData: FormData) {
   const profile = await requireAccountProfile();
   const orderId = String(formData.get("orderId") ?? "").trim();
+  const paymentMode = String(formData.get("paymentMode") ?? "").trim();
   const buyerPhone = String(formData.get("buyerPhone") ?? "").trim();
   const cardholderName = String(formData.get("cardholderName") ?? "").trim();
   const cardNumber = String(formData.get("cardNumber") ?? "").replace(/\s+/g, "");
   const expiry = String(formData.get("expiry") ?? "").trim();
   const cvv = String(formData.get("cvv") ?? "").trim();
+  const useMockProvider = paymentMode === "paystack_mock";
 
   if (!orderId) {
     redirect("/account/orders");
@@ -530,25 +536,27 @@ export async function completeCheckoutAction(formData: FormData) {
     redirect(getCheckoutPath(order.id, "checkout-unavailable"));
   }
 
-  if (
-    !buyerPhone ||
-    !isValidPhoneNumber(buyerPhone) ||
-    cardholderName.length < 3 ||
-    !/^\d{12,19}$/.test(cardNumber) ||
-    !isValidExpiry(expiry) ||
-    !/^\d{3,4}$/.test(cvv)
-  ) {
+  const cardDetailsInvalid =
+    !useMockProvider &&
+    (cardholderName.length < 3 ||
+      !/^\d{12,19}$/.test(cardNumber) ||
+      !isValidExpiry(expiry) ||
+      !/^\d{3,4}$/.test(cvv));
+
+  if (!buyerPhone || !isValidPhoneNumber(buyerPhone) || cardDetailsInvalid) {
     redirect(getCheckoutPath(order.id, "payment-invalid"));
   }
 
   const paymentReference = getPaymentReference();
-  const paymentLast4 = cardNumber.slice(-4);
+  const paymentLast4 = useMockProvider ? "TEST" : cardNumber.slice(-4);
   const paymentResult = await markOrderPaid({
     orderId: order.id,
     listingId: order.listing_id,
     buyerPhone,
     paymentReference,
-    paymentLast4
+    paymentLast4,
+    paymentProvider: useMockProvider ? "paystack_mock" : "secure_checkout",
+    paymentChannel: useMockProvider ? "provider_test" : "card"
   });
 
   if (!paymentResult.ok) {

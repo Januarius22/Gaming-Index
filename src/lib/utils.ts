@@ -2,7 +2,7 @@ import type { KycStatus, ListingStatus, OrderStatus } from "@/types";
 
 export const APP_TIME_ZONE = "Africa/Lagos";
 export const APP_TIME_LABEL = "WAT";
-export const SOLD_LISTING_PUBLIC_VISIBILITY_HOURS = 5;
+export const SOLD_LISTING_PUBLIC_VISIBILITY_HOURS = 24 * 7;
 
 export function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");

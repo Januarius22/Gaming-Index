@@ -78,7 +78,7 @@ export default function SellerListingCard({
             <p className="text-sm font-semibold text-foreground">Sold listing</p>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {stillVisibleInMarketplace
-                ? `This listing stays visible in the marketplace for up to 5 hours after sale, then it moves fully into history.`
+                ? `This listing stays visible in the marketplace for up to 1 week after sale, then it moves fully into history.`
                 : "This listing is no longer visible in the marketplace and now lives only in history."}
             </p>
           </div>
