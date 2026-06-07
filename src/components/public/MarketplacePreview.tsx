@@ -414,21 +414,21 @@ export default function MarketplacePreview({
                           </div>
 
                           <div className="mt-auto border-t border-border/70 pt-5">
-                            <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+                            <div className="space-y-4">
                               <div className="min-w-0 space-y-2">
-                                <p className="text-sm font-medium text-muted-foreground">
+                                <p className="break-words text-sm font-medium text-muted-foreground">
                                   @{listing.seller_username}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
                                   {listing.seller_reviews ?? 0}{" "}
                                   {(listing.seller_reviews ?? 0) === 1 ? "buyer rating" : "buyer ratings"}
                                 </p>
-                                <p className="font-heading text-[2.15rem] font-semibold leading-none text-foreground">
+                                <p className="break-all font-heading text-3xl font-semibold leading-none text-foreground sm:text-[2.15rem]">
                                   {formatCurrency(listing.price)}
                                 </p>
                               </div>
 
-                              <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
+                              <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
                                 <button
                                   type="button"
                                   disabled={isSold || isUpdatingCart}
@@ -459,7 +459,7 @@ export default function MarketplacePreview({
                                     strokeWidth={isSaved ? 2.75 : 2.35}
                                   />
                                 </button>
-                                <form action={buyNowAction} className="min-w-[10.25rem] flex-1">
+                                <form action={buyNowAction} className="min-w-[10.25rem] flex-1 sm:flex-none">
                                   <input type="hidden" name="listingId" value={listing.id} />
                                   <input type="hidden" name="returnTo" value={pathname} />
                                   <button
@@ -526,16 +526,16 @@ export default function MarketplacePreview({
                             </p>
                           </div>
 
-                          <div className="mt-auto flex items-end justify-between gap-4 border-t border-border/70 pt-5">
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium text-muted-foreground">
+                          <div className="mt-auto space-y-4 border-t border-border/70 pt-5">
+                            <div className="min-w-0 space-y-2">
+                              <p className="break-words text-sm font-medium text-muted-foreground">
                                 @{listing.seller_username}
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {listing.seller_reviews ?? 0}{" "}
                                 {(listing.seller_reviews ?? 0) === 1 ? "buyer rating" : "buyer ratings"}
                               </p>
-                              <p className="font-heading text-[2.15rem] font-semibold leading-none text-foreground">
+                              <p className="break-all font-heading text-3xl font-semibold leading-none text-foreground sm:text-[2.15rem]">
                                 {formatCurrency(listing.price)}
                               </p>
                             </div>
@@ -545,7 +545,7 @@ export default function MarketplacePreview({
                                 variant: "secondary",
                                 size: "md",
                                 className:
-                                  "pointer-events-none rounded-2xl border-primary/12 bg-primary-soft/70 text-primary"
+                                  "pointer-events-none w-full rounded-2xl border-primary/12 bg-primary-soft/70 text-primary sm:w-auto"
                               })}
                             >
                               More Info
