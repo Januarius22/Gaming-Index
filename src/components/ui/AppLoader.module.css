@@ -10,14 +10,16 @@
 
 .panel {
   display: flex;
-  min-width: min(22rem, 100%);
+  width: 8rem;
+  height: 8rem;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 1.25rem;
   border: 1px solid rgba(215, 227, 248, 0.9);
   border-radius: 1.75rem;
   background: rgba(255, 255, 255, 0.84);
-  padding: 2rem;
+  padding: 1.5rem;
   box-shadow: 0 28px 80px -54px rgba(6, 43, 99, 0.55);
   backdrop-filter: blur(16px);
 }
@@ -46,23 +48,6 @@
   inset: -31px;
   border: 1px solid rgba(0, 87, 255, 0.2);
   border-radius: 999px;
-}
-
-.text {
-  margin: 0;
-  color: #062b63;
-  font-size: 0.92rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.subtext {
-  margin: -0.65rem 0 0;
-  color: #6b7280;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  text-align: center;
 }
 
 @keyframes gamingIndexLoader8 {
