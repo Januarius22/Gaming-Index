@@ -86,6 +86,10 @@ export async function redirectIfAuthenticated() {
   const profile = await getCurrentProfile();
 
   if (profile) {
+    if (profile.is_banned && profile.role !== "admin") {
+      redirect("/account-suspended");
+    }
+
     redirect(getDashboardRoute(profile.role));
   }
 }
@@ -101,6 +105,10 @@ export async function requireAccountProfile() {
     redirect("/admin/dashboard");
   }
 
+  if (profile.is_banned) {
+    redirect("/account-suspended");
+  }
+
   return profile;
 }
 
@@ -113,6 +121,10 @@ export async function requireSellerProfile() {
 
   if (profile.role === "admin") {
     redirect("/admin/dashboard");
+  }
+
+  if (profile.is_banned) {
+    redirect("/account-suspended");
   }
 
   if (!profile.seller_enabled) {

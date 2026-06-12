@@ -24,8 +24,11 @@ export function normalizeProfile(
     role?: unknown;
     seller_enabled?: unknown;
     kyc_status?: unknown;
+    is_banned?: unknown;
   }
 ): Profile {
+  const rawIsBanned = value.is_banned as unknown;
+
   return {
     id: value.id ?? "",
     full_name: value.full_name ?? "Gaming Index User",
@@ -34,6 +37,10 @@ export function normalizeProfile(
     role: normalizeRole(value.role),
     seller_enabled: normalizeSellerEnabled(value.seller_enabled, value.role),
     kyc_status: normalizeKycStatus(value.kyc_status),
+    is_banned: rawIsBanned === true || rawIsBanned === "true",
+    banned_at: value.banned_at ?? null,
+    banned_reason: value.banned_reason ?? "",
+    banned_by: value.banned_by ?? null,
     created_at: value.created_at ?? new Date().toISOString()
   };
 }

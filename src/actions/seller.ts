@@ -22,12 +22,118 @@ import {
   validateUploadedStorageAsset
 } from "@/lib/storageUploads";
 import { getNigeriaTimestamp, isValidPhoneNumber } from "@/lib/utils";
-import type { KycActionState, ListingActionState, Profile } from "@/types";
+import type { KycActionState, Listing, ListingActionState, Profile } from "@/types";
 
 const LISTING_STORAGE_BUCKET = "listing-media";
 const MAX_LISTING_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_LISTING_IMAGES = 1;
 const LISTING_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
+const DUPLICATE_LISTING_WINDOW_MS = 10 * 60 * 1000;
+
+function normalizeDuplicateValue(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function isSameListingSubmission(
+  listing: Pick<
+    Listing,
+    "seller_id" | "game" | "title" | "description" | "price" | "platform" | "account_level" | "login_method" | "extra_notes"
+  >,
+  values: {
+    sellerId: string;
+    game: string;
+    title: string;
+    description: string;
+    price: number;
+    platform: string;
+    accountLevel: string;
+    loginMethod: string;
+    extraNotes: string;
+  }
+) {
+  return (
+    listing.seller_id === values.sellerId &&
+    normalizeDuplicateValue(listing.game) === normalizeDuplicateValue(values.game) &&
+    normalizeDuplicateValue(listing.title) === normalizeDuplicateValue(values.title) &&
+    normalizeDuplicateValue(listing.description) === normalizeDuplicateValue(values.description) &&
+    Number(listing.price) === values.price &&
+    normalizeDuplicateValue(listing.platform) === normalizeDuplicateValue(values.platform) &&
+    normalizeDuplicateValue(listing.account_level) === normalizeDuplicateValue(values.accountLevel) &&
+    normalizeDuplicateValue(listing.login_method) === normalizeDuplicateValue(values.loginMethod) &&
+    normalizeDuplicateValue(listing.extra_notes ?? "") === normalizeDuplicateValue(values.extraNotes)
+  );
+}
+
+async function hasRecentDuplicateListing({
+  sellerId,
+  game,
+  title,
+  description,
+  price,
+  platform,
+  accountLevel,
+  loginMethod,
+  extraNotes
+}: {
+  sellerId: string;
+  game: string;
+  title: string;
+  description: string;
+  price: number;
+  platform: string;
+  accountLevel: string;
+  loginMethod: string;
+  extraNotes: string;
+}) {
+  const duplicateWindowStart = getNigeriaTimestamp(
+    new Date(Date.now() - DUPLICATE_LISTING_WINDOW_MS)
+  );
+  const duplicateValues = {
+    sellerId,
+    game,
+    title,
+    description,
+    price,
+    platform,
+    accountLevel,
+    loginMethod,
+    extraNotes
+  };
+
+  if (!hasSupabaseEnv) {
+    const listings = await getDemoListings();
+
+    return listings.some(
+      (listing) =>
+        listing.created_at >= duplicateWindowStart &&
+        isSameListingSubmission(listing, duplicateValues)
+    );
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { data, error } = await supabase!
+    .from("listings")
+    .select(
+      "seller_id, game, title, description, price, platform, account_level, login_method, extra_notes"
+    )
+    .eq("seller_id", sellerId)
+    .eq("game", game)
+    .eq("title", title)
+    .eq("price", price)
+    .eq("platform", platform)
+    .eq("account_level", accountLevel)
+    .eq("login_method", loginMethod)
+    .gte("created_at", duplicateWindowStart)
+    .limit(5);
+
+  if (error) {
+    return false;
+  }
+
+  return ((data as Listing[] | null) ?? []).some((listing) =>
+    isSameListingSubmission(listing, duplicateValues)
+  );
+}
 
 function getUploadedFileName(value: FormDataEntryValue | null) {
   if (!(value instanceof File) || value.size <= 0) {
@@ -149,6 +255,13 @@ export async function saveKycSubmission({
   seller: Profile;
   formData: FormData;
 }): Promise<{ status: "success" } | { status: "error"; message: string }> {
+  if (seller.is_banned) {
+    return {
+      status: "error",
+      message: "Your account is suspended. Seller features are unavailable."
+    };
+  }
+
   if (seller.kyc_status === "approved") {
     return {
       status: "error",
@@ -435,6 +548,13 @@ export async function saveListingSubmission({
   seller: Profile;
   formData: FormData;
 }): Promise<ListingActionState> {
+  if (seller.is_banned) {
+    return {
+      status: "error",
+      message: "Your account is suspended. Seller features are unavailable."
+    };
+  }
+
   const game = String(formData.get("game") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -524,6 +644,26 @@ export async function saveListingSubmission({
     return {
       status: "error",
       message: "Final grid image must be 8MB or smaller."
+    };
+  }
+
+  const duplicateListingExists = await hasRecentDuplicateListing({
+    sellerId: seller.id,
+    game,
+    title,
+    description,
+    price,
+    platform,
+    accountLevel,
+    loginMethod,
+    extraNotes
+  });
+
+  if (duplicateListingExists) {
+    return {
+      status: "success",
+      message:
+        "This listing was already published recently. Please check My Listings before publishing it again."
     };
   }
 

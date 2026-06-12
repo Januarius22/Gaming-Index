@@ -93,6 +93,10 @@ export async function registerAccountAction(
     role: "user" as const,
     seller_enabled: false,
     kyc_status: "not_started" as const,
+    is_banned: false,
+    banned_at: null,
+    banned_reason: "",
+    banned_by: null,
     created_at: getNigeriaTimestamp()
   };
 
@@ -136,6 +140,10 @@ export async function loginAction(
       .eq("id", user?.id ?? "")
       .maybeSingle();
 
+    if (profile?.is_banned && profile.role !== "admin") {
+      redirect("/account-suspended");
+    }
+
     if (profile?.role === "admin") {
       redirect("/admin/dashboard");
     }
@@ -155,6 +163,11 @@ export async function loginAction(
       status: "error",
       message: "No demo account matches that email. Register first or use admin@gamingindex.dev."
     };
+  }
+
+  if (profile.is_banned && profile.role !== "admin") {
+    await setDemoSession(profile.id);
+    redirect("/account-suspended");
   }
 
   await setDemoSession(profile.id);

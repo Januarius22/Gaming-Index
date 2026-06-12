@@ -31,6 +31,10 @@ export async function POST(request: Request) {
     return redirectTo(request, "/admin/dashboard");
   }
 
+  if (profile.is_banned) {
+    return redirectTo(request, "/account-suspended");
+  }
+
   if (!profile.seller_enabled) {
     return redirectTo(request, "/account/seller");
   }

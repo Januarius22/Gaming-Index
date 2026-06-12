@@ -1,16 +1,43 @@
-import Badge from "@/components/ui/Badge";
+import AdminUsersTable from "@/components/admin/AdminUsersTable";
+import FormMessage from "@/components/auth/FormMessage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import PaginationControls from "@/components/ui/PaginationControls";
 import { getAdminUsers } from "@/lib/data";
-import { formatDate, paginateItems, parsePageParam } from "@/lib/utils";
+import { paginateItems, parsePageParam } from "@/lib/utils";
+
+function getUserNotice(notice?: string, error?: string) {
+  switch (notice) {
+    case "user-banned":
+      return {
+        message: "User banned successfully. Their listings are hidden until they are unbanned.",
+        tone: "success" as const
+      };
+    case "user-unbanned":
+      return {
+        message: "User unbanned successfully. Their app access has been restored.",
+        tone: "success" as const
+      };
+    case "user-ban-failed":
+      return {
+        message: error || "We could not update this user's ban status.",
+        tone: "error" as const
+      };
+    default:
+      return {
+        message: "",
+        tone: "success" as const
+      };
+  }
+}
 
 export default async function AdminUsersPage({
   searchParams
 }: {
-  searchParams?: Promise<{ page?: string }>;
+  searchParams?: Promise<{ page?: string; notice?: string; error?: string }>;
 }) {
   const users = await getAdminUsers();
   const params = (await searchParams) ?? {};
+  const noticeState = getUserNotice(params.notice, params.error);
   const requestedPage = parsePageParam(params.page);
   const {
     items: paginatedUsers,
@@ -30,6 +57,7 @@ export default async function AdminUsersPage({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <FormMessage message={noticeState.message} tone={noticeState.tone} />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             Showing {pageStart}-{pageEnd} of {totalCount} users
@@ -40,44 +68,10 @@ export default async function AdminUsersPage({
             totalPages={totalPages}
           />
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-border text-muted-foreground">
-                <th className="px-4 py-3 font-medium">Name</th>
-                <th className="px-4 py-3 font-medium">Username</th>
-                <th className="px-4 py-3 font-medium">Email</th>
-                <th className="px-4 py-3 font-medium">Role</th>
-                <th className="px-4 py-3 font-medium">Created Date</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
-                    No users yet.
-                  </td>
-                </tr>
-              ) : (
-                paginatedUsers.map((user) => (
-                  <tr key={user.id} className="border-b border-border/60">
-                    <td className="px-4 py-4 font-medium text-foreground">{user.full_name}</td>
-                    <td className="px-4 py-4">@{user.username}</td>
-                    <td className="px-4 py-4">{user.email}</td>
-                    <td className="px-4 py-4 capitalize">{user.role}</td>
-                    <td className="px-4 py-4">{formatDate(user.created_at)}</td>
-                    <td className="px-4 py-4">
-                      <Badge variant={user.seller_enabled ? "info" : "neutral"}>
-                        {user.seller_enabled ? "Seller enabled" : "Buyer account"}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <AdminUsersTable
+          users={paginatedUsers}
+          returnTo={`/admin/users${currentPage > 1 ? `?page=${currentPage}` : ""}`}
+        />
       </CardContent>
     </Card>
   );

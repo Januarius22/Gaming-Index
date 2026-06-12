@@ -19,6 +19,7 @@ export default function SellerUploadForm({
   feedbackMessage?: string;
 }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const previewUrl = useMemo(
@@ -65,6 +66,7 @@ export default function SellerUploadForm({
           action="/seller/upload/submit"
           method="POST"
           encType="multipart/form-data"
+          onSubmit={() => setIsSubmitting(true)}
           className="space-y-6"
         >
           <div className="grid gap-5 md:grid-cols-2">
@@ -323,7 +325,7 @@ export default function SellerUploadForm({
           <FormMessage message={feedbackMessage} tone="error" />
 
           <div className="flex justify-end">
-            <SubmitButton pendingLabel="Publishing listing...">
+            <SubmitButton disabled={isSubmitting} pendingLabel="Publishing listing...">
               Publish Listing
             </SubmitButton>
           </div>

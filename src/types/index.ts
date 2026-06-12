@@ -22,6 +22,10 @@ export interface Profile {
   role: AppRole;
   seller_enabled: boolean;
   kyc_status: KycStatus;
+  is_banned: boolean;
+  banned_at?: string | null;
+  banned_reason?: string;
+  banned_by?: string | null;
   created_at: string;
 }
 
@@ -81,6 +85,7 @@ export interface Listing {
   image_names?: string[];
   image_paths?: string[];
   image_urls?: string[];
+  seller_is_banned?: boolean;
   seller_rating?: number;
   seller_reviews?: number;
   seller_tag?: "top_seller" | null;

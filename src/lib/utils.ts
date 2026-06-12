@@ -216,7 +216,12 @@ export function isListingMarketplaceVisible(listing: {
   status: ListingStatus;
   sold_at?: string | null;
   created_at: string;
+  seller_is_banned?: boolean;
 }) {
+  if (listing.seller_is_banned) {
+    return false;
+  }
+
   if (listing.status === "approved") {
     return true;
   }

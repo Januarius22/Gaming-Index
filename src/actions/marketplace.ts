@@ -24,6 +24,13 @@ export async function submitSellerRatingAction(
     };
   }
 
+  if (profile.is_banned) {
+    return {
+      status: "error",
+      message: "Your account is suspended. Marketplace actions are unavailable."
+    };
+  }
+
   if (!sellerId || !listingId) {
     return {
       status: "error",

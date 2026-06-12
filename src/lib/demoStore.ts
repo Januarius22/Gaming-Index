@@ -60,6 +60,10 @@ export function getDemoAdminProfile(): Profile {
     role: "admin",
     seller_enabled: false,
     kyc_status: "approved",
+    is_banned: false,
+    banned_at: null,
+    banned_reason: "",
+    banned_by: null,
     created_at: "2026-05-14T00:00:00.000Z"
   });
 }

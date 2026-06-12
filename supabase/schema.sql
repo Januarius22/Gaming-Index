@@ -6,10 +6,18 @@ create table if not exists public.profiles (
   role text not null default 'user' check (role in ('user', 'admin')),
   seller_enabled boolean not null default false,
   kyc_status text not null default 'not_started' check (kyc_status in ('not_started', 'pending', 'approved', 'rejected')),
+  is_banned boolean not null default false,
+  banned_at timestamp with time zone,
+  banned_reason text not null default '',
+  banned_by uuid references public.profiles(id) on delete set null,
   created_at timestamp with time zone not null default now()
 );
 
 alter table public.profiles add column if not exists seller_enabled boolean not null default false;
+alter table public.profiles add column if not exists is_banned boolean not null default false;
+alter table public.profiles add column if not exists banned_at timestamp with time zone;
+alter table public.profiles add column if not exists banned_reason text not null default '';
+alter table public.profiles add column if not exists banned_by uuid references public.profiles(id) on delete set null;
 update public.profiles set seller_enabled = true where role = 'seller';
 update public.profiles set role = 'user' where role = 'seller';
 alter table public.profiles alter column role set default 'user';
@@ -269,6 +277,40 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+create or replace function public.protect_profile_admin_fields()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() = old.id and not exists (
+    select 1
+    from public.profiles as admin_profile
+    where admin_profile.id = auth.uid()
+      and admin_profile.role = 'admin'
+  ) then
+    if
+      new.role is distinct from old.role
+      or new.kyc_status is distinct from old.kyc_status
+      or new.is_banned is distinct from old.is_banned
+      or new.banned_at is distinct from old.banned_at
+      or new.banned_reason is distinct from old.banned_reason
+      or new.banned_by is distinct from old.banned_by
+    then
+      raise exception 'Only admins can update protected profile fields.';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists protect_profile_admin_fields_before_update on public.profiles;
+create trigger protect_profile_admin_fields_before_update
+  before update on public.profiles
+  for each row execute procedure public.protect_profile_admin_fields();
 
 alter table public.profiles enable row level security;
 alter table public.kyc_submissions enable row level security;

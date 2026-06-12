@@ -187,11 +187,11 @@ async function getSupabaseListings() {
     sellerIds.length > 0
       ? await supabase
           .from("profiles")
-          .select("id, full_name, username")
+          .select("id, full_name, username, is_banned")
           .in("id", sellerIds)
-      : { data: [] as Array<{ id: string; full_name: string; username: string }> };
+      : { data: [] as Array<{ id: string; full_name: string; username: string; is_banned: boolean }> };
   const profileMap = new Map(
-    ((profileRows as Array<{ id: string; full_name: string; username: string }> | null) ?? []).map(
+    ((profileRows as Array<{ id: string; full_name: string; username: string; is_banned: boolean }> | null) ?? []).map(
       (profile) => [profile.id, profile]
     )
   );
@@ -211,6 +211,7 @@ async function getSupabaseListings() {
           normalizedListing.seller_username ||
           sellerProfile?.username ||
           "seller",
+        seller_is_banned: sellerProfile?.is_banned ?? false,
         image_urls: await getSignedListingAssetUrls(
           supabase,
           Array.isArray(listing.image_paths) ? listing.image_paths : []
@@ -402,11 +403,18 @@ function enrichMarketplaceListings(listings: Listing[], ratings: SellerRating[])
 
 async function getAllMarketplaceListings() {
   if (!hasSupabaseEnv) {
-    const [demoListings, demoRatings] = await Promise.all([
+    const [demoListings, demoRatings, demoProfiles] = await Promise.all([
       getDemoListings(),
-      getDemoSellerRatings()
+      getDemoSellerRatings(),
+      getDemoProfiles()
     ]);
-    const normalizedDemoListings = demoListings.map((listing) => normalizeListing(listing));
+    const bannedSellerIds = new Set(
+      demoProfiles.filter((profile) => profile.is_banned).map((profile) => profile.id)
+    );
+    const normalizedDemoListings = demoListings.map((listing) => ({
+      ...normalizeListing(listing),
+      seller_is_banned: bannedSellerIds.has(listing.seller_id)
+    }));
     const visibleListings = normalizedDemoListings.filter((listing) =>
       isListingMarketplaceVisible(listing)
     );
