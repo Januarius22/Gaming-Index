@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   Bookmark,
   LayoutDashboard,
-  LogOut,
   PackageCheck,
   Settings,
   ShieldPlus,
@@ -13,7 +12,7 @@ import {
   Store,
   X
 } from "lucide-react";
-import { logoutAction } from "@/actions/auth";
+import LogoutConfirmButton from "@/components/auth/LogoutConfirmButton";
 import { BrandMark } from "@/components/branding/BrandLogo";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -160,27 +159,24 @@ export default function AccountSidebar({
           collapsedDesktop ? "p-3" : "p-4"
         )}
       >
-        <form action={logoutAction}>
-          <Button
-            type="submit"
-            variant="ghost"
-            title={collapsedDesktop ? "Logout" : undefined}
-            className={cn(
-              "w-full bg-surface text-foreground transition-all duration-300 ease-in-out hover:bg-primary-soft",
-              collapsedDesktop ? "justify-center px-0" : "justify-start"
-            )}
-          >
-            <LogOut className={cn("h-4 w-4 shrink-0 transition-transform duration-300 ease-in-out", collapsedDesktop ? "" : "mr-3")} />
-            <span
-              className={cn(
-                "overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out",
-                collapsedDesktop ? "max-w-0 opacity-0" : "max-w-[8rem] opacity-100"
-              )}
-            >
-              Logout
-            </span>
-          </Button>
-        </form>
+        <LogoutConfirmButton
+          variant="ghost"
+          title={collapsedDesktop ? "Logout" : undefined}
+          className={cn(
+            "w-full bg-surface text-foreground transition-all duration-300 ease-in-out hover:bg-primary-soft",
+            collapsedDesktop ? "justify-center px-0" : "justify-start"
+          )}
+          iconClassName={cn(
+            "transition-transform duration-300 ease-in-out",
+            collapsedDesktop ? "" : "mr-3"
+          )}
+          labelClassName={cn(
+            "overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out",
+            collapsedDesktop ? "max-w-0 opacity-0" : "max-w-[8rem] opacity-100"
+          )}
+        >
+          Logout
+        </LogoutConfirmButton>
       </div>
     </aside>
   );

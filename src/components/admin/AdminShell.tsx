@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { ArrowLeft, Monitor } from "lucide-react";
 import { useEffect, useState } from "react";
-import { logoutAction } from "@/actions/auth";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminTopbar from "@/components/admin/AdminTopbar";
-import Button, { buttonClassName } from "@/components/ui/Button";
+import LogoutConfirmButton from "@/components/auth/LogoutConfirmButton";
+import { buttonClassName } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 
@@ -54,11 +54,7 @@ export default function AdminShell({
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to homepage
             </Link>
-            <form action={logoutAction}>
-              <Button type="submit" variant="secondary" size="lg" className="w-full sm:w-auto">
-                Logout
-              </Button>
-            </form>
+            <LogoutConfirmButton variant="secondary" size="lg" className="w-full gap-2 sm:w-auto" />
           </div>
         </div>
       </div>

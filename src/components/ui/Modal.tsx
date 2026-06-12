@@ -3,17 +3,20 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import Button from "@/components/ui/Button";
+import { cn } from "@/lib/utils";
 
 export default function Modal({
   open,
   title,
   description,
+  panelClassName,
   onClose,
   children
 }: {
   open: boolean;
   title: string;
   description?: string;
+  panelClassName?: string;
   onClose: () => void;
   children: React.ReactNode;
 }) {
@@ -32,7 +35,10 @@ export default function Modal({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 8, scale: 0.98 }}
           transition={{ duration: 0.2 }}
-          className="max-h-[88vh] w-full max-w-4xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl"
+          className={cn(
+            "max-h-[88vh] w-full max-w-4xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl",
+            panelClassName
+          )}
           onClick={(event) => event.stopPropagation()}
         >
             <div className="mb-6 flex items-start justify-between gap-4">
