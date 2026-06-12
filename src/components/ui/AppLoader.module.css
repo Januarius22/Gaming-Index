@@ -1,0 +1,82 @@
+.shell {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background:
+    radial-gradient(circle at top, rgba(0, 87, 255, 0.1), transparent 36%),
+    linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
+}
+
+.panel {
+  display: flex;
+  min-width: min(22rem, 100%);
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  border: 1px solid rgba(215, 227, 248, 0.9);
+  border-radius: 1.75rem;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 2rem;
+  box-shadow: 0 28px 80px -54px rgba(6, 43, 99, 0.55);
+  backdrop-filter: blur(16px);
+}
+
+/*
+  Adapted from the pasted CodePen's "loader8".
+  The original collection included many loaders; this app keeps loader 8 only.
+*/
+.loader {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border: 40px double;
+  border-color: transparent #0057ff;
+  border-radius: 50px;
+  background-color: rgba(0, 87, 255, 0.12);
+  box-sizing: border-box;
+  transform-origin: 50% 50%;
+  animation: gamingIndexLoader8 1.35s linear infinite;
+  filter: drop-shadow(0 18px 28px rgba(0, 87, 255, 0.18));
+}
+
+.loader::after {
+  content: "";
+  position: absolute;
+  inset: -31px;
+  border: 1px solid rgba(0, 87, 255, 0.2);
+  border-radius: 999px;
+}
+
+.text {
+  margin: 0;
+  color: #062b63;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.subtext {
+  margin: -0.65rem 0 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+@keyframes gamingIndexLoader8 {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader {
+    animation-duration: 2.8s;
+  }
+}
