@@ -172,7 +172,7 @@ export default function PublicNavbar() {
                     href="/auth/register"
                     className={buttonClassName({
                       size: "lg",
-                      className: "mt-4 w-full rounded-2xl"
+                      className: "mt-4 w-full gap-2 rounded-2xl"
                     })}
                     onClick={() => setOpen(false)}
                   >
