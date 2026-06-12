@@ -3,17 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { ArrowRight, Home, Info, LogIn, Menu, Store, UserPlus, X } from "lucide-react";
 import { useState } from "react";
 import BrandLogo from "@/components/branding/BrandLogo";
 import Button, { buttonClassName } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Home" },
-  { href: "/marketplace", label: "Marketplace" },
-  { href: "/how-it-works", label: "How It Works" },
-  { href: "/auth/login", label: "Login" }
+  { href: "/", label: "Home", helper: "Back to the main page", icon: Home },
+  { href: "/marketplace", label: "Marketplace", helper: "Browse verified accounts", icon: Store },
+  { href: "/how-it-works", label: "How It Works", helper: "See how safe trades work", icon: Info },
+  { href: "/auth/login", label: "Login", helper: "Return to your account", icon: LogIn }
 ];
 
 export default function PublicNavbar() {
@@ -82,41 +82,104 @@ export default function PublicNavbar() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-950/30 md:hidden"
+            className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-sm md:hidden"
             onClick={() => setOpen(false)}
           >
             <motion.div
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
-              transition={{ duration: 0.22 }}
-              className="ml-auto flex h-full w-72 flex-col border-l border-white/30 bg-white/85 p-6 backdrop-blur-2xl"
+              transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+              className="ml-auto flex h-full w-[min(92vw,26rem)] flex-col overflow-hidden border-l border-white/60 bg-white shadow-[0_30px_90px_-45px_rgba(2,10,24,0.65)]"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex items-center justify-between">
-                <span className="font-heading text-lg font-semibold">Menu</span>
-                <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
-                  <X className="h-5 w-5" />
-                </Button>
+              <div className="relative border-b border-border/70 bg-[linear-gradient(135deg,#ffffff_0%,#eef5ff_58%,#eaf2ff_100%)] p-5">
+                <div className="absolute right-[-4rem] top-[-5rem] h-36 w-36 rounded-full bg-primary/10 blur-2xl" />
+                <div className="relative flex items-start justify-between gap-4">
+                  <BrandLogo
+                    theme="light"
+                    tagline="Verified account trades"
+                    markClassName="h-12 w-12"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-10 w-10 rounded-2xl p-0 hover:bg-white/70"
+                    onClick={() => setOpen(false)}
+                    aria-label="Close menu"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+                <div className="relative mt-5 rounded-3xl border border-white/80 bg-white/70 p-4 shadow-[0_18px_45px_-35px_rgba(6,43,99,0.45)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                    Gaming Index
+                  </p>
+                  <p className="mt-2 font-heading text-xl font-semibold leading-tight text-foreground">
+                    Trade verified gaming accounts with confidence.
+                  </p>
+                </div>
               </div>
-              <div className="mt-8 flex flex-col gap-2">
-                {navItems.map((item) => (
+
+              <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-5">
+                <nav className="space-y-2">
+                  {navItems.map((item) => {
+                    const active = pathname === item.href;
+                    const Icon = item.icon;
+
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "group flex items-center gap-3 rounded-3xl border p-3 transition",
+                          active
+                            ? "border-primary/20 bg-primary-soft text-primary-dark shadow-[0_18px_45px_-38px_rgba(0,87,255,0.65)]"
+                            : "border-border/70 bg-white text-foreground hover:border-primary/20 hover:bg-primary-soft/55"
+                        )}
+                        onClick={() => setOpen(false)}
+                      >
+                        <span
+                          className={cn(
+                            "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition",
+                            active
+                              ? "bg-primary text-white"
+                              : "bg-surface text-primary group-hover:bg-white"
+                          )}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-semibold">{item.label}</span>
+                          <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+                            {item.helper}
+                          </span>
+                        </span>
+                        <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                      </Link>
+                    );
+                  })}
+                </nav>
+
+                <div className="mt-auto rounded-[28px] border border-primary/12 bg-primary-soft/55 p-4">
+                  <p className="font-heading text-lg font-semibold text-foreground">
+                    Ready to trade?
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Join the marketplace and unlock your buyer workspace.
+                  </p>
                   <Link
-                    key={item.href}
-                    href={item.href}
-                    className="rounded-xl px-4 py-3 text-sm font-medium text-foreground hover:bg-primary-soft"
+                    href="/auth/register"
+                    className={buttonClassName({
+                      size: "lg",
+                      className: "mt-4 w-full rounded-2xl"
+                    })}
                     onClick={() => setOpen(false)}
                   >
-                    {item.label}
+                    <UserPlus className="h-4 w-4" />
+                    Get Started
                   </Link>
-                ))}
-                <Link
-                  href="/auth/register"
-                  className={buttonClassName({ className: "mt-3 w-full" })}
-                  onClick={() => setOpen(false)}
-                >
-                  Get Started
-                </Link>
+                </div>
               </div>
             </motion.div>
           </motion.div>
