@@ -95,6 +95,7 @@ function revalidateBuyerCheckout(listingId: string, orderId: string) {
   revalidatePath(`/marketplace/${listingId}`);
   revalidatePath(`/account/marketplace/${listingId}`);
   revalidatePath(`/account/checkout/${orderId}`);
+  revalidatePath(`/account/checkout/${orderId}/success`);
   revalidatePath(`/account/orders/${orderId}`);
   revalidatePath("/seller/orders");
   revalidatePath("/seller/listings");
@@ -574,5 +575,5 @@ export async function completeCheckoutAction(formData: FormData) {
 
   revalidateBuyerCheckout(order.listing_id, order.id);
 
-  redirect(getOrderDetailPath(order.id, "payment-confirmed"));
+  redirect(`/account/checkout/${order.id}/success`);
 }

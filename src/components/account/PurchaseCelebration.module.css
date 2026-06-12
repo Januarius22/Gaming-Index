@@ -1,0 +1,52 @@
+.stage {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.ribbon {
+  position: absolute;
+  top: -14%;
+  width: 0.75rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  opacity: 0.88;
+  animation-name: ribbonFall;
+  animation-duration: var(--duration);
+  animation-delay: var(--delay);
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  transform: translate3d(0, -100%, 0) rotate(var(--rotation));
+}
+
+.ribbon::after {
+  content: "";
+  position: absolute;
+  inset: 0.2rem 0;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.38);
+}
+
+@keyframes ribbonFall {
+  0% {
+    transform: translate3d(0, -100%, 0) rotate(var(--rotation));
+  }
+
+  50% {
+    transform: translate3d(var(--drift), 55vh, 0) rotate(calc(var(--rotation) + 180deg));
+  }
+
+  100% {
+    transform: translate3d(calc(var(--drift) * -0.65), 115vh, 0)
+      rotate(calc(var(--rotation) + 360deg));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ribbon {
+    animation-duration: 12s;
+    opacity: 0.28;
+  }
+}
