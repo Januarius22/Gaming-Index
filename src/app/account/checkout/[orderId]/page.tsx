@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, CreditCard, LockKeyhole, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CreditCard, ShieldCheck } from "lucide-react";
 import { completeCheckoutAction } from "@/actions/account";
 import FormMessage from "@/components/auth/FormMessage";
 import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
@@ -172,21 +172,6 @@ export default async function AccountCheckoutPage({
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-primary/10 bg-primary-soft/55 p-5">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-2xl bg-white p-3 text-primary shadow-sm">
-                    <LockKeyhole className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-foreground">Delivery stays protected until payment</p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      Once this checkout is completed, your order page will unlock the seller’s
-                      delivery details so you can take over the account immediately.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
               <div className="flex flex-wrap gap-3">
                 <Link
                   href={`/account/orders/${order.id}`}
@@ -334,10 +319,6 @@ export default async function AccountCheckoutPage({
                         <p className="mt-2 font-heading text-4xl font-semibold text-foreground">
                           {formatCurrency(order.amount)}
                         </p>
-                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                          Dummy test payment. Real card, bank transfer, and USSD options will
-                          happen on Paystack when it is connected.
-                        </p>
                       </div>
                       <div className="rounded-2xl bg-white p-3 text-primary shadow-sm">
                         <CreditCard className="h-5 w-5" />
@@ -353,21 +334,6 @@ export default async function AccountCheckoutPage({
                           {method}
                         </div>
                       ))}
-                    </div>
-                  </div>
-
-                  <div className="rounded-3xl border border-primary/10 bg-primary-soft/55 p-5">
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-2xl bg-white p-3 text-primary shadow-sm">
-                        <ShieldCheck className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-foreground">Provider checkout preview</p>
-                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                          This button completes the dummy order now. Later, the same button will
-                          open Paystack and payment will be confirmed by webhook.
-                        </p>
-                      </div>
                     </div>
                   </div>
 
