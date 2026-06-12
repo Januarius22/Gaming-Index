@@ -104,11 +104,11 @@ export default function PublicNavbar() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-10 w-10 rounded-2xl p-0 hover:bg-white/70"
+                    className="h-12 w-12 rounded-2xl border border-border/70 bg-white/80 p-0 shadow-sm hover:bg-white"
                     onClick={() => setOpen(false)}
                     aria-label="Close menu"
                   >
-                    <X className="h-5 w-5" />
+                    <X className="h-6 w-6" strokeWidth={2.4} />
                   </Button>
                 </div>
                 <div className="relative mt-5 rounded-3xl border border-white/80 bg-white/70 p-4 shadow-[0_18px_45px_-35px_rgba(6,43,99,0.45)]">
