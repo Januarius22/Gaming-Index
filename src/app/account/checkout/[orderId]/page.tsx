@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowLeft, CreditCard, ShieldCheck } from "lucide-react";
+import { redirect } from "next/navigation";
+import { ArrowLeft, CreditCard } from "lucide-react";
 import { completeCheckoutAction } from "@/actions/account";
 import FormMessage from "@/components/auth/FormMessage";
 import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
@@ -86,6 +87,10 @@ export default async function AccountCheckoutPage({
   const checkoutBlocked =
     order.status === "cancelled" || !listing || (!paymentConfirmed && listing.status !== "approved");
 
+  if (paymentConfirmed) {
+    redirect(`/account/checkout/${order.id}/success`);
+  }
+
   return (
     <div className="space-y-6">
       <div className="space-y-3">
@@ -130,11 +135,7 @@ export default async function AccountCheckoutPage({
                   </span>
                 ) : null}
                 <Badge variant={statusVariant(order.status)}>{order.status}</Badge>
-                {paymentConfirmed ? (
-                  <Badge variant="success">Payment confirmed</Badge>
-                ) : (
-                  <Badge variant="warning">Awaiting payment</Badge>
-                )}
+                <Badge variant="warning">Awaiting payment</Badge>
               </div>
 
               <div className="space-y-3">
@@ -199,38 +200,7 @@ export default async function AccountCheckoutPage({
         </Card>
 
         <div className="space-y-6">
-          {paymentConfirmed ? (
-            <Card className="border-border/70">
-              <CardHeader>
-                <CardTitle>Payment complete</CardTitle>
-                <CardDescription>
-                  This order has already been paid and is ready on the buyer side.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-2xl bg-white p-3 text-emerald-700 shadow-sm">
-                      <ShieldCheck className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-foreground">Your order is ready</p>
-                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                        Open the order record to reveal delivery details and secure the account
-                        immediately after handoff.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <Link
-                  href={`/account/orders/${order.id}?notice=payment-already-confirmed`}
-                  className={buttonClassName({ className: "w-full rounded-2xl" })}
-                >
-                  Open Order Details
-                </Link>
-              </CardContent>
-            </Card>
-          ) : checkoutBlocked ? (
+          {checkoutBlocked ? (
             <Card className="border-border/70">
               <CardHeader>
                 <CardTitle>Checkout unavailable</CardTitle>
