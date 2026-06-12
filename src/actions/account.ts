@@ -50,14 +50,8 @@ function getCheckoutPath(orderId: string, notice?: string) {
   return `${basePath}?notice=${encodeURIComponent(notice)}`;
 }
 
-function getOrderDetailPath(orderId: string, notice?: string) {
-  const basePath = `/account/orders/${orderId}`;
-
-  if (!notice) {
-    return basePath;
-  }
-
-  return `${basePath}?notice=${encodeURIComponent(notice)}`;
+function getCheckoutSuccessPath(orderId: string) {
+  return `/account/checkout/${orderId}/success`;
 }
 
 function getPaymentReference() {
@@ -425,7 +419,7 @@ export async function buyNowAction(formData: FormData) {
   );
 
   if (existingPaidOrder) {
-    redirect(getOrderDetailPath(existingPaidOrder.id, "payment-already-confirmed"));
+    redirect(getCheckoutSuccessPath(existingPaidOrder.id));
   }
 
   const nextOrder = await createPendingOrderForListing({
@@ -530,7 +524,7 @@ export async function completeCheckoutAction(formData: FormData) {
   const { order, listing, paymentConfirmed } = orderDetail;
 
   if (paymentConfirmed) {
-    redirect(getOrderDetailPath(order.id, "payment-already-confirmed"));
+    redirect(getCheckoutSuccessPath(order.id));
   }
 
   if (order.status !== "pending" || !listing || listing.seller_id === profile.id) {
@@ -575,5 +569,5 @@ export async function completeCheckoutAction(formData: FormData) {
 
   revalidateBuyerCheckout(order.listing_id, order.id);
 
-  redirect(`/account/checkout/${order.id}/success`);
+  redirect(getCheckoutSuccessPath(order.id));
 }
