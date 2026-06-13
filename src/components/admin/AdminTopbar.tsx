@@ -1,6 +1,7 @@
 "use client";
 
-import { Menu, PanelLeftClose, PanelLeftOpen, ShieldCheck } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, ShieldCheck } from "lucide-react";
+import AnimatedMenuButton from "@/components/ui/AnimatedMenuButton";
 import Button from "@/components/ui/Button";
 import type { Profile } from "@/types";
 
@@ -20,9 +21,7 @@ export default function AdminTopbar({
       <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6">
         <div className="flex items-center gap-3">
           <div className="lg:hidden">
-            <Button variant="ghost" size="sm" onClick={onMenuClick}>
-              <Menu className="h-5 w-5" />
-            </Button>
+            <AnimatedMenuButton onClick={onMenuClick} label="Open admin menu" />
           </div>
           <div className="hidden xl:block">
             <Button variant="ghost" size="sm" onClick={onCollapseToggle}>

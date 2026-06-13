@@ -13,16 +13,16 @@ export default function AdminStatsCards({ stats }: { stats: DashboardStat[] }) {
         return (
           <Card key={stat.label}>
             <CardHeader className="flex flex-row items-start justify-between gap-4 pb-3">
-              <div>
+              <div className="min-w-0">
                 <CardTitle className="text-lg">{stat.label}</CardTitle>
                 <p className="mt-2 text-sm text-muted-foreground">{stat.helper}</p>
               </div>
-              <div className="rounded-2xl bg-primary-soft p-3 text-primary">
+              <div className="shrink-0 rounded-2xl bg-primary-soft p-3 text-primary">
                 <Icon className="h-5 w-5" />
               </div>
             </CardHeader>
             <CardContent>
-              <p className="font-heading text-4xl font-semibold text-foreground">
+              <p className="break-words font-heading text-[clamp(2rem,3vw,2.5rem)] font-semibold leading-tight text-foreground">
                 {stat.value}
               </p>
             </CardContent>

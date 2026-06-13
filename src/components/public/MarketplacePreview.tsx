@@ -18,13 +18,14 @@ import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCompactCurrency } from "@/lib/utils";
 import type { Listing } from "@/types";
 
 interface MarketplaceFilters {
   minPrice: string;
   maxPrice: string;
   game: string;
+  status: "all" | "active" | "sold";
 }
 
 const emptyListingIds: string[] = [];
@@ -32,7 +33,8 @@ const emptyListingIds: string[] = [];
 const defaultFilters: MarketplaceFilters = {
   minPrice: "",
   maxPrice: "",
-  game: "all"
+  game: "all",
+  status: "all"
 };
 
 export default function MarketplacePreview({
@@ -42,6 +44,7 @@ export default function MarketplacePreview({
   showViewAll = true,
   showHeader = true,
   enableSearch = false,
+  showPagination = true,
   context = "public",
   savedListingIds = emptyListingIds,
   cartListingIds = emptyListingIds,
@@ -54,6 +57,7 @@ export default function MarketplacePreview({
   showViewAll?: boolean;
   showHeader?: boolean;
   enableSearch?: boolean;
+  showPagination?: boolean;
   context?: "public" | "account";
   savedListingIds?: string[];
   cartListingIds?: string[];
@@ -204,6 +208,14 @@ export default function MarketplacePreview({
       return false;
     }
 
+    if (appliedFilters.status === "active" && listing.status !== "approved") {
+      return false;
+    }
+
+    if (appliedFilters.status === "sold" && listing.status !== "sold") {
+      return false;
+    }
+
     return true;
   });
   const sortedListings = [...filteredListings].sort((left, right) =>
@@ -270,7 +282,7 @@ export default function MarketplacePreview({
                 Marketplace filters
               </div>
 
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)]">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]">
                 <Input
                   value={draftFilters.minPrice}
                   onChange={(event) => updateDraftFilter("minPrice", event.target.value)}
@@ -303,6 +315,18 @@ export default function MarketplacePreview({
                     </option>
                   ))}
                 </Select>
+
+                <Select
+                  value={draftFilters.status}
+                  onChange={(event) =>
+                    updateDraftFilter("status", event.target.value as MarketplaceFilters["status"])
+                  }
+                  className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="active">Active</option>
+                  <option value="sold">Sold</option>
+                </Select>
               </div>
 
               <div className="flex justify-end">
@@ -322,8 +346,8 @@ export default function MarketplacePreview({
         ) : null}
 
         {sortedListings.length === 0 ? (
-          <Card className="border-border/70">
-            <CardContent className="p-8 text-center sm:p-10">
+          <Card className="mx-auto max-w-4xl border-border/70">
+            <CardContent className="flex min-h-[36vh] flex-col items-center justify-center p-8 text-center sm:p-10">
               <h3 className="font-heading text-2xl font-semibold text-foreground">
                 No listings match these filters.
               </h3>
@@ -423,8 +447,11 @@ export default function MarketplacePreview({
                                   {listing.seller_reviews ?? 0}{" "}
                                   {(listing.seller_reviews ?? 0) === 1 ? "buyer rating" : "buyer ratings"}
                                 </p>
-                                <p className="break-all font-heading text-3xl font-semibold leading-none text-foreground sm:text-[2.15rem]">
-                                  {formatCurrency(listing.price)}
+                                <p
+                                  className="break-words font-heading text-3xl font-semibold leading-none text-foreground sm:text-[2.15rem]"
+                                  title={`$${listing.price.toLocaleString("en-US")}`}
+                                >
+                                  {formatCompactCurrency(listing.price)}
                                 </p>
                               </div>
 
@@ -535,8 +562,11 @@ export default function MarketplacePreview({
                                 {listing.seller_reviews ?? 0}{" "}
                                 {(listing.seller_reviews ?? 0) === 1 ? "buyer rating" : "buyer ratings"}
                               </p>
-                              <p className="break-all font-heading text-3xl font-semibold leading-none text-foreground sm:text-[2.15rem]">
-                                {formatCurrency(listing.price)}
+                              <p
+                                className="break-words font-heading text-3xl font-semibold leading-none text-foreground sm:text-[2.15rem]"
+                                title={`$${listing.price.toLocaleString("en-US")}`}
+                              >
+                                {formatCompactCurrency(listing.price)}
                               </p>
                             </div>
 
@@ -560,7 +590,7 @@ export default function MarketplacePreview({
               </motion.div>
             ))}
           </div>
-            {totalPages > 1 ? (
+            {showPagination && totalPages > 1 ? (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-muted-foreground">
                   Showing {sortedListings.length === 0 ? 0 : pageStartIndex + 1}-

@@ -39,7 +39,7 @@ export default async function SellerListingsPage({
 
   if (listings.length === 0) {
     return (
-      <Card className="max-w-3xl">
+      <Card className="mx-auto max-w-3xl text-center">
         <CardHeader>
           <CardTitle>No active listings right now</CardTitle>
           <CardDescription>
@@ -48,7 +48,7 @@ export default async function SellerListingsPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap justify-center gap-3">
             <Link href="/seller/upload">
               <Button>Create your first listing</Button>
             </Link>

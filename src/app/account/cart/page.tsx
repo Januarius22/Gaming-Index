@@ -15,7 +15,7 @@ import {
   getCartMarketplaceListings,
   getSavedMarketplaceListingIds
 } from "@/lib/data";
-import { formatCurrency, formatDate, paginateItems, parsePageParam } from "@/lib/utils";
+import { formatCompactCurrency, formatDate, paginateItems, parsePageParam } from "@/lib/utils";
 
 function getNoticeMessage(notice?: string) {
   switch (notice) {
@@ -79,9 +79,9 @@ export default async function AccountCartPage({
       <FormMessage message={noticeState.message} tone={noticeState.tone} />
 
       {cartListings.length === 0 ? (
-        <Card className="max-w-4xl">
+        <Card className="mx-auto max-w-4xl">
           <CardContent>
-            <div className="flex flex-col items-center justify-center rounded-[32px] border border-dashed border-border bg-surface px-6 py-14 text-center">
+            <div className="flex min-h-[44vh] flex-col items-center justify-center rounded-[32px] border border-dashed border-border bg-surface px-6 py-14 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-primary shadow-sm">
                 <ReceiptText className="h-6 w-6" />
               </div>
@@ -114,7 +114,7 @@ export default async function AccountCartPage({
               <div className="rounded-3xl bg-surface p-5">
                 <p className="text-sm text-muted-foreground">Cart total</p>
                 <p className="mt-2 font-heading text-4xl font-semibold text-foreground">
-                  {formatCurrency(cartTotal)}
+                  {formatCompactCurrency(cartTotal)}
                 </p>
               </div>
               <div className="rounded-3xl border border-primary/10 bg-primary-soft/60 p-5">
@@ -202,7 +202,7 @@ export default async function AccountCartPage({
                         <div>
                           <p className="text-muted-foreground">Price</p>
                           <p className="mt-1 font-heading text-2xl font-semibold text-foreground">
-                            {formatCurrency(listing.price)}
+                            {formatCompactCurrency(listing.price)}
                           </p>
                         </div>
                       </div>
@@ -234,19 +234,25 @@ export default async function AccountCartPage({
                           <Button
                             type="submit"
                             variant={isSaved ? "danger" : "secondary"}
-                            className="rounded-2xl"
+                            className="h-12 w-14 rounded-2xl px-0"
+                            aria-label={isSaved ? "Remove from saved listings" : "Save listing"}
+                            title={isSaved ? "Remove from saved listings" : "Save listing"}
                           >
-                            <Heart className={`mr-2 h-4 w-4 ${isSaved ? "fill-current" : ""}`} />
-                            {isSaved ? "Saved" : "Save for later"}
+                            <Heart className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`} />
                           </Button>
                         </form>
 
                         <form action={removeCartListingAction}>
                           <input type="hidden" name="listingId" value={listing.id} />
                           <input type="hidden" name="returnTo" value={returnTo} />
-                          <Button type="submit" variant="ghost" className="rounded-2xl">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Remove from cart
+                          <Button
+                            type="submit"
+                            variant="ghost"
+                            className="h-12 w-14 rounded-2xl px-0"
+                            aria-label="Remove from cart"
+                            title="Remove from cart"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </form>
                       </div>

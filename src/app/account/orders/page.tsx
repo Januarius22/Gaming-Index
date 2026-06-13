@@ -37,7 +37,7 @@ export default async function AccountOrdersPage({
       </CardHeader>
       <CardContent>
         {orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-[32px] border border-dashed border-border bg-surface px-6 py-14 text-center">
+          <div className="mx-auto flex min-h-[44vh] max-w-4xl flex-col items-center justify-center rounded-[32px] border border-dashed border-border bg-surface px-6 py-14 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-primary shadow-sm">
               <ReceiptText className="h-6 w-6" />
             </div>

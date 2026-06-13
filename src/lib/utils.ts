@@ -16,6 +16,15 @@ export function formatCurrency(value: number) {
   }).format(value);
 }
 
+export function formatCompactCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: value >= 1000 ? 1 : 0
+  }).format(value);
+}
+
 export function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",

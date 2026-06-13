@@ -1,34 +1,40 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { BadgeCheck, FileCheck2, LayoutDashboard } from "lucide-react";
+import { BadgeCheck, CreditCard, FileCheck2, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
 
 const steps = [
   {
-    title: "Create your account",
+    title: "Browse accounts",
     description:
-      "Register once with your full name, username, email, and password to start as a buyer.",
-    icon: LayoutDashboard
-  },
-  {
-    title: "Unlock seller access when needed",
-    description:
-      "Open the seller center from your dashboard when you are ready to start listing accounts.",
-    icon: FileCheck2
-  },
-  {
-    title: "Complete KYC and manage listings",
-    description:
-      "Submit verification, publish listings directly, and manage seller tools in a separate workspace.",
+      "Check account details, price, seller rating, and status before deciding what to save, cart, or buy.",
     icon: BadgeCheck
+  },
+  {
+    title: "Pay through checkout",
+    description:
+      "Start checkout from a listing or cart item. Payment confirmation creates an order record for the buyer.",
+    icon: CreditCard
+  },
+  {
+    title: "Receive delivery details",
+    description:
+      "After payment, the order page unlocks the seller’s delivery details so the buyer can secure the account.",
+    icon: ShieldCheck
+  },
+  {
+    title: "Sell with verification",
+    description:
+      "Sellers enable seller access, complete KYC, publish accounts, and keep private login details locked until payment.",
+    icon: FileCheck2
   }
 ];
 
 export default function HowItWorks({
   title = "How Gaming Index works",
-  description = "A clear account-first flow that keeps trust, seller activation, and maintainability at the center.",
+  description = "Buyers get a clear checkout path, sellers get a controlled listing flow, and account delivery stays protected until payment is confirmed.",
   className
 }: {
   title?: string;
@@ -50,7 +56,7 @@ export default function HowItWorks({
           </p>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           {steps.map((step, index) => {
             const Icon = step.icon;
             return (

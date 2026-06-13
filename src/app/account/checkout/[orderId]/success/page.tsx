@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, PackageCheck, ShieldCheck, Sparkles } from "lucide-react";
 import PurchaseCelebration from "@/components/account/PurchaseCelebration";
+import PurchaseSuccessScrollReset from "@/components/account/PurchaseSuccessScrollReset";
 import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -30,6 +31,7 @@ export default async function PurchaseSuccessPage({
 
   return (
     <div className="relative min-h-[calc(100svh-9rem)] overflow-hidden rounded-[32px] border border-border/70 bg-white shadow-[0_28px_90px_-58px_rgba(6,43,99,0.45)]">
+      <PurchaseSuccessScrollReset />
       <PurchaseCelebration />
 
       <div className="relative mx-auto flex max-w-4xl flex-col items-center px-5 py-14 text-center sm:px-8 lg:py-20">

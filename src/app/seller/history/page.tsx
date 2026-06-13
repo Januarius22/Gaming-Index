@@ -45,9 +45,9 @@ export default async function SellerHistoryPage({
       <FormMessage message={feedbackMessage} tone={feedbackTone} />
 
       {history.length === 0 ? (
-        <Card className="max-w-3xl">
+        <Card className="mx-auto max-w-3xl">
           <CardContent>
-            <div className="rounded-[32px] border border-dashed border-border bg-surface px-6 py-14 text-center">
+            <div className="flex min-h-[36vh] flex-col items-center justify-center rounded-[32px] border border-dashed border-border bg-surface px-6 py-14 text-center">
               <h2 className="font-heading text-2xl font-semibold text-foreground">
                 No history yet
               </h2>

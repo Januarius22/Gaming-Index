@@ -76,6 +76,7 @@ export default function SellerShell({
           <SellerTopbar
             profile={profile}
             collapsed={collapsed}
+            mobileMenuOpen={open}
             onCollapseToggle={toggleCollapsed}
             onMenuClick={() => setOpen(true)}
           />

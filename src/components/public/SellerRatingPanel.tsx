@@ -48,7 +48,7 @@ export default function SellerRatingPanel({
   }, [average, reviews]);
 
   return (
-    <div className="rounded-3xl border border-border/70 bg-white p-5 sm:p-6">
+    <div className="w-full rounded-3xl border border-border/70 bg-white p-4 sm:p-6">
       <div className="flex flex-wrap items-center gap-3">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
           Seller rating
@@ -60,8 +60,8 @@ export default function SellerRatingPanel({
         ) : null}
       </div>
 
-      <div className="mt-4 flex items-center gap-4">
-        <div className="flex items-center gap-1 text-amber-500">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="flex flex-wrap items-center gap-1 text-amber-500">
           {[1, 2, 3, 4, 5].map((star) => (
             <Star
               key={star}
@@ -69,9 +69,9 @@ export default function SellerRatingPanel({
             />
           ))}
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-base font-semibold text-foreground">{sellerName}</p>
-          <p className="text-sm text-muted-foreground">{summaryText}</p>
+          <p className="text-sm leading-6 text-muted-foreground">{summaryText}</p>
         </div>
       </div>
 
@@ -92,7 +92,7 @@ export default function SellerRatingPanel({
                   onMouseLeave={() => setHovered(null)}
                   onClick={() => setRating(star)}
                   className={cn(
-                    "inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition",
+                    "inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition sm:h-12 sm:w-12",
                     activeStars >= star
                       ? "border-amber-200 bg-amber-50 text-amber-500"
                       : "border-border bg-surface text-muted-foreground hover:border-primary/30 hover:text-primary"

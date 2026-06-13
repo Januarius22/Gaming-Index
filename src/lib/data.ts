@@ -15,6 +15,7 @@ import { normalizeProfile } from "@/lib/profile";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import {
+  formatCompactCurrency,
   getListingHistoryTimestamp,
   isListingMarketplaceVisible,
   isOrderPaymentConfirmed
@@ -907,7 +908,7 @@ export async function getAdminDashboardStats() {
         },
         {
           label: "Total Sales",
-          value: `$${Math.round(totalSales)}`,
+          value: formatCompactCurrency(totalSales),
           helper: "Completed order value"
         }
       ],

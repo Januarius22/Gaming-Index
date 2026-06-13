@@ -124,6 +124,7 @@ export default function AccountShell({
             <AccountTopbar
               profile={profile}
               collapsed={collapsed}
+              mobileMenuOpen={open}
               onCollapseToggle={toggleCollapsed}
               onMenuClick={() => setOpen(true)}
             />

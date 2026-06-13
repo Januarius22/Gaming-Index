@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Home, Info, LogIn, Menu, Store, UserPlus, X } from "lucide-react";
+import { ArrowRight, Home, Info, LogIn, Store, UserPlus, X } from "lucide-react";
 import { useState } from "react";
 import BrandLogo from "@/components/branding/BrandLogo";
+import AnimatedMenuButton from "@/components/ui/AnimatedMenuButton";
 import Button, { buttonClassName } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
@@ -66,14 +67,12 @@ export default function PublicNavbar() {
           </Link>
         </nav>
 
-        <Button
-          variant="ghost"
-          size="sm"
+        <AnimatedMenuButton
+          open={open}
+          label={open ? "Close navigation menu" : "Open navigation menu"}
           className={cn("md:hidden", isHomePage && "text-white hover:bg-white/10 hover:text-white")}
           onClick={() => setOpen(true)}
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
+        />
       </div>
 
       <AnimatePresence>

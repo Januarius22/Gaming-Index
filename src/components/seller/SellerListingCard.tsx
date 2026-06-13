@@ -3,7 +3,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import {
-  formatCurrency,
+  formatCompactCurrency,
   formatDate,
   isListingMarketplaceVisible,
   statusVariant,
@@ -55,7 +55,7 @@ export default function SellerListingCard({
           <div>
             <p className="text-sm text-muted-foreground">Price</p>
             <p className="font-heading text-3xl font-semibold text-foreground">
-              {formatCurrency(listing.price)}
+              {formatCompactCurrency(listing.price)}
             </p>
           </div>
           <p className="text-sm text-muted-foreground">{formatDate(listing.created_at)}</p>

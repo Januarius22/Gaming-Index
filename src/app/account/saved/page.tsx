@@ -59,9 +59,9 @@ export default async function AccountSavedPage({
       <FormMessage message={noticeState.message} tone={noticeState.tone} />
 
       {savedListings.length === 0 ? (
-        <Card className="max-w-4xl">
+        <Card className="mx-auto max-w-4xl">
           <CardContent>
-            <div className="flex flex-col items-center justify-center rounded-[32px] border border-dashed border-border bg-surface px-6 py-14 text-center">
+            <div className="flex min-h-[44vh] flex-col items-center justify-center rounded-[32px] border border-dashed border-border bg-surface px-6 py-14 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-primary shadow-sm">
                 <Bookmark className="h-6 w-6" />
               </div>

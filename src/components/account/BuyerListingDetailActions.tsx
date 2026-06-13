@@ -67,10 +67,10 @@ export default function BuyerListingDetailActions({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <FormMessage message={errorMessage} tone="error" />
 
-      <div className="grid grid-cols-[1fr_1fr] gap-3">
+      <div className="grid grid-cols-[auto_auto] justify-center gap-4">
         <Button
           type="button"
           onClick={() => {
@@ -78,10 +78,11 @@ export default function BuyerListingDetailActions({
           }}
           disabled={isSold || isUpdatingCart}
           variant={isInCart ? "subtle" : "secondary"}
-          className="w-full rounded-2xl"
+          className="h-12 w-14 rounded-2xl px-0"
+          aria-label={isInCart ? "Remove from cart" : "Add to cart"}
+          title={isInCart ? "Remove from cart" : "Add to cart"}
         >
-          <ShoppingCart className="mr-2 h-4 w-4" />
-          {isInCart ? "Remove from Cart" : "Add to Cart"}
+          <ShoppingCart className="h-4 w-4" />
         </Button>
 
         <Button
@@ -91,10 +92,11 @@ export default function BuyerListingDetailActions({
           }}
           disabled={isSaving}
           variant={isSaved ? "danger" : "secondary"}
-          className="w-full rounded-2xl"
+          className="h-12 w-14 rounded-2xl px-0"
+          aria-label={isSaved ? "Remove from saved listings" : "Save listing"}
+          title={isSaved ? "Remove from saved listings" : "Save listing"}
         >
-          <Heart className={`mr-2 h-4 w-4 ${isSaved ? "fill-current" : ""}`} />
-          {isSaved ? "Saved" : "Save"}
+          <Heart className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`} />
         </Button>
       </div>
     </div>

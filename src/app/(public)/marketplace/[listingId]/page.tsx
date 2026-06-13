@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { getCurrentProfile, getDashboardRoute } from "@/lib/auth";
 import { getMarketplaceListingById, getSellerRatingState } from "@/lib/data";
 import {
-  formatCurrency,
+  formatCompactCurrency,
   formatDate
 } from "@/lib/utils";
 
@@ -36,8 +36,8 @@ export default async function MarketplaceListingDetailPage({
     : "Login to continue";
 
   return (
-    <section className="px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
-      <div className="mx-auto max-w-7xl space-y-8">
+    <section className="px-3 py-6 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+      <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
         <Link
           href="/marketplace"
           className="inline-flex items-center gap-2 text-sm font-semibold text-primary transition hover:text-primary-dark"
@@ -46,12 +46,12 @@ export default async function MarketplaceListingDetailPage({
           Back to marketplace
         </Link>
 
-        <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr] xl:items-start">
-          <div className="space-y-6">
-            <ListingPhotoGrid listing={listing} size="detail" />
+        <div className="grid min-w-0 gap-6 sm:gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] xl:items-start">
+          <div className="min-w-0 space-y-6">
+            <ListingPhotoGrid listing={listing} size="detail" className="max-w-full" />
 
             <Card className="border-border/70">
-              <CardContent className="space-y-6 p-6 sm:p-8">
+              <CardContent className="space-y-6 p-4 sm:p-8">
                 <div className="space-y-3">
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
                     Account overview
@@ -65,7 +65,7 @@ export default async function MarketplaceListingDetailPage({
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-3xl bg-surface p-5">
+                  <div className="rounded-3xl bg-surface p-4 sm:p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-foreground">Seller</p>
@@ -93,7 +93,7 @@ export default async function MarketplaceListingDetailPage({
                       </p>
                     </div>
                   </div>
-                  <div className="rounded-3xl bg-surface p-5">
+                  <div className="rounded-3xl bg-surface p-4 sm:p-5">
                     <p className="text-sm font-semibold text-foreground">Posted</p>
                     <p className="mt-2 text-lg font-semibold text-foreground">
                       {formatDate(listing.created_at)}
@@ -117,7 +117,7 @@ export default async function MarketplaceListingDetailPage({
                   currentRating={ratingState.buyerRating}
                 />
 
-                <div className="rounded-3xl border border-border/70 bg-white p-5 sm:p-6">
+                <div className="rounded-3xl border border-border/70 bg-white p-4 sm:p-6">
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
                     Seller notes
                   </p>
@@ -129,8 +129,8 @@ export default async function MarketplaceListingDetailPage({
             </Card>
           </div>
 
-          <Card className="border-border/70 xl:sticky xl:top-28">
-            <CardContent className="space-y-6 p-6 sm:p-8">
+          <Card className="min-w-0 border-border/70 xl:sticky xl:top-28">
+            <CardContent className="space-y-6 p-4 sm:p-8">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="inline-flex rounded-full bg-primary-soft px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-dark">
                   {listing.game}
@@ -150,27 +150,27 @@ export default async function MarketplaceListingDetailPage({
 
               <div>
                 <p className="text-sm text-muted-foreground">Price</p>
-                <p className="mt-2 font-heading text-5xl font-semibold tracking-tight text-foreground">
-                  {formatCurrency(listing.price)}
+                <p className="mt-2 break-words font-heading text-[clamp(2rem,9vw,3.5rem)] font-semibold leading-tight tracking-tight text-foreground">
+                  {formatCompactCurrency(listing.price)}
                 </p>
               </div>
 
-              <div className="rounded-3xl bg-surface p-5 text-sm">
-                <div className="flex items-center justify-between gap-4 border-b border-border/70 py-3 first:pt-0 last:border-b-0 last:pb-0">
+              <div className="rounded-[28px] bg-surface p-4 text-sm sm:p-5">
+                <div className="flex items-start justify-between gap-4 border-b border-border/70 py-3 first:pt-0 last:border-b-0 last:pb-0">
                   <span className="text-muted-foreground">Platform</span>
-                  <span className="font-semibold text-foreground">{listing.platform}</span>
+                  <span className="break-words text-right font-semibold text-foreground">{listing.platform}</span>
                 </div>
-                <div className="flex items-center justify-between gap-4 border-b border-border/70 py-3 first:pt-0 last:border-b-0 last:pb-0">
+                <div className="flex items-start justify-between gap-4 border-b border-border/70 py-3 first:pt-0 last:border-b-0 last:pb-0">
                   <span className="text-muted-foreground">Account level</span>
-                  <span className="font-semibold text-foreground">{listing.account_level}</span>
+                  <span className="break-words text-right font-semibold text-foreground">{listing.account_level}</span>
                 </div>
-                <div className="flex items-center justify-between gap-4 border-b border-border/70 py-3 first:pt-0 last:border-b-0 last:pb-0">
+                <div className="flex items-start justify-between gap-4 border-b border-border/70 py-3 first:pt-0 last:border-b-0 last:pb-0">
                   <span className="text-muted-foreground">Seller</span>
-                  <span className="font-semibold text-foreground">@{listing.seller_username}</span>
+                  <span className="break-all text-right font-semibold text-foreground">@{listing.seller_username}</span>
                 </div>
-                <div className="flex items-center justify-between gap-4 py-3 first:pt-0 last:border-b-0 last:pb-0">
+                <div className="flex items-start justify-between gap-4 py-3 first:pt-0 last:border-b-0 last:pb-0">
                   <span className="text-muted-foreground">Seller rating</span>
-                  <span className="font-semibold text-foreground">
+                  <span className="break-words text-right font-semibold text-foreground">
                     {ratingState.average.toFixed(1)} / 5
                   </span>
                 </div>

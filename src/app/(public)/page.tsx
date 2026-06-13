@@ -9,7 +9,12 @@ export default async function HomePage() {
   return (
     <>
       <HeroSection />
-      <MarketplacePreview listings={listings} itemsPerPage={3} className="pt-16 lg:pt-20" />
+      <MarketplacePreview
+        listings={listings}
+        itemsPerPage={3}
+        showPagination={false}
+        className="pt-16 lg:pt-20"
+      />
       <HowItWorks />
     </>
   );
