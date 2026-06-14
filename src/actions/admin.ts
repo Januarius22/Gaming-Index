@@ -54,25 +54,216 @@ function getAdminListingRedirectPath(
   return `${pathname}?${searchParams.toString()}`;
 }
 
-export async function banUserAction(formData: FormData) {
+function getSafeAdminOrdersReturnPath(value: string) {
+  return value.startsWith("/admin/orders") ? value : "/admin/orders";
+}
+
+function getAdminOrdersRedirectPath(
+  basePath: string,
+  notice: "seller-funds-released" | "seller-funds-release-failed",
+  errorMessage?: string
+) {
+  const [pathname, existingQuery = ""] = basePath.split("?");
+  const searchParams = new URLSearchParams(existingQuery);
+  searchParams.set("notice", notice);
+
+  if (errorMessage) {
+    searchParams.set("error", errorMessage);
+  }
+
+  return `${pathname}?${searchParams.toString()}`;
+}
+
+type AdminActionResult = {
+  status: "success" | "error";
+  message: string;
+};
+
+async function releaseSellerFunds(formData: FormData): Promise<AdminActionResult & { orderId?: string }> {
+  await requireAdminProfile();
+  const orderId = String(formData.get("orderId") ?? "").trim();
+
+  if (!orderId) {
+    return {
+      status: "error",
+      message: "Order not found."
+    };
+  }
+
+  if (hasSupabaseEnv) {
+    const supabase = await getSupabaseServerClient();
+    const { error } = await supabase!.rpc("release_seller_earning", {
+      target_order_id: orderId
+    });
+
+    if (error) {
+      console.error("Admin seller fund release failed", {
+        orderId,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+
+      return {
+        status: "error",
+        message: error.message
+      };
+    }
+  } else {
+    return {
+      status: "error",
+      message: "Connect Supabase to release seller funds."
+    };
+  }
+
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/seller/dashboard");
+  revalidatePath("/seller/wallet");
+  revalidatePath("/seller/orders");
+  revalidatePath("/seller/notifications");
+
+  return {
+    status: "success",
+    message: "Seller funds were released successfully.",
+    orderId
+  };
+}
+
+export async function releaseSellerFundsInlineAction(formData: FormData) {
+  return releaseSellerFunds(formData);
+}
+
+export async function releaseSellerFundsAction(formData: FormData) {
+  const returnTo = getSafeAdminOrdersReturnPath(String(formData.get("returnTo") ?? "").trim());
+  const result = await releaseSellerFunds(formData);
+
+  if (result.status === "error") {
+    redirect(getAdminOrdersRedirectPath(returnTo, "seller-funds-release-failed", result.message));
+  }
+
+  redirect(getAdminOrdersRedirectPath(returnTo, "seller-funds-released"));
+}
+
+export async function markWithdrawalPaidAction(formData: FormData) {
+  await requireAdminProfile();
+  const withdrawalId = String(formData.get("withdrawalId") ?? "").trim();
+
+  if (!withdrawalId) {
+    return {
+      status: "error" as const,
+      message: "Withdrawal request not found."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to manage withdrawals."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase!.rpc("mark_withdrawal_paid", {
+    target_withdrawal_id: withdrawalId
+  });
+
+  if (error) {
+    return {
+      status: "error" as const,
+      message: error.message
+    };
+  }
+
+  revalidatePath("/admin/withdrawals");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/seller/wallet");
+  revalidatePath("/seller/withdrawals");
+  revalidatePath("/seller/transactions");
+  revalidatePath("/seller/notifications");
+  revalidatePath("/seller/dashboard");
+
+  return {
+    status: "success" as const,
+    message: "Withdrawal marked paid.",
+    withdrawalId
+  };
+}
+
+export async function rejectWithdrawalAction(formData: FormData) {
+  await requireAdminProfile();
+  const withdrawalId = String(formData.get("withdrawalId") ?? "").trim();
+  const adminNote = String(formData.get("adminNote") ?? "").trim();
+
+  if (!withdrawalId) {
+    return {
+      status: "error" as const,
+      message: "Withdrawal request not found."
+    };
+  }
+
+  if (!adminNote) {
+    return {
+      status: "error" as const,
+      message: "Add a rejection reason before rejecting this withdrawal."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to manage withdrawals."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase!.rpc("reject_withdrawal_request", {
+    target_withdrawal_id: withdrawalId,
+    rejection_note: adminNote
+  });
+
+  if (error) {
+    return {
+      status: "error" as const,
+      message: error.message
+    };
+  }
+
+  revalidatePath("/admin/withdrawals");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/seller/wallet");
+  revalidatePath("/seller/withdrawals");
+  revalidatePath("/seller/transactions");
+  revalidatePath("/seller/notifications");
+  revalidatePath("/seller/dashboard");
+
+  return {
+    status: "success" as const,
+    message: "Withdrawal rejected and funds returned.",
+    withdrawalId,
+    adminNote
+  };
+}
+
+async function banUser(formData: FormData): Promise<AdminActionResult & { userId?: string; banReason?: string }> {
   const admin = await requireAdminProfile();
   const userId = String(formData.get("userId") ?? "").trim();
   const banReason = String(formData.get("banReason") ?? "").trim();
-  const returnTo = getSafeAdminUsersReturnPath(String(formData.get("returnTo") ?? "").trim());
   const bannedAt = getNigeriaTimestamp();
 
   if (!userId || !banReason) {
-    redirect(
-      getAdminUsersRedirectPath(
-        returnTo,
-        "user-ban-failed",
-        !banReason ? "Add a reason before banning this user." : undefined
-      )
-    );
+    return {
+      status: "error",
+      message: !banReason ? "Add a reason before banning this user." : "User not found."
+    };
   }
 
   if (userId === admin.id) {
-    redirect(getAdminUsersRedirectPath(returnTo, "user-ban-failed", "You cannot ban yourself."));
+    return {
+      status: "error",
+      message: "You cannot ban yourself."
+    };
   }
 
   if (hasSupabaseEnv) {
@@ -84,11 +275,17 @@ export async function banUserAction(formData: FormData) {
       .maybeSingle();
 
     if (targetError || !targetUser) {
-      redirect(getAdminUsersRedirectPath(returnTo, "user-ban-failed", "User not found."));
+      return {
+        status: "error",
+        message: "User not found."
+      };
     }
 
     if (targetUser.role === "admin") {
-      redirect(getAdminUsersRedirectPath(returnTo, "user-ban-failed", "Admin users cannot be banned."));
+      return {
+        status: "error",
+        message: "Admin users cannot be banned."
+      };
     }
 
     const { error } = await supabase!
@@ -103,17 +300,26 @@ export async function banUserAction(formData: FormData) {
       .neq("role", "admin");
 
     if (error) {
-      redirect(getAdminUsersRedirectPath(returnTo, "user-ban-failed", error.message));
+      return {
+        status: "error",
+        message: error.message
+      };
     }
   } else {
     const targetUser = await getDemoProfileById(userId);
 
     if (!targetUser) {
-      redirect(getAdminUsersRedirectPath(returnTo, "user-ban-failed", "User not found."));
+      return {
+        status: "error",
+        message: "User not found."
+      };
     }
 
     if (targetUser.role === "admin") {
-      redirect(getAdminUsersRedirectPath(returnTo, "user-ban-failed", "Admin users cannot be banned."));
+      return {
+        status: "error",
+        message: "Admin users cannot be banned."
+      };
     }
 
     await updateDemoProfile(userId, {
@@ -133,16 +339,23 @@ export async function banUserAction(formData: FormData) {
   revalidatePath("/account/saved");
   revalidatePath("/account/cart");
 
-  redirect(getAdminUsersRedirectPath(returnTo, "user-banned"));
+  return {
+    status: "success",
+    message: "User banned successfully.",
+    userId,
+    banReason
+  };
 }
 
-export async function unbanUserAction(formData: FormData) {
+async function unbanUser(formData: FormData): Promise<AdminActionResult & { userId?: string }> {
   const admin = await requireAdminProfile();
   const userId = String(formData.get("userId") ?? "").trim();
-  const returnTo = getSafeAdminUsersReturnPath(String(formData.get("returnTo") ?? "").trim());
 
   if (!userId || userId === admin.id) {
-    redirect(getAdminUsersRedirectPath(returnTo, "user-ban-failed"));
+    return {
+      status: "error",
+      message: "This user cannot be unbanned."
+    };
   }
 
   if (hasSupabaseEnv) {
@@ -159,17 +372,26 @@ export async function unbanUserAction(formData: FormData) {
       .neq("role", "admin");
 
     if (error) {
-      redirect(getAdminUsersRedirectPath(returnTo, "user-ban-failed", error.message));
+      return {
+        status: "error",
+        message: error.message
+      };
     }
   } else {
     const targetUser = await getDemoProfileById(userId);
 
     if (!targetUser) {
-      redirect(getAdminUsersRedirectPath(returnTo, "user-ban-failed", "User not found."));
+      return {
+        status: "error",
+        message: "User not found."
+      };
     }
 
     if (targetUser.role === "admin") {
-      redirect(getAdminUsersRedirectPath(returnTo, "user-ban-failed", "Admin users cannot be banned."));
+      return {
+        status: "error",
+        message: "Admin users cannot be banned."
+      };
     }
 
     await updateDemoProfile(userId, {
@@ -189,23 +411,70 @@ export async function unbanUserAction(formData: FormData) {
   revalidatePath("/account/saved");
   revalidatePath("/account/cart");
 
+  return {
+    status: "success",
+    message: "User unbanned successfully.",
+    userId
+  };
+}
+
+export async function banUserInlineAction(formData: FormData) {
+  return banUser(formData);
+}
+
+export async function unbanUserInlineAction(formData: FormData) {
+  return unbanUser(formData);
+}
+
+export async function banUserAction(formData: FormData) {
+  const returnTo = getSafeAdminUsersReturnPath(String(formData.get("returnTo") ?? "").trim());
+  const result = await banUser(formData);
+
+  if (result.status === "error") {
+    redirect(getAdminUsersRedirectPath(returnTo, "user-ban-failed", result.message));
+  }
+
+  redirect(getAdminUsersRedirectPath(returnTo, "user-banned"));
+}
+
+export async function unbanUserAction(formData: FormData) {
+  const returnTo = getSafeAdminUsersReturnPath(String(formData.get("returnTo") ?? "").trim());
+  const result = await unbanUser(formData);
+
+  if (result.status === "error") {
+    redirect(getAdminUsersRedirectPath(returnTo, "user-ban-failed", result.message));
+  }
+
   redirect(getAdminUsersRedirectPath(returnTo, "user-unbanned"));
 }
 
-export async function updateKycStatusAction(formData: FormData) {
+type KycReviewActionResult = {
+  status: "success" | "error";
+  message: string;
+  submissionId?: string;
+  reviewedStatus?: "approved" | "rejected";
+  rejectionReason?: string;
+};
+
+async function updateKycStatus(formData: FormData): Promise<KycReviewActionResult> {
   await requireAdminProfile();
   const submissionId = String(formData.get("submissionId") ?? "");
   const sellerId = String(formData.get("sellerId") ?? "");
   const status = String(formData.get("status") ?? "");
   const rejectionReason = String(formData.get("rejectionReason") ?? "").trim();
-  const redirectPage = Math.max(1, Number(formData.get("redirectPage") ?? "1") || 1);
 
   if (!submissionId || !sellerId || (status !== "approved" && status !== "rejected")) {
-    return;
+    return {
+      status: "error",
+      message: "This KYC submission could not be reviewed. Refresh and try again."
+    };
   }
 
   if (status === "rejected" && !rejectionReason) {
-    return;
+    return {
+      status: "error",
+      message: "Add a rejection reason before rejecting KYC."
+    };
   }
 
   if (hasSupabaseEnv) {
@@ -219,7 +488,10 @@ export async function updateKycStatusAction(formData: FormData) {
       .eq("id", submissionId);
 
     if (submissionError) {
-      redirect(`/admin/kyc?page=${redirectPage}&notice=kyc-update-failed`);
+      return {
+        status: "error",
+        message: submissionError.message
+      };
     }
 
     const { error: profileError } = await supabase!
@@ -228,8 +500,27 @@ export async function updateKycStatusAction(formData: FormData) {
       .eq("id", sellerId);
 
     if (profileError) {
-      redirect(`/admin/kyc?page=${redirectPage}&notice=kyc-profile-sync-failed`);
+      return {
+        status: "error",
+        message: "KYC review changed, but the seller profile did not sync."
+      };
     }
+
+    await supabase!.from("notifications").insert({
+      profile_id: sellerId,
+      type: status === "approved" ? "kyc_approved" : "kyc_rejected",
+      title: status === "approved" ? "KYC approved" : "KYC rejected",
+      message:
+        status === "approved"
+          ? "Your KYC has been approved. Seller upload access is now enabled."
+          : `Your KYC was rejected: ${rejectionReason}`,
+      link_path: "/seller/kyc",
+      metadata: {
+        kyc_submission_id: submissionId,
+        status,
+        reason: status === "rejected" ? rejectionReason : ""
+      }
+    });
   } else {
     await updateDemoKycSubmissionStatus(submissionId, status, rejectionReason);
   }
@@ -242,10 +533,32 @@ export async function updateKycStatusAction(formData: FormData) {
   revalidatePath("/seller/kyc");
   revalidatePath("/seller/upload");
   revalidatePath("/seller/dashboard");
+  revalidatePath("/seller/notifications");
+
+  return {
+    status: "success",
+    message: status === "approved" ? "KYC approved successfully." : "KYC rejected successfully.",
+    submissionId,
+    reviewedStatus: status,
+    rejectionReason: status === "rejected" ? rejectionReason : ""
+  };
+}
+
+export async function reviewKycStatusAction(formData: FormData) {
+  return updateKycStatus(formData);
+}
+
+export async function updateKycStatusAction(formData: FormData) {
+  const redirectPage = Math.max(1, Number(formData.get("redirectPage") ?? "1") || 1);
+  const result = await updateKycStatus(formData);
+
+  if (result.status === "error") {
+    redirect(`/admin/kyc?page=${redirectPage}&notice=kyc-update-failed`);
+  }
 
   redirect(
     `/admin/kyc?page=${redirectPage}&notice=${
-      status === "approved" ? "kyc-approved" : "kyc-rejected"
+      result.reviewedStatus === "approved" ? "kyc-approved" : "kyc-rejected"
     }`
   );
 }
@@ -276,33 +589,34 @@ export async function updateListingStatusAction(formData: FormData) {
   revalidatePath("/marketplace");
 }
 
-export async function takeDownListingAction(formData: FormData) {
+async function takeDownListing(
+  formData: FormData
+): Promise<AdminActionResult & { listingId?: string; adminNote?: string }> {
   const admin = await requireAdminProfile();
   const listingId = String(formData.get("listingId") ?? "").trim();
   const adminNote = String(formData.get("adminNote") ?? "").trim();
-  const returnTo = getSafeAdminReturnPath(String(formData.get("returnTo") ?? "").trim());
   const adminActionAt = getNigeriaTimestamp();
 
   if (!listingId || !adminNote) {
-    redirect(
-      getAdminListingRedirectPath(
-        returnTo,
-        "listing-take-down-failed",
-        !adminNote ? "Add a note before taking down a listing." : undefined
-      )
-    );
+    return {
+      status: "error",
+      message: !adminNote ? "Add a note before taking down a listing." : "Listing not found."
+    };
   }
 
   if (hasSupabaseEnv) {
     const supabase = await getSupabaseServerClient();
     const { data: listing, error: listingError } = await supabase!
       .from("listings")
-      .select("id, status")
+      .select("id, status, seller_id, title")
       .eq("id", listingId)
       .maybeSingle();
 
     if (listingError || !listing) {
-      redirect(getAdminListingRedirectPath(returnTo, "listing-take-down-failed"));
+      return {
+        status: "error",
+        message: "Listing not found."
+      };
     }
 
     const { data: updatedListing, error: updateError } = await supabase!
@@ -323,35 +637,39 @@ export async function takeDownListingAction(formData: FormData) {
         listingId,
         error: updateError.message
       });
-      redirect(
-        getAdminListingRedirectPath(
-          returnTo,
-          "listing-take-down-failed",
-          updateError.message
-        )
-      );
+      return {
+        status: "error",
+        message: updateError.message
+      };
     }
 
     if (!updatedListing) {
-      redirect(
-        getAdminListingRedirectPath(
-          returnTo,
-          "listing-take-down-failed",
-          "Only active unsold listings can be taken down."
-        )
-      );
+      return {
+        status: "error",
+        message: "Only active unsold listings can be taken down."
+      };
     }
+
+    await supabase!.from("notifications").insert({
+      profile_id: listing.seller_id,
+      type: "listing_taken_down",
+      title: "Listing taken down",
+      message: `Your listing was taken down: ${adminNote}`,
+      link_path: "/seller/history",
+      metadata: {
+        listing_id: listing.id,
+        title: listing.title,
+        reason: adminNote
+      }
+    });
   } else {
     const existingListing = (await getDemoListings()).find((listing) => listing.id === listingId);
 
     if (!existingListing || existingListing.status !== "approved") {
-      redirect(
-        getAdminListingRedirectPath(
-          returnTo,
-          "listing-take-down-failed",
-          "Only active unsold listings can be taken down."
-        )
-      );
+      return {
+        status: "error",
+        message: "Only active unsold listings can be taken down."
+      };
     }
 
     const takenDownListing = await updateDemoListingStatus(listingId, "taken_down", {
@@ -361,7 +679,10 @@ export async function takeDownListingAction(formData: FormData) {
     });
 
     if (!takenDownListing) {
-      redirect(getAdminListingRedirectPath(returnTo, "listing-take-down-failed"));
+      return {
+        status: "error",
+        message: "Listing could not be taken down."
+      };
     }
   }
 
@@ -373,9 +694,30 @@ export async function takeDownListingAction(formData: FormData) {
   revalidatePath("/seller/listings");
   revalidatePath("/seller/history");
   revalidatePath("/seller/dashboard");
+  revalidatePath("/seller/notifications");
   revalidatePath("/admin/listings");
   revalidatePath("/admin/listing-history");
   revalidatePath("/admin/dashboard");
+
+  return {
+    status: "success",
+    message: "Listing taken down successfully.",
+    listingId,
+    adminNote
+  };
+}
+
+export async function takeDownListingInlineAction(formData: FormData) {
+  return takeDownListing(formData);
+}
+
+export async function takeDownListingAction(formData: FormData) {
+  const returnTo = getSafeAdminReturnPath(String(formData.get("returnTo") ?? "").trim());
+  const result = await takeDownListing(formData);
+
+  if (result.status === "error") {
+    redirect(getAdminListingRedirectPath(returnTo, "listing-take-down-failed", result.message));
+  }
 
   redirect(getAdminListingRedirectPath(returnTo, "listing-taken-down"));
 }

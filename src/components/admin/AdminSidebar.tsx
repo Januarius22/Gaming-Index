@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bell,
   FileCheck2,
   History,
   LayoutDashboard,
   ListOrdered,
+  Landmark,
   Settings,
   ShieldAlert,
   Store,
@@ -28,7 +30,9 @@ const navItems = [
   { href: "/admin/listing-history", label: "Listing History", icon: History },
   { href: "/admin/kyc", label: "KYC Reviews", icon: FileCheck2 },
   { href: "/admin/orders", label: "Orders", icon: ListOrdered },
+  { href: "/admin/withdrawals", label: "Withdrawals", icon: Landmark },
   { href: "/admin/disputes", label: "Disputes", icon: ShieldAlert },
+  { href: "/admin/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/settings", label: "Settings", icon: Settings }
 ];
 

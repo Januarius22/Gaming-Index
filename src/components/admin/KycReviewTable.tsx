@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Eye } from "lucide-react";
-import { updateKycStatusAction } from "@/actions/admin";
+import { useRouter } from "next/navigation";
+import { reviewKycStatusAction } from "@/actions/admin";
+import FormMessage from "@/components/auth/FormMessage";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
@@ -96,8 +98,16 @@ export default function KycReviewTable({
   submissions: KycSubmission[];
   currentPage: number;
 }) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [visibleSubmissions, setVisibleSubmissions] = useState(submissions);
   const [selectedSubmission, setSelectedSubmission] = useState<KycSubmission | null>(null);
   const [rejectingSubmission, setRejectingSubmission] = useState<KycSubmission | null>(null);
+  const [pendingSubmissionId, setPendingSubmissionId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    message: string;
+    tone: "success" | "error";
+  } | null>(null);
   const selectedState =
     selectedSubmission?.state ||
     selectedSubmission?.state_city?.split("/")[0]?.trim() ||
@@ -107,8 +117,47 @@ export default function KycReviewTable({
     selectedSubmission?.state_city?.split("/")[1]?.trim() ||
     "Not provided";
 
+  useEffect(() => {
+    setVisibleSubmissions(submissions);
+  }, [submissions]);
+
+  const submitKycReview = (formData: FormData) => {
+    const submissionId = String(formData.get("submissionId") ?? "");
+    setPendingSubmissionId(submissionId);
+    setFeedback(null);
+
+    startTransition(() => {
+      void (async () => {
+        const result = await reviewKycStatusAction(formData);
+
+        if (result.status === "success" && result.submissionId && result.reviewedStatus) {
+          setVisibleSubmissions((currentSubmissions) =>
+            currentSubmissions.map((submission) =>
+              submission.id === result.submissionId
+                ? {
+                    ...submission,
+                    status: result.reviewedStatus!,
+                    rejection_reason: result.rejectionReason
+                  }
+                : submission
+            )
+          );
+          setRejectingSubmission(null);
+          router.refresh();
+        }
+
+        setFeedback({
+          message: result.message,
+          tone: result.status === "success" ? "success" : "error"
+        });
+        setPendingSubmissionId(null);
+      })();
+    });
+  };
+
   return (
     <>
+      <FormMessage message={feedback?.message} tone={feedback?.tone} />
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
           <thead>
@@ -129,8 +178,9 @@ export default function KycReviewTable({
                 </td>
               </tr>
             ) : (
-              submissions.map((submission) => {
+              visibleSubmissions.map((submission) => {
                 const resolved = submission.status !== "pending";
+                const isReviewing = pendingSubmissionId === submission.id;
 
                 return (
                   <tr key={submission.id} className="border-b border-border/60 align-top">
@@ -145,20 +195,25 @@ export default function KycReviewTable({
                     <td className="px-4 py-4">{formatDate(submission.created_at)}</td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap items-center gap-2">
-                        <form action={updateKycStatusAction}>
+                        <form
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            submitKycReview(new FormData(event.currentTarget));
+                          }}
+                        >
                           <input type="hidden" name="submissionId" value={submission.id} />
                           <input type="hidden" name="sellerId" value={submission.seller_id} />
                           <input type="hidden" name="status" value="approved" />
                           <input type="hidden" name="redirectPage" value={currentPage} />
-                          <Button size="sm" type="submit" disabled={resolved}>
-                            Approve
+                          <Button size="sm" type="submit" disabled={resolved || isReviewing}>
+                            {isReviewing ? "Approving..." : "Approve"}
                           </Button>
                         </form>
                         <Button
                           size="sm"
                           type="button"
                           variant="secondary"
-                          disabled={resolved}
+                          disabled={resolved || isReviewing}
                           onClick={() => setRejectingSubmission(submission)}
                         >
                           Reject
@@ -264,7 +319,13 @@ export default function KycReviewTable({
         description="Tell the seller exactly what needs to be corrected before they submit again."
       >
         {rejectingSubmission ? (
-          <form action={updateKycStatusAction} className="space-y-5">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitKycReview(new FormData(event.currentTarget));
+            }}
+            className="space-y-5"
+          >
             <input type="hidden" name="submissionId" value={rejectingSubmission.id} />
             <input type="hidden" name="sellerId" value={rejectingSubmission.seller_id} />
             <input type="hidden" name="status" value="rejected" />
@@ -287,12 +348,17 @@ export default function KycReviewTable({
               <Button
                 variant="secondary"
                 type="button"
+                disabled={pendingSubmissionId === rejectingSubmission.id}
                 onClick={() => setRejectingSubmission(null)}
               >
                 Cancel
               </Button>
-              <Button variant="danger" type="submit">
-                Reject KYC
+              <Button
+                variant="danger"
+                type="submit"
+                disabled={pendingSubmissionId === rejectingSubmission.id}
+              >
+                {pendingSubmissionId === rejectingSubmission.id ? "Rejecting..." : "Reject KYC"}
               </Button>
             </div>
           </form>

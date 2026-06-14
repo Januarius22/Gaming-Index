@@ -383,6 +383,39 @@ alter table public.notifications add column if not exists link_path text not nul
 alter table public.notifications add column if not exists metadata jsonb not null default '{}'::jsonb;
 alter table public.notifications add column if not exists read_at timestamp with time zone;
 
+create or replace function public.notify_admins(
+  notification_type text,
+  notification_title text,
+  notification_message text,
+  notification_link_path text default '',
+  notification_metadata jsonb default '{}'::jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  select
+    admin_profile.id,
+    notification_type,
+    notification_title,
+    notification_message,
+    notification_link_path,
+    notification_metadata
+  from public.profiles as admin_profile
+  where admin_profile.role = 'admin';
+end;
+$$;
+
 create or replace function public.ensure_profile_wallet()
 returns trigger
 language plpgsql
@@ -402,6 +435,69 @@ drop trigger if exists ensure_profile_wallet_after_insert on public.profiles;
 create trigger ensure_profile_wallet_after_insert
   after insert on public.profiles
   for each row execute procedure public.ensure_profile_wallet();
+
+create or replace function public.notify_admins_on_kyc_submission()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.notify_admins(
+    'admin_kyc_submission',
+    'New KYC submission',
+    new.full_name || ' submitted KYC for review.',
+    '/admin/kyc',
+    jsonb_build_object(
+      'kyc_submission_id', new.id,
+      'seller_id', new.seller_id,
+      'seller_name', new.full_name,
+      'email', new.email,
+      'document_type', new.document_type
+    )
+  );
+
+  return new;
+end;
+$$;
+
+drop trigger if exists notify_admins_on_kyc_submission_after_insert on public.kyc_submissions;
+create trigger notify_admins_on_kyc_submission_after_insert
+  after insert on public.kyc_submissions
+  for each row execute procedure public.notify_admins_on_kyc_submission();
+
+create or replace function public.notify_admins_on_listing_created()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.notify_admins(
+    'admin_listing_created',
+    'New listing created',
+    coalesce(nullif(new.seller_name, ''), 'A seller') || ' created ' || new.title || '.',
+    '/admin/listings',
+    jsonb_build_object(
+      'listing_id', new.id,
+      'seller_id', new.seller_id,
+      'seller_name', new.seller_name,
+      'seller_username', new.seller_username,
+      'title', new.title,
+      'game', new.game,
+      'amount', new.price,
+      'status', new.status
+    )
+  );
+
+  return new;
+end;
+$$;
+
+drop trigger if exists notify_admins_on_listing_created_after_insert on public.listings;
+create trigger notify_admins_on_listing_created_after_insert
+  after insert on public.listings
+  for each row execute procedure public.notify_admins_on_listing_created();
 
 create or replace function public.record_seller_pending_earning(target_order_id uuid)
 returns void
@@ -507,11 +603,429 @@ begin
     )
   );
 
+  perform public.notify_admins(
+    'admin_order_paid',
+    'Order paid',
+    'A buyer paid for ' || paid_order.listing_title || '. Funds are now pending release.',
+    '/admin/orders',
+    jsonb_build_object(
+      'order_id', paid_order.id,
+      'listing_id', paid_order.listing_id,
+      'seller_id', paid_order.seller_id,
+      'buyer_id', paid_order.buyer_id,
+      'amount', paid_order.amount,
+      'hold_expires_at', hold_expires_at
+    )
+  );
+
   update public.orders
   set
     escrow_status = 'holding',
     seller_hold_expires_at = hold_expires_at
   where id = paid_order.id;
+end;
+$$;
+
+create or replace function public.release_seller_earning(target_order_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  held_order public.orders%rowtype;
+begin
+  select *
+  into held_order
+  from public.orders
+  where id = target_order_id
+  for update;
+
+  if not found then
+    raise exception 'Order not found.';
+  end if;
+
+  if not exists (
+    select 1
+    from public.profiles as admin_profile
+    where admin_profile.id = auth.uid()
+      and admin_profile.role = 'admin'
+  ) then
+    raise exception 'Only admins can release seller funds.';
+  end if;
+
+  if held_order.payment_status <> 'successful'
+    or held_order.status not in ('processing', 'completed')
+    or held_order.escrow_status <> 'holding' then
+    raise exception 'Order funds are not ready for release.';
+  end if;
+
+  insert into public.wallets (profile_id)
+  values (held_order.seller_id)
+  on conflict (profile_id) do nothing;
+
+  update public.wallets
+  set
+    pending_balance = greatest(pending_balance - held_order.amount, 0),
+    available_balance = available_balance + held_order.amount,
+    total_earned = total_earned + held_order.amount,
+    updated_at = now()
+  where profile_id = held_order.seller_id;
+
+  insert into public.wallet_transactions (
+    wallet_profile_id,
+    type,
+    direction,
+    balance_bucket,
+    status,
+    amount,
+    order_id,
+    listing_id,
+    payment_reference,
+    description,
+    metadata
+  )
+  values (
+    held_order.seller_id,
+    'seller_release',
+    'credit',
+    'available',
+    'completed',
+    held_order.amount,
+    held_order.id,
+    held_order.listing_id,
+    held_order.payment_reference,
+    'Sale funds released to available balance.',
+    jsonb_build_object('listing_title', held_order.listing_title)
+  );
+
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values (
+    held_order.seller_id,
+    'seller_release',
+    'Funds released',
+    'Funds for ' || held_order.listing_title || ' are now available for withdrawal.',
+    '/seller/wallet',
+    jsonb_build_object(
+      'order_id', held_order.id,
+      'listing_id', held_order.listing_id,
+      'amount', held_order.amount
+    )
+  );
+
+  update public.orders
+  set
+    escrow_status = 'released',
+    seller_released_at = now(),
+    seller_released_by = auth.uid()
+  where id = held_order.id;
+end;
+$$;
+
+create or replace function public.submit_withdrawal_request(
+  withdrawal_amount numeric,
+  withdrawal_bank_name text,
+  withdrawal_account_number text,
+  withdrawal_account_name text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  requester_id uuid;
+  request_id uuid;
+begin
+  requester_id := auth.uid();
+
+  if requester_id is null then
+    raise exception 'You must be signed in to request a withdrawal.';
+  end if;
+
+  if withdrawal_amount <= 0 then
+    raise exception 'Withdrawal amount must be greater than zero.';
+  end if;
+
+  if trim(withdrawal_bank_name) = ''
+    or trim(withdrawal_account_number) = ''
+    or trim(withdrawal_account_name) = '' then
+    raise exception 'Bank details are required.';
+  end if;
+
+  insert into public.wallets (profile_id)
+  values (requester_id)
+  on conflict (profile_id) do nothing;
+
+  update public.wallets
+  set
+    available_balance = available_balance - withdrawal_amount,
+    updated_at = now()
+  where profile_id = requester_id
+    and available_balance >= withdrawal_amount;
+
+  if not found then
+    raise exception 'Insufficient available balance.';
+  end if;
+
+  insert into public.withdrawal_requests (
+    profile_id,
+    amount,
+    bank_name,
+    account_number,
+    account_name
+  )
+  values (
+    requester_id,
+    withdrawal_amount,
+    trim(withdrawal_bank_name),
+    trim(withdrawal_account_number),
+    trim(withdrawal_account_name)
+  )
+  returning id into request_id;
+
+  insert into public.wallet_transactions (
+    wallet_profile_id,
+    type,
+    direction,
+    balance_bucket,
+    status,
+    amount,
+    description,
+    metadata
+  )
+  values (
+    requester_id,
+    'withdrawal_request',
+    'debit',
+    'available',
+    'pending',
+    withdrawal_amount,
+    'Withdrawal request submitted.',
+    jsonb_build_object('withdrawal_request_id', request_id)
+  );
+
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values (
+    requester_id,
+    'withdrawal_request',
+    'Withdrawal request submitted',
+    'Your withdrawal request is waiting for admin review.',
+    '/seller/withdrawals',
+    jsonb_build_object('withdrawal_request_id', request_id, 'amount', withdrawal_amount)
+  );
+
+  perform public.notify_admins(
+    'admin_withdrawal_request',
+    'New withdrawal request',
+    'A seller requested a withdrawal.',
+    '/admin/withdrawals',
+    jsonb_build_object(
+      'withdrawal_request_id', request_id,
+      'profile_id', requester_id,
+      'amount', withdrawal_amount,
+      'bank_name', trim(withdrawal_bank_name),
+      'account_name', trim(withdrawal_account_name)
+    )
+  );
+
+  return request_id;
+end;
+$$;
+
+create or replace function public.reject_withdrawal_request(
+  target_withdrawal_id uuid,
+  rejection_note text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  withdrawal public.withdrawal_requests%rowtype;
+begin
+  if not exists (
+    select 1
+    from public.profiles as admin_profile
+    where admin_profile.id = auth.uid()
+      and admin_profile.role = 'admin'
+  ) then
+    raise exception 'Only admins can reject withdrawals.';
+  end if;
+
+  select *
+  into withdrawal
+  from public.withdrawal_requests
+  where id = target_withdrawal_id
+  for update;
+
+  if not found then
+    raise exception 'Withdrawal request not found.';
+  end if;
+
+  if withdrawal.status <> 'pending' then
+    raise exception 'Only pending withdrawals can be rejected.';
+  end if;
+
+  update public.wallets
+  set
+    available_balance = available_balance + withdrawal.amount,
+    updated_at = now()
+  where profile_id = withdrawal.profile_id;
+
+  update public.withdrawal_requests
+  set
+    status = 'rejected',
+    admin_note = coalesce(nullif(trim(rejection_note), ''), 'Rejected by admin.'),
+    reviewed_by = auth.uid(),
+    reviewed_at = now()
+  where id = withdrawal.id;
+
+  insert into public.wallet_transactions (
+    wallet_profile_id,
+    type,
+    direction,
+    balance_bucket,
+    status,
+    amount,
+    description,
+    metadata
+  )
+  values (
+    withdrawal.profile_id,
+    'withdrawal_rejected',
+    'credit',
+    'available',
+    'completed',
+    withdrawal.amount,
+    'Withdrawal request rejected and returned to available balance.',
+    jsonb_build_object('withdrawal_request_id', withdrawal.id)
+  );
+
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values (
+    withdrawal.profile_id,
+    'withdrawal_rejected',
+    'Withdrawal rejected',
+    'Your withdrawal request was rejected: ' || coalesce(nullif(trim(rejection_note), ''), 'Rejected by admin.'),
+    '/seller/withdrawals',
+    jsonb_build_object(
+      'withdrawal_request_id',
+      withdrawal.id,
+      'amount',
+      withdrawal.amount,
+      'reason',
+      coalesce(nullif(trim(rejection_note), ''), 'Rejected by admin.')
+    )
+  );
+end;
+$$;
+
+create or replace function public.mark_withdrawal_paid(target_withdrawal_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  withdrawal public.withdrawal_requests%rowtype;
+begin
+  if not exists (
+    select 1
+    from public.profiles as admin_profile
+    where admin_profile.id = auth.uid()
+      and admin_profile.role = 'admin'
+  ) then
+    raise exception 'Only admins can mark withdrawals paid.';
+  end if;
+
+  select *
+  into withdrawal
+  from public.withdrawal_requests
+  where id = target_withdrawal_id
+  for update;
+
+  if not found then
+    raise exception 'Withdrawal request not found.';
+  end if;
+
+  if withdrawal.status not in ('pending', 'approved') then
+    raise exception 'This withdrawal cannot be marked paid.';
+  end if;
+
+  update public.wallets
+  set
+    total_withdrawn = total_withdrawn + withdrawal.amount,
+    updated_at = now()
+  where profile_id = withdrawal.profile_id;
+
+  update public.withdrawal_requests
+  set
+    status = 'paid',
+    reviewed_by = auth.uid(),
+    reviewed_at = coalesce(reviewed_at, now()),
+    paid_at = now()
+  where id = withdrawal.id;
+
+  insert into public.wallet_transactions (
+    wallet_profile_id,
+    type,
+    direction,
+    balance_bucket,
+    status,
+    amount,
+    description,
+    metadata
+  )
+  values (
+    withdrawal.profile_id,
+    'withdrawal_paid',
+    'debit',
+    'external',
+    'completed',
+    withdrawal.amount,
+    'Withdrawal paid by admin.',
+    jsonb_build_object('withdrawal_request_id', withdrawal.id)
+  );
+
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values (
+    withdrawal.profile_id,
+    'withdrawal_paid',
+    'Withdrawal paid',
+    'Your withdrawal request has been marked paid.',
+    '/seller/withdrawals',
+    jsonb_build_object('withdrawal_request_id', withdrawal.id, 'amount', withdrawal.amount)
+  );
 end;
 $$;
 

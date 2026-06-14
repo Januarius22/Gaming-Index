@@ -4,12 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ArrowLeft,
+  Bell,
   CreditCard,
   FileCheck2,
   History,
+  Landmark,
   LayoutDashboard,
   ListChecks,
   PackageCheck,
+  ReceiptText,
   Settings,
   Upload,
   X
@@ -28,6 +31,9 @@ const navItems = [
   { href: "/seller/history", label: "Listing History", icon: History },
   { href: "/seller/orders", label: "Orders", icon: PackageCheck },
   { href: "/seller/wallet", label: "Wallet", icon: CreditCard },
+  { href: "/seller/withdrawals", label: "Withdrawals", icon: Landmark },
+  { href: "/seller/transactions", label: "Transactions", icon: ReceiptText },
+  { href: "/seller/notifications", label: "Notifications", icon: Bell },
   { href: "/seller/settings", label: "Settings", icon: Settings }
 ];
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { PanelLeftClose, PanelLeftOpen, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { Bell, PanelLeftClose, PanelLeftOpen, ShieldCheck } from "lucide-react";
 import AnimatedMenuButton from "@/components/ui/AnimatedMenuButton";
 import Button from "@/components/ui/Button";
 import type { Profile } from "@/types";
@@ -39,9 +40,22 @@ export default function AdminTopbar({
             </h1>
           </div>
         </div>
-        <div className="flex items-center gap-3 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          {profile.full_name}
+        <div className="flex shrink-0 items-center gap-3">
+          <Link
+            href="/admin/notifications"
+            aria-label="Open admin notifications"
+            className="inline-flex h-11 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-foreground shadow-sm transition hover:border-primary/30 hover:bg-primary-soft/70 hover:text-primary-dark"
+          >
+            <span className="relative">
+              <Bell className="h-4 w-4" />
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary ring-2 ring-white" />
+            </span>
+            <span>Notifications</span>
+          </Link>
+          <div className="flex items-center gap-3 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            {profile.full_name}
+          </div>
         </div>
       </div>
     </div>

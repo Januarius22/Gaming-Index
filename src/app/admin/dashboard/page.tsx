@@ -1,51 +1,42 @@
+import Link from "next/link";
 import AdminStatsCards from "@/components/admin/AdminStatsCards";
+import NotificationList from "@/components/notifications/NotificationList";
+import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
-import PaginationControls from "@/components/ui/PaginationControls";
-import { getAdminDashboardStats } from "@/lib/data";
-import { paginateItems, parsePageParam } from "@/lib/utils";
+import { requireAdminProfile } from "@/lib/auth";
+import { getAdminDashboardStats, getProfileNotifications } from "@/lib/data";
 
-export default async function AdminDashboardPage({
-  searchParams
-}: {
-  searchParams?: Promise<{ page?: string }>;
-}) {
-  const { stats, activity } = await getAdminDashboardStats();
-  const params = (await searchParams) ?? {};
-  const requestedPage = parsePageParam(params.page);
-  const {
-    items: paginatedActivity,
-    currentPage,
-    totalPages,
-    totalCount,
-    pageStart,
-    pageEnd
-  } = paginateItems(activity, requestedPage, 6);
+export default async function AdminDashboardPage() {
+  const profile = await requireAdminProfile();
+  const [{ stats }, notifications] = await Promise.all([
+    getAdminDashboardStats(),
+    getProfileNotifications(profile.id, 3)
+  ]);
 
   return (
     <div className="space-y-6">
       <AdminStatsCards stats={stats} />
       <Card>
-        <CardHeader>
-          <CardTitle>Recent activity</CardTitle>
-          <CardDescription>Operational signals for onboarding, review work, and marketplace flow.</CardDescription>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-2">
+            <CardTitle>Recent activity</CardTitle>
+            <CardDescription>
+              Latest admin notifications for review work and marketplace flow.
+            </CardDescription>
+          </div>
+          <Link
+            href="/admin/notifications"
+            className={buttonClassName({ variant: "secondary", size: "sm" })}
+          >
+            See more
+          </Link>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">
-              Showing {pageStart}-{pageEnd} of {totalCount} activity items
-            </p>
-            <PaginationControls
-              pathname="/admin/dashboard"
-              currentPage={currentPage}
-              totalPages={totalPages}
-            />
-          </div>
-          {paginatedActivity.map((item) => (
-            <div key={item.id} className="rounded-3xl bg-surface p-5">
-              <p className="font-semibold text-foreground">{item.title}</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.detail}</p>
-            </div>
-          ))}
+          <NotificationList
+            notifications={notifications}
+            emptyMessage="No admin notifications yet."
+            compact
+          />
         </CardContent>
       </Card>
     </div>

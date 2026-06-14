@@ -1,44 +1,44 @@
-import AdminOrdersTable from "@/components/admin/AdminOrdersTable";
+import AdminWithdrawalsTable from "@/components/admin/AdminWithdrawalsTable";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import PaginationControls from "@/components/ui/PaginationControls";
-import { getAdminOrders } from "@/lib/data";
+import { getAdminWithdrawalRequests } from "@/lib/data";
 import { paginateItems, parsePageParam } from "@/lib/utils";
 
-export default async function AdminOrdersPage({
+export default async function AdminWithdrawalsPage({
   searchParams
 }: {
   searchParams?: Promise<{ page?: string }>;
 }) {
-  const orders = await getAdminOrders();
   const params = (await searchParams) ?? {};
   const requestedPage = parsePageParam(params.page);
+  const requests = await getAdminWithdrawalRequests();
   const {
-    items: paginatedOrders,
+    items: paginatedRequests,
     currentPage,
     totalPages,
     totalCount,
     pageStart,
     pageEnd
-  } = paginateItems(orders, requestedPage, 10);
+  } = paginateItems(requests, requestedPage, 10);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Orders</CardTitle>
-        <CardDescription>Review payments, escrow holds, and seller fund releases.</CardDescription>
+        <CardTitle>Withdrawals</CardTitle>
+        <CardDescription>Review seller payout requests and mark completed transfers.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {pageStart}-{pageEnd} of {totalCount} orders
+            Showing {pageStart}-{pageEnd} of {totalCount} withdrawals
           </p>
           <PaginationControls
-            pathname="/admin/orders"
+            pathname="/admin/withdrawals"
             currentPage={currentPage}
             totalPages={totalPages}
           />
         </div>
-        <AdminOrdersTable orders={paginatedOrders} currentPage={currentPage} />
+        <AdminWithdrawalsTable requests={paginatedRequests} />
       </CardContent>
     </Card>
   );

@@ -30,6 +30,72 @@ const MAX_LISTING_IMAGES = 1;
 const LISTING_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
 const DUPLICATE_LISTING_WINDOW_MS = 10 * 60 * 1000;
 
+export type WithdrawalActionState = {
+  status: "idle" | "success" | "error";
+  message?: string;
+};
+
+export async function requestWithdrawalAction(
+  _previousState: WithdrawalActionState,
+  formData: FormData
+): Promise<WithdrawalActionState> {
+  await requireSellerProfile();
+
+  const amount = Number(String(formData.get("amount") ?? "").trim());
+  const bankName = String(formData.get("bankName") ?? "").trim();
+  const accountNumber = String(formData.get("accountNumber") ?? "").trim();
+  const accountName = String(formData.get("accountName") ?? "").trim();
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return {
+      status: "error",
+      message: "Enter a valid withdrawal amount."
+    };
+  }
+
+  if (!bankName || !accountNumber || !accountName) {
+    return {
+      status: "error",
+      message: "Add your complete bank details."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error",
+      message: "Connect Supabase to request withdrawals."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase!.rpc("submit_withdrawal_request", {
+    withdrawal_amount: amount,
+    withdrawal_bank_name: bankName,
+    withdrawal_account_number: accountNumber,
+    withdrawal_account_name: accountName
+  });
+
+  if (error) {
+    return {
+      status: "error",
+      message: error.message
+    };
+  }
+
+  revalidatePath("/seller/wallet");
+  revalidatePath("/seller/withdrawals");
+  revalidatePath("/seller/notifications");
+  revalidatePath("/seller/dashboard");
+  revalidatePath("/admin/withdrawals");
+  revalidatePath("/admin/notifications");
+  revalidatePath("/admin/dashboard");
+
+  return {
+    status: "success",
+    message: "Withdrawal request submitted for admin review."
+  };
+}
+
 function normalizeDuplicateValue(value: string) {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
@@ -514,6 +580,8 @@ export async function saveKycSubmission({
   revalidatePath("/seller/kyc");
   revalidatePath("/seller/dashboard");
   revalidatePath("/admin/kyc");
+  revalidatePath("/admin/notifications");
+  revalidatePath("/admin/dashboard");
 
   return { status: "success" };
 }
@@ -744,6 +812,8 @@ export async function saveListingSubmission({
     revalidatePath("/seller/listings");
     revalidatePath("/seller/dashboard");
     revalidatePath("/admin/listings");
+    revalidatePath("/admin/notifications");
+    revalidatePath("/admin/dashboard");
     revalidatePath("/marketplace");
     revalidatePath("/account/marketplace");
 
@@ -780,6 +850,8 @@ export async function saveListingSubmission({
   revalidatePath("/seller/listings");
   revalidatePath("/seller/dashboard");
   revalidatePath("/admin/listings");
+  revalidatePath("/admin/notifications");
+  revalidatePath("/admin/dashboard");
   revalidatePath("/marketplace");
   revalidatePath("/account/marketplace");
 

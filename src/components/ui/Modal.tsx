@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import Button from "@/components/ui/Button";
@@ -20,14 +22,24 @@ export default function Modal({
   onClose: () => void;
   children: React.ReactNode;
 }) {
-  return (
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
+  return createPortal(
     <AnimatePresence>
       {open ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-10"
+          className="fixed inset-0 z-[100] flex cursor-pointer items-center justify-center bg-slate-950/45 px-4 py-10 backdrop-blur-md"
           onClick={onClose}
         >
         <motion.div
@@ -37,6 +49,7 @@ export default function Modal({
           transition={{ duration: 0.2 }}
           className={cn(
             "max-h-[88vh] w-full max-w-4xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl",
+            "cursor-default",
             panelClassName
           )}
           onClick={(event) => event.stopPropagation()}
@@ -60,6 +73,7 @@ export default function Modal({
           </motion.div>
         </motion.div>
       ) : null}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

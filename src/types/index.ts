@@ -155,6 +155,50 @@ export interface Wallet {
   updated_at: string;
 }
 
+export type WithdrawalStatus = "pending" | "approved" | "rejected" | "paid" | "cancelled";
+
+export interface WithdrawalRequest {
+  id: string;
+  profile_id: string;
+  amount: number;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  status: WithdrawalStatus;
+  admin_note: string;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  paid_at?: string | null;
+  created_at: string;
+  profile_name?: string;
+  profile_email?: string;
+  profile_username?: string;
+}
+
+export interface WalletTransaction {
+  id: string;
+  wallet_profile_id: string;
+  type: string;
+  direction: "credit" | "debit";
+  balance_bucket: "available" | "pending" | "external";
+  status: "pending" | "completed" | "failed" | "cancelled";
+  amount: number;
+  description: string;
+  created_at: string;
+}
+
+export interface Notification {
+  id: string;
+  profile_id: string;
+  type: string;
+  title: string;
+  message: string;
+  link_path: string;
+  metadata: Record<string, unknown>;
+  read_at?: string | null;
+  created_at: string;
+}
+
 export interface ActivityItem {
   id: string;
   title: string;

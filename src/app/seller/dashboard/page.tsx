@@ -1,10 +1,15 @@
 import Link from "next/link";
 import FormMessage from "@/components/auth/FormMessage";
+import NotificationList from "@/components/notifications/NotificationList";
 import KycReviewNoticeModal from "@/components/seller/KycReviewNoticeModal";
 import SellerStatsCards from "@/components/seller/SellerStatsCards";
-import Button from "@/components/ui/Button";
+import Button, { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
-import { getLatestSellerKycSubmission, getSellerDashboardStats } from "@/lib/data";
+import {
+  getLatestSellerKycSubmission,
+  getProfileNotifications,
+  getSellerDashboardStats
+} from "@/lib/data";
 import { canUploadAccounts, requireSellerProfile } from "@/lib/auth";
 import { titleCase } from "@/lib/utils";
 
@@ -14,8 +19,11 @@ export default async function SellerDashboardPage({
   searchParams?: Promise<{ kyc?: string }>;
 }) {
   const profile = await requireSellerProfile();
-  const stats = await getSellerDashboardStats(profile);
-  const latestKycSubmission = await getLatestSellerKycSubmission(profile.id);
+  const [stats, latestKycSubmission, notifications] = await Promise.all([
+    getSellerDashboardStats(profile),
+    getLatestSellerKycSubmission(profile.id),
+    getProfileNotifications(profile.id, 3)
+  ]);
   const params = (await searchParams) ?? {};
   const uploadUnlocked = canUploadAccounts(profile.kyc_status);
   const kycHeading =
@@ -49,6 +57,28 @@ export default async function SellerDashboardPage({
       ) : null}
 
       <SellerStatsCards stats={stats} />
+
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-2">
+            <CardTitle>Recent notifications</CardTitle>
+            <CardDescription>Latest sales, wallet, and account updates.</CardDescription>
+          </div>
+          <Link
+            href="/seller/notifications"
+            className={buttonClassName({ variant: "secondary", size: "sm" })}
+          >
+            See more
+          </Link>
+        </CardHeader>
+        <CardContent>
+          <NotificationList
+            notifications={notifications}
+            emptyMessage="No seller notifications yet."
+            compact
+          />
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <Card>

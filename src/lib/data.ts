@@ -27,9 +27,12 @@ import type {
   Listing,
   ListingDeliveryDetails,
   Order,
+  Notification,
   Profile,
   SellerRating,
-  Wallet
+  Wallet,
+  WalletTransaction,
+  WithdrawalRequest
 } from "@/types";
 
 const KYC_STORAGE_BUCKET = "kyc-documents";
@@ -427,6 +430,165 @@ export async function getProfileWallet(profileId: string) {
     return normalizeWallet(data as Wallet | null, profileId);
   } catch {
     return createEmptyWallet(profileId);
+  }
+}
+
+function normalizeWithdrawalRequest(
+  request: WithdrawalRequest,
+  profile?: Pick<Profile, "full_name" | "email" | "username"> | null
+): WithdrawalRequest {
+  return {
+    ...request,
+    amount: Number(request.amount ?? 0),
+    bank_name: request.bank_name ?? "",
+    account_number: request.account_number ?? "",
+    account_name: request.account_name ?? "",
+    status: request.status ?? "pending",
+    admin_note: request.admin_note ?? "",
+    reviewed_by: request.reviewed_by ?? null,
+    reviewed_at: request.reviewed_at ?? null,
+    paid_at: request.paid_at ?? null,
+    profile_name: profile?.full_name,
+    profile_email: profile?.email,
+    profile_username: profile?.username
+  };
+}
+
+export async function getSellerWithdrawalRequests(profileId: string) {
+  if (!hasSupabaseEnv) {
+    return [] as WithdrawalRequest[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("withdrawal_requests")
+      .select("*")
+      .eq("profile_id", profileId)
+      .order("created_at", { ascending: false });
+
+    return ((data as WithdrawalRequest[] | null) ?? []).map((request) =>
+      normalizeWithdrawalRequest(request)
+    );
+  } catch {
+    return [] as WithdrawalRequest[];
+  }
+}
+
+export async function getProfileWalletTransactions(profileId: string, limit = 10) {
+  if (!hasSupabaseEnv) {
+    return [] as WalletTransaction[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("wallet_transactions")
+      .select("id, wallet_profile_id, type, direction, balance_bucket, status, amount, description, created_at")
+      .eq("wallet_profile_id", profileId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    return ((data as WalletTransaction[] | null) ?? []).map((transaction) => ({
+      ...transaction,
+      amount: Number(transaction.amount ?? 0),
+      description: transaction.description ?? ""
+    }));
+  } catch {
+    return [] as WalletTransaction[];
+  }
+}
+
+function normalizeNotification(notification: Notification): Notification {
+  return {
+    ...notification,
+    type: notification.type ?? "general",
+    title: notification.title ?? "Notification",
+    message: notification.message ?? "",
+    link_path: notification.link_path ?? "",
+    metadata:
+      notification.metadata && typeof notification.metadata === "object"
+        ? notification.metadata
+        : {},
+    read_at: notification.read_at ?? null
+  };
+}
+
+export async function getProfileNotifications(profileId: string, limit = 50) {
+  if (!hasSupabaseEnv) {
+    return [] as Notification[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("profile_id", profileId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    return ((data as Notification[] | null) ?? []).map((notification) =>
+      normalizeNotification(notification)
+    );
+  } catch {
+    return [] as Notification[];
+  }
+}
+
+export async function getAdminWithdrawalRequests() {
+  if (!hasSupabaseEnv) {
+    return [] as WithdrawalRequest[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("withdrawal_requests")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    const requests = (data as WithdrawalRequest[] | null) ?? [];
+    const profileIds = Array.from(new Set(requests.map((request) => request.profile_id)));
+    const { data: profiles } =
+      profileIds.length > 0
+        ? await supabase
+            .from("profiles")
+            .select("id, full_name, email, username")
+            .in("id", profileIds)
+        : { data: [] as Array<Profile & { id: string }> };
+    const profileMap = new Map(
+      ((profiles as Array<Profile & { id: string }> | null) ?? []).map((profile) => [
+        profile.id,
+        profile
+      ])
+    );
+
+    return requests.map((request) =>
+      normalizeWithdrawalRequest(request, profileMap.get(request.profile_id))
+    );
+  } catch {
+    return [] as WithdrawalRequest[];
   }
 }
 

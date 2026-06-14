@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Ban, RotateCcw } from "lucide-react";
-import { banUserAction, unbanUserAction } from "@/actions/admin";
+import { useRouter } from "next/navigation";
+import { banUserInlineAction, unbanUserInlineAction } from "@/actions/admin";
+import FormMessage from "@/components/auth/FormMessage";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
@@ -16,9 +18,21 @@ export default function AdminUsersTable({
   users: Profile[];
   returnTo: string;
 }) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [visibleUsers, setVisibleUsers] = useState(users);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [mode, setMode] = useState<"ban" | "unban">("ban");
   const [banReason, setBanReason] = useState("");
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    message: string;
+    tone: "success" | "error";
+  } | null>(null);
+
+  useEffect(() => {
+    setVisibleUsers(users);
+  }, [users]);
 
   const openBanModal = (user: Profile) => {
     setSelectedUser(user);
@@ -37,8 +51,49 @@ export default function AdminUsersTable({
     setBanReason("");
   };
 
+  const submitUserAction = (formData: FormData, actionMode: "ban" | "unban") => {
+    const userId = String(formData.get("userId") ?? "");
+    const submittedBanReason = String(formData.get("banReason") ?? "");
+    setPendingUserId(userId);
+    setFeedback(null);
+
+    startTransition(() => {
+      void (async () => {
+        const result =
+          actionMode === "ban"
+            ? await banUserInlineAction(formData)
+            : await unbanUserInlineAction(formData);
+
+        if (result.status === "success" && result.userId) {
+          setVisibleUsers((currentUsers) =>
+            currentUsers.map((user) =>
+              user.id === result.userId
+                ? {
+                    ...user,
+                    is_banned: actionMode === "ban",
+                    banned_reason: actionMode === "ban" ? submittedBanReason : "",
+                    banned_at: actionMode === "ban" ? new Date().toISOString() : null,
+                    banned_by: actionMode === "ban" ? user.banned_by : null
+                  }
+                : user
+            )
+          );
+          closeModal();
+          router.refresh();
+        }
+
+        setFeedback({
+          message: result.message,
+          tone: result.status === "success" ? "success" : "error"
+        });
+        setPendingUserId(null);
+      })();
+    });
+  };
+
   return (
     <>
+      <FormMessage message={feedback?.message} tone={feedback?.tone} />
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
           <thead>
@@ -60,7 +115,7 @@ export default function AdminUsersTable({
                 </td>
               </tr>
             ) : (
-              users.map((user) => (
+              visibleUsers.map((user) => (
                 <tr key={user.id} className="border-b border-border/60 align-top">
                   <td className="px-4 py-4 font-medium text-foreground">{user.full_name}</td>
                   <td className="px-4 py-4">@{user.username}</td>
@@ -132,7 +187,13 @@ export default function AdminUsersTable({
       >
         {selectedUser ? (
           mode === "ban" ? (
-            <form action={banUserAction} className="space-y-5">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitUserAction(new FormData(event.currentTarget), "ban");
+              }}
+              className="space-y-5"
+            >
               <input type="hidden" name="userId" value={selectedUser.id} />
               <input type="hidden" name="returnTo" value={returnTo} />
               <div className="rounded-3xl border border-rose-100 bg-rose-50 p-4 text-sm leading-6 text-muted-foreground">
@@ -157,16 +218,22 @@ export default function AdminUsersTable({
                 />
               </div>
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <Button type="button" variant="secondary" onClick={closeModal}>
+                <Button type="button" variant="secondary" disabled={pendingUserId === selectedUser.id} onClick={closeModal}>
                   Cancel
                 </Button>
-                <Button type="submit" variant="danger">
-                  Ban User
+                <Button type="submit" variant="danger" disabled={pendingUserId === selectedUser.id}>
+                  {pendingUserId === selectedUser.id ? "Banning..." : "Ban User"}
                 </Button>
               </div>
             </form>
           ) : (
-            <form action={unbanUserAction} className="space-y-5">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitUserAction(new FormData(event.currentTarget), "unban");
+              }}
+              className="space-y-5"
+            >
               <input type="hidden" name="userId" value={selectedUser.id} />
               <input type="hidden" name="returnTo" value={returnTo} />
               <div className="rounded-3xl border border-border bg-surface p-4 text-sm leading-6 text-muted-foreground">
@@ -174,10 +241,12 @@ export default function AdminUsersTable({
                 will be visible again.
               </div>
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <Button type="button" variant="secondary" onClick={closeModal}>
+                <Button type="button" variant="secondary" disabled={pendingUserId === selectedUser.id} onClick={closeModal}>
                   Cancel
                 </Button>
-                <Button type="submit">Unban User</Button>
+                <Button type="submit" disabled={pendingUserId === selectedUser.id}>
+                  {pendingUserId === selectedUser.id ? "Unbanning..." : "Unban User"}
+                </Button>
               </div>
             </form>
           )

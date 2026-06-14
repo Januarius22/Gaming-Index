@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Eye } from "lucide-react";
-import { takeDownListingAction } from "@/actions/admin";
+import { useRouter } from "next/navigation";
+import { takeDownListingInlineAction } from "@/actions/admin";
+import FormMessage from "@/components/auth/FormMessage";
 import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -19,16 +21,71 @@ export default function ListingsReviewTable({
   returnTo?: string;
   mode?: "live" | "history";
 }) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [visibleListings, setVisibleListings] = useState(listings);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [adminNote, setAdminNote] = useState("");
+  const [pendingListingId, setPendingListingId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    message: string;
+    tone: "success" | "error";
+  } | null>(null);
+
+  useEffect(() => {
+    setVisibleListings(listings);
+  }, [listings]);
 
   const openListing = (listing: Listing) => {
     setSelectedListing(listing);
     setAdminNote("");
   };
 
+  const submitTakeDown = (formData: FormData) => {
+    const listingId = String(formData.get("listingId") ?? "");
+    setPendingListingId(listingId);
+    setFeedback(null);
+
+    startTransition(() => {
+      void (async () => {
+        const result = await takeDownListingInlineAction(formData);
+
+        if (result.status === "success" && result.listingId) {
+          if (mode === "live") {
+            setVisibleListings((currentListings) =>
+              currentListings.filter((listing) => listing.id !== result.listingId)
+            );
+          } else {
+            setVisibleListings((currentListings) =>
+              currentListings.map((listing) =>
+                listing.id === result.listingId
+                  ? {
+                      ...listing,
+                      status: "taken_down",
+                      admin_note: result.adminNote,
+                      admin_action_at: new Date().toISOString()
+                    }
+                  : listing
+              )
+            );
+          }
+          setSelectedListing(null);
+          setAdminNote("");
+          router.refresh();
+        }
+
+        setFeedback({
+          message: result.message,
+          tone: result.status === "success" ? "success" : "error"
+        });
+        setPendingListingId(null);
+      })();
+    });
+  };
+
   return (
     <>
+      <FormMessage message={feedback?.message} tone={feedback?.tone} />
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
           <thead>
@@ -57,7 +114,7 @@ export default function ListingsReviewTable({
                 </td>
               </tr>
             ) : (
-              listings.map((listing) => {
+              visibleListings.map((listing) => {
                 return (
                   <tr key={listing.id} className="border-b border-border/60 align-top">
                     <td className="px-4 py-4">
@@ -184,7 +241,13 @@ export default function ListingsReviewTable({
 
             {mode === "live" && selectedListing.status === "approved" ? (
               <section className="md:col-span-2">
-                <form action={takeDownListingAction} className="space-y-4">
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    submitTakeDown(new FormData(event.currentTarget));
+                  }}
+                  className="space-y-4"
+                >
                   <input type="hidden" name="listingId" value={selectedListing.id} />
                   <input type="hidden" name="returnTo" value={returnTo} />
                   <div>
@@ -204,8 +267,12 @@ export default function ListingsReviewTable({
                       className="min-h-28 w-full rounded-3xl border border-border bg-white px-4 py-3 text-sm text-foreground shadow-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-4 focus:ring-ring"
                     />
                   </div>
-                  <Button type="submit" variant="danger">
-                    Take Down Listing
+                  <Button
+                    type="submit"
+                    variant="danger"
+                    disabled={pendingListingId === selectedListing.id}
+                  >
+                    {pendingListingId === selectedListing.id ? "Taking down..." : "Take Down Listing"}
                   </Button>
                 </form>
               </section>
