@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
+import Link from "next/link";
 import { logoutAction } from "@/actions/auth";
 import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
+import Button, { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { getCurrentProfile, getDashboardRoute } from "@/lib/auth";
 import { formatDate } from "@/lib/utils";
@@ -36,11 +37,11 @@ export default async function AccountSuspendedPage() {
             </Badge>
 
             <h1 className="mt-5 font-heading text-3xl font-semibold text-foreground">
-              Your account has been suspended.
+              Account suspended
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">
-              You can still sign in to view this notice, but marketplace, checkout, seller, and
-              account workspace features are unavailable until an admin lifts the suspension.
+              Your account is currently suspended. You may submit an appeal if you believe this
+              action should be reviewed.
             </p>
 
             <div className="mt-8 w-full rounded-3xl border border-rose-100 bg-rose-50 p-5 text-left">
@@ -55,16 +56,19 @@ export default async function AccountSuspendedPage() {
               ) : null}
             </div>
 
-            <div className="mt-6 w-full rounded-3xl border border-border bg-surface p-5 text-left text-sm leading-7 text-muted-foreground">
-              To appeal, contact Gaming Index support with your account email:
-              <span className="font-semibold text-foreground"> {profile.email}</span>.
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/account-suspended/appeal"
+                className={buttonClassName({ variant: "primary", className: "rounded-2xl" })}
+              >
+                Submit appeal
+              </Link>
+              <form action={logoutAction}>
+                <Button type="submit" variant="secondary" className="w-full rounded-2xl">
+                  Log out
+                </Button>
+              </form>
             </div>
-
-            <form action={logoutAction} className="mt-8">
-              <Button type="submit" variant="secondary" className="rounded-2xl">
-                Log out
-              </Button>
-            </form>
           </div>
         </CardContent>
       </Card>

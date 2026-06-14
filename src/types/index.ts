@@ -175,6 +175,26 @@ export interface WithdrawalRequest {
   profile_username?: string;
 }
 
+export type SuspensionAppealStatus = "pending" | "reviewed" | "approved" | "rejected";
+
+export interface SuspensionAppeal {
+  id: string;
+  profile_id: string;
+  email: string;
+  phone_number: string;
+  appeal_reason: string;
+  status: SuspensionAppealStatus;
+  admin_note: string;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
+  profile_name?: string;
+  profile_email?: string;
+  profile_username?: string;
+  banned_reason?: string;
+  banned_at?: string | null;
+}
+
 export interface WalletTransaction {
   id: string;
   wallet_profile_id: string;

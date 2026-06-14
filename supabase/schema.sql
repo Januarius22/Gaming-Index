@@ -366,6 +366,33 @@ alter table public.withdrawal_requests add constraint withdrawal_requests_status
 alter table public.withdrawal_requests drop constraint if exists withdrawal_requests_amount_check;
 alter table public.withdrawal_requests add constraint withdrawal_requests_amount_check check (amount > 0);
 
+create table if not exists public.suspension_appeals (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  email text not null,
+  phone_number text not null default '',
+  appeal_reason text not null,
+  status text not null default 'pending' check (status in ('pending', 'reviewed', 'approved', 'rejected')),
+  admin_note text not null default '',
+  reviewed_by uuid references public.profiles(id) on delete set null,
+  reviewed_at timestamp with time zone,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.suspension_appeals add column if not exists email text not null default '';
+alter table public.suspension_appeals add column if not exists phone_number text not null default '';
+alter table public.suspension_appeals add column if not exists appeal_reason text not null default '';
+alter table public.suspension_appeals add column if not exists status text not null default 'pending';
+alter table public.suspension_appeals add column if not exists admin_note text not null default '';
+alter table public.suspension_appeals add column if not exists reviewed_by uuid references public.profiles(id) on delete set null;
+alter table public.suspension_appeals add column if not exists reviewed_at timestamp with time zone;
+alter table public.suspension_appeals drop constraint if exists suspension_appeals_status_check;
+alter table public.suspension_appeals add constraint suspension_appeals_status_check
+  check (status in ('pending', 'reviewed', 'approved', 'rejected'));
+alter table public.suspension_appeals drop constraint if exists suspension_appeals_appeal_reason_check;
+alter table public.suspension_appeals add constraint suspension_appeals_appeal_reason_check
+  check (length(trim(appeal_reason)) >= 20);
+
 create table if not exists public.notifications (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.profiles(id) on delete cascade,
@@ -413,6 +440,84 @@ begin
     notification_metadata
   from public.profiles as admin_profile
   where admin_profile.role = 'admin';
+end;
+$$;
+
+create or replace function public.submit_suspension_appeal(
+  appeal_email text,
+  appeal_phone_number text,
+  appeal_reason text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  requester_id uuid;
+  requester public.profiles%rowtype;
+  appeal_id uuid;
+begin
+  requester_id := auth.uid();
+
+  if requester_id is null then
+    raise exception 'You must be signed in to submit an appeal.';
+  end if;
+
+  select *
+  into requester
+  from public.profiles
+  where id = requester_id;
+
+  if not found then
+    raise exception 'Profile not found.';
+  end if;
+
+  if requester.role = 'admin' then
+    raise exception 'Admin accounts cannot submit suspension appeals.';
+  end if;
+
+  if requester.is_banned is not true then
+    raise exception 'Only suspended accounts can submit an appeal.';
+  end if;
+
+  if trim(appeal_email) = ''
+    or trim(appeal_phone_number) = ''
+    or length(trim(appeal_reason)) < 20 then
+    raise exception 'Email, phone number, and a detailed appeal reason are required.';
+  end if;
+
+  insert into public.suspension_appeals (
+    profile_id,
+    email,
+    phone_number,
+    appeal_reason
+  )
+  values (
+    requester_id,
+    lower(trim(appeal_email)),
+    trim(appeal_phone_number),
+    trim(appeal_reason)
+  )
+  returning id into appeal_id;
+
+  perform public.notify_admins(
+    'admin_suspension_appeal',
+    'New suspension appeal',
+    requester.full_name || ' submitted an account suspension appeal.',
+    '/admin/users',
+    jsonb_build_object(
+      'appeal_id', appeal_id,
+      'profile_id', requester_id,
+      'email', lower(trim(appeal_email)),
+      'phone_number', trim(appeal_phone_number),
+      'reason', trim(appeal_reason),
+      'ban_reason', requester.banned_reason,
+      'banned_at', requester.banned_at
+    )
+  );
+
+  return appeal_id;
 end;
 $$;
 
@@ -1118,6 +1223,7 @@ alter table public.orders enable row level security;
 alter table public.wallets enable row level security;
 alter table public.wallet_transactions enable row level security;
 alter table public.withdrawal_requests enable row level security;
+alter table public.suspension_appeals enable row level security;
 alter table public.notifications enable row level security;
 alter table public.seller_ratings enable row level security;
 
@@ -1489,6 +1595,59 @@ create policy "users can cancel their pending withdrawal requests"
 drop policy if exists "admins can update withdrawal requests" on public.withdrawal_requests;
 create policy "admins can update withdrawal requests"
   on public.withdrawal_requests
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+      and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "users can read their own suspension appeals" on public.suspension_appeals;
+create policy "users can read their own suspension appeals"
+  on public.suspension_appeals
+  for select
+  to authenticated
+  using (
+    auth.uid() = profile_id
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "users can submit their own suspension appeals" on public.suspension_appeals;
+create policy "users can submit their own suspension appeals"
+  on public.suspension_appeals
+  for insert
+  to authenticated
+  with check (
+    auth.uid() = profile_id
+    and exists (
+      select 1
+      from public.profiles as suspended_profile
+      where suspended_profile.id = auth.uid()
+        and suspended_profile.is_banned = true
+        and suspended_profile.role <> 'admin'
+    )
+  );
+
+drop policy if exists "admins can update suspension appeals" on public.suspension_appeals;
+create policy "admins can update suspension appeals"
+  on public.suspension_appeals
   for update
   to authenticated
   using (

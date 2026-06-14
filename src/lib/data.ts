@@ -30,6 +30,7 @@ import type {
   Notification,
   Profile,
   SellerRating,
+  SuspensionAppeal,
   Wallet,
   WalletTransaction,
   WithdrawalRequest
@@ -589,6 +590,68 @@ export async function getAdminWithdrawalRequests() {
     );
   } catch {
     return [] as WithdrawalRequest[];
+  }
+}
+
+function normalizeSuspensionAppeal(
+  appeal: SuspensionAppeal,
+  profile?: Pick<Profile, "full_name" | "email" | "username" | "banned_reason" | "banned_at"> | null
+): SuspensionAppeal {
+  return {
+    ...appeal,
+    email: appeal.email ?? "",
+    phone_number: appeal.phone_number ?? "",
+    appeal_reason: appeal.appeal_reason ?? "",
+    status: appeal.status ?? "pending",
+    admin_note: appeal.admin_note ?? "",
+    reviewed_by: appeal.reviewed_by ?? null,
+    reviewed_at: appeal.reviewed_at ?? null,
+    profile_name: profile?.full_name,
+    profile_email: profile?.email,
+    profile_username: profile?.username,
+    banned_reason: profile?.banned_reason ?? "",
+    banned_at: profile?.banned_at ?? null
+  };
+}
+
+export async function getAdminSuspensionAppeals() {
+  if (!hasSupabaseEnv) {
+    return [] as SuspensionAppeal[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("suspension_appeals")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    const appeals = (data as SuspensionAppeal[] | null) ?? [];
+    const profileIds = Array.from(new Set(appeals.map((appeal) => appeal.profile_id)));
+    const { data: profiles } =
+      profileIds.length > 0
+        ? await supabase
+            .from("profiles")
+            .select("id, full_name, email, username, banned_reason, banned_at")
+            .in("id", profileIds)
+        : { data: [] as Array<Profile & { id: string }> };
+    const profileMap = new Map(
+      ((profiles as Array<Profile & { id: string }> | null) ?? []).map((profile) => [
+        profile.id,
+        profile
+      ])
+    );
+
+    return appeals.map((appeal) =>
+      normalizeSuspensionAppeal(appeal, profileMap.get(appeal.profile_id))
+    );
+  } catch {
+    return [] as SuspensionAppeal[];
   }
 }
 

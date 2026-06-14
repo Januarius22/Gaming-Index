@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAccountProfile } from "@/lib/auth";
+import { getCurrentProfile, requireAccountProfile } from "@/lib/auth";
 import {
   removeCartListingId,
   removeSavedListingId,
@@ -28,6 +28,76 @@ import {
   isValidPhoneNumber
 } from "@/lib/utils";
 import type { ActionState } from "@/types";
+
+export async function submitSuspensionAppealAction(
+  _previousState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const profile = await getCurrentProfile();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const phoneNumber = String(formData.get("phoneNumber") ?? "").trim();
+  const appealReason = String(formData.get("appealReason") ?? "").trim();
+
+  if (!profile) {
+    return {
+      status: "error",
+      message: "Please sign in before submitting an appeal."
+    };
+  }
+
+  if (profile.role === "admin" || !profile.is_banned) {
+    return {
+      status: "error",
+      message: "This account is not eligible to submit a suspension appeal."
+    };
+  }
+
+  if (!email || !phoneNumber || appealReason.length < 20) {
+    return {
+      status: "error",
+      message: "Add your email, phone number, and a detailed appeal reason."
+    };
+  }
+
+  if (!isValidPhoneNumber(phoneNumber)) {
+    return {
+      status: "error",
+      message: "Phone number must contain only numbers and can include +, spaces, hyphens, or parentheses."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error",
+      message: "Connect Supabase to submit appeals."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase!.rpc("submit_suspension_appeal", {
+    appeal_email: email,
+    appeal_phone_number: phoneNumber,
+    appeal_reason: appealReason
+  });
+
+  if (error) {
+    return {
+      status: "error",
+      message: error.message
+    };
+  }
+
+  revalidatePath("/account-suspended");
+  revalidatePath("/account-suspended/appeal");
+  revalidatePath("/admin/notifications");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin/users");
+
+  return {
+    status: "success",
+    message: "Appeal submitted. An admin will review your request."
+  };
+}
 
 function getSafeReturnPath(value: string, fallback = "/account/marketplace") {
   return value.startsWith("/account/") ? value : fallback;

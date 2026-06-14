@@ -246,6 +246,203 @@ export async function rejectWithdrawalAction(formData: FormData) {
   };
 }
 
+export async function approveSuspensionAppealAction(formData: FormData) {
+  const admin = await requireAdminProfile();
+  const appealId = String(formData.get("appealId") ?? "").trim();
+  const profileId = String(formData.get("profileId") ?? "").trim();
+  const adminNote = String(formData.get("adminNote") ?? "").trim();
+  const reviewedAt = getNigeriaTimestamp();
+
+  if (!appealId || !profileId) {
+    return {
+      status: "error" as const,
+      message: "Appeal not found."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to manage appeals."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { data: appeal, error: appealError } = await supabase!
+    .from("suspension_appeals")
+    .select("id, status")
+    .eq("id", appealId)
+    .eq("profile_id", profileId)
+    .maybeSingle();
+
+  if (appealError || !appeal) {
+    return {
+      status: "error" as const,
+      message: "Appeal not found."
+    };
+  }
+
+  if (appeal.status !== "pending") {
+    return {
+      status: "error" as const,
+      message: "Only pending appeals can be approved."
+    };
+  }
+
+  const { error: profileError } = await supabase!
+    .from("profiles")
+    .update({
+      is_banned: false,
+      banned_at: null,
+      banned_reason: "",
+      banned_by: null
+    })
+    .eq("id", profileId)
+    .neq("role", "admin");
+
+  if (profileError) {
+    return {
+      status: "error" as const,
+      message: profileError.message
+    };
+  }
+
+  const { error: updateError } = await supabase!
+    .from("suspension_appeals")
+    .update({
+      status: "approved",
+      admin_note: adminNote || "Appeal approved. Suspension lifted.",
+      reviewed_by: admin.id,
+      reviewed_at: reviewedAt
+    })
+    .eq("id", appealId);
+
+  if (updateError) {
+    return {
+      status: "error" as const,
+      message: updateError.message
+    };
+  }
+
+  await supabase!.from("notifications").insert({
+    profile_id: profileId,
+    type: "suspension_appeal_approved",
+    title: "Appeal approved",
+    message: "Your suspension appeal was approved. Your account has been restored.",
+    link_path: "/account/dashboard",
+    metadata: {
+      appeal_id: appealId,
+      note: adminNote || "Appeal approved. Suspension lifted."
+    }
+  });
+
+  revalidatePath("/admin/appeals");
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/notifications");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/account-suspended");
+
+  return {
+    status: "success" as const,
+    message: "Appeal approved and account restored.",
+    appealId,
+    adminNote: adminNote || "Appeal approved. Suspension lifted."
+  };
+}
+
+export async function rejectSuspensionAppealAction(formData: FormData) {
+  const admin = await requireAdminProfile();
+  const appealId = String(formData.get("appealId") ?? "").trim();
+  const profileId = String(formData.get("profileId") ?? "").trim();
+  const adminNote = String(formData.get("adminNote") ?? "").trim();
+  const reviewedAt = getNigeriaTimestamp();
+
+  if (!appealId || !profileId) {
+    return {
+      status: "error" as const,
+      message: "Appeal not found."
+    };
+  }
+
+  if (!adminNote) {
+    return {
+      status: "error" as const,
+      message: "Add a reason before rejecting this appeal."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to manage appeals."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { data: appeal, error: appealError } = await supabase!
+    .from("suspension_appeals")
+    .select("id, status")
+    .eq("id", appealId)
+    .eq("profile_id", profileId)
+    .maybeSingle();
+
+  if (appealError || !appeal) {
+    return {
+      status: "error" as const,
+      message: "Appeal not found."
+    };
+  }
+
+  if (appeal.status !== "pending") {
+    return {
+      status: "error" as const,
+      message: "Only pending appeals can be rejected."
+    };
+  }
+
+  const { error: updateError } = await supabase!
+    .from("suspension_appeals")
+    .update({
+      status: "rejected",
+      admin_note: adminNote,
+      reviewed_by: admin.id,
+      reviewed_at: reviewedAt
+    })
+    .eq("id", appealId);
+
+  if (updateError) {
+    return {
+      status: "error" as const,
+      message: updateError.message
+    };
+  }
+
+  await supabase!.from("notifications").insert({
+    profile_id: profileId,
+    type: "suspension_appeal_rejected",
+    title: "Appeal rejected",
+    message: `Your suspension appeal was rejected: ${adminNote}`,
+    link_path: "/account-suspended",
+    metadata: {
+      appeal_id: appealId,
+      reason: adminNote
+    }
+  });
+
+  revalidatePath("/admin/appeals");
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/notifications");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/account-suspended");
+
+  return {
+    status: "success" as const,
+    message: "Appeal rejected.",
+    appealId,
+    adminNote
+  };
+}
+
 async function banUser(formData: FormData): Promise<AdminActionResult & { userId?: string; banReason?: string }> {
   const admin = await requireAdminProfile();
   const userId = String(formData.get("userId") ?? "").trim();
