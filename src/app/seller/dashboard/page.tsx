@@ -58,10 +58,10 @@ export default async function SellerDashboardPage({
 
       <SellerStatsCards stats={stats} />
 
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <Card className="overflow-hidden">
+        <CardHeader className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
           <div className="space-y-2">
-            <CardTitle>Recent notifications</CardTitle>
+            <CardTitle className="text-lg">Recent notifications</CardTitle>
             <CardDescription>Latest sales, wallet, and account updates.</CardDescription>
           </div>
           <Link
@@ -71,7 +71,7 @@ export default async function SellerDashboardPage({
             See more
           </Link>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 pt-0 sm:p-5 sm:pt-0">
           <NotificationList
             notifications={notifications}
             emptyMessage="No seller notifications yet."
