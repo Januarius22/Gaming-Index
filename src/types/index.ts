@@ -137,7 +137,22 @@ export interface Order {
   payment_channel?: string;
   payment_last4?: string;
   paid_at?: string | null;
+  escrow_status?: "not_started" | "holding" | "released" | "refunded" | "disputed";
+  seller_hold_expires_at?: string | null;
+  seller_released_at?: string | null;
+  seller_released_by?: string | null;
   created_at: string;
+}
+
+export interface Wallet {
+  profile_id: string;
+  available_balance: number;
+  pending_balance: number;
+  total_earned: number;
+  total_deposited: number;
+  total_withdrawn: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ActivityItem {

@@ -94,6 +94,8 @@ function revalidateBuyerCheckout(listingId: string, orderId: string) {
   revalidatePath("/seller/orders");
   revalidatePath("/seller/listings");
   revalidatePath("/seller/history");
+  revalidatePath("/seller/dashboard");
+  revalidatePath("/seller/wallet");
   revalidatePath("/admin/orders");
   revalidatePath("/admin/listings");
   revalidatePath("/admin/listing-history");
@@ -239,14 +241,14 @@ async function markOrderPaid({
   const { error: orderError } = await supabase
     .from("orders")
     .update({
-    buyer_phone: buyerPhone,
-    status: "completed",
-    payment_status: "successful",
-    payment_provider: paymentProvider,
-    payment_reference: paymentReference,
-    payment_channel: paymentChannel,
-    payment_last4: paymentLast4,
-    paid_at: paidAt
+      buyer_phone: buyerPhone,
+      status: "completed",
+      payment_status: "successful",
+      payment_provider: paymentProvider,
+      payment_reference: paymentReference,
+      payment_channel: paymentChannel,
+      payment_last4: paymentLast4,
+      paid_at: paidAt
     })
     .eq("id", orderId);
 
@@ -254,6 +256,44 @@ async function markOrderPaid({
     await supabase
       .from("listings")
       .update({ status: "approved" })
+      .eq("id", listingId)
+      .eq("status", "sold");
+
+    return { ok: false as const, reason: "payment-failed" };
+  }
+
+  const { error: escrowError } = await supabase.rpc("record_seller_pending_earning", {
+    target_order_id: orderId
+  });
+
+  if (escrowError) {
+    console.error("Seller pending escrow failed", {
+      orderId,
+      listingId,
+      message: escrowError.message,
+      details: escrowError.details,
+      hint: escrowError.hint,
+      code: escrowError.code
+    });
+
+    await supabase
+      .from("orders")
+      .update({
+        status: "pending",
+        payment_status: "pending",
+        payment_provider: "",
+        payment_reference: "",
+        payment_channel: paymentChannel,
+        payment_last4: "",
+        paid_at: null,
+        escrow_status: "not_started",
+        seller_hold_expires_at: null
+      })
+      .eq("id", orderId);
+
+    await supabase
+      .from("listings")
+      .update({ status: "approved", sold_at: null })
       .eq("id", listingId)
       .eq("status", "sold");
 

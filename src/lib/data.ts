@@ -28,7 +28,8 @@ import type {
   ListingDeliveryDetails,
   Order,
   Profile,
-  SellerRating
+  SellerRating,
+  Wallet
 } from "@/types";
 
 const KYC_STORAGE_BUCKET = "kyc-documents";
@@ -334,6 +335,10 @@ function normalizeOrder(order: Order, listingTitle?: string | null): Order {
     payment_channel: order.payment_channel ?? "",
     payment_last4: order.payment_last4 ?? "",
     paid_at: order.paid_at ?? null,
+    escrow_status: order.escrow_status ?? "not_started",
+    seller_hold_expires_at: order.seller_hold_expires_at ?? null,
+    seller_released_at: order.seller_released_at ?? null,
+    seller_released_by: order.seller_released_by ?? null,
     listing_title: order.listing_title || listingTitle || "Listing"
   };
 }
@@ -367,6 +372,62 @@ async function getSupabaseListingDeliveryDetailsForListing(listingId: string) {
     .maybeSingle();
 
   return (data as ListingDeliveryDetails | null) ?? null;
+}
+
+function createEmptyWallet(profileId: string): Wallet {
+  return {
+    profile_id: profileId,
+    available_balance: 0,
+    pending_balance: 0,
+    total_earned: 0,
+    total_deposited: 0,
+    total_withdrawn: 0,
+    created_at: "",
+    updated_at: ""
+  };
+}
+
+function normalizeWallet(wallet: Wallet | null | undefined, profileId: string): Wallet {
+  const fallback = createEmptyWallet(profileId);
+
+  if (!wallet) {
+    return fallback;
+  }
+
+  return {
+    profile_id: wallet.profile_id ?? profileId,
+    available_balance: Number(wallet.available_balance ?? 0),
+    pending_balance: Number(wallet.pending_balance ?? 0),
+    total_earned: Number(wallet.total_earned ?? 0),
+    total_deposited: Number(wallet.total_deposited ?? 0),
+    total_withdrawn: Number(wallet.total_withdrawn ?? 0),
+    created_at: wallet.created_at ?? "",
+    updated_at: wallet.updated_at ?? ""
+  };
+}
+
+export async function getProfileWallet(profileId: string) {
+  if (!hasSupabaseEnv) {
+    return createEmptyWallet(profileId);
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return createEmptyWallet(profileId);
+    }
+
+    const { data } = await supabase
+      .from("wallets")
+      .select("*")
+      .eq("profile_id", profileId)
+      .maybeSingle();
+
+    return normalizeWallet(data as Wallet | null, profileId);
+  } catch {
+    return createEmptyWallet(profileId);
+  }
 }
 
 function combineSellerMetrics(
@@ -542,6 +603,7 @@ export async function getSellerDashboardStats(profile: Profile): Promise<Dashboa
     const pendingOrders = orders.filter(
       (order) => order.seller_id === profile.id && order.status === "pending"
     );
+    const wallet = await getProfileWallet(profile.id);
 
     return [
       {
@@ -562,9 +624,9 @@ export async function getSellerDashboardStats(profile: Profile): Promise<Dashboa
         helper: "Orders awaiting action"
       },
       {
-        label: "Wallet Balance",
-        value: "$0",
-        helper: "Dummy wallet balance"
+        label: "Available Balance",
+        value: formatCompactCurrency(wallet.available_balance),
+        helper: "Ready for withdrawal"
       }
     ];
   }
@@ -575,7 +637,8 @@ export async function getSellerDashboardStats(profile: Profile): Promise<Dashboa
     const [
       totalListingsResult,
       activeListingsResult,
-      pendingOrdersResult
+      pendingOrdersResult,
+      wallet
     ] = await Promise.all([
       supabase
         ?.from("listings")
@@ -590,7 +653,8 @@ export async function getSellerDashboardStats(profile: Profile): Promise<Dashboa
         ?.from("orders")
         .select("*", { count: "exact", head: true })
         .eq("seller_id", profile.id)
-        .eq("status", "pending")
+        .eq("status", "pending"),
+      getProfileWallet(profile.id)
     ]);
 
     return [
@@ -610,9 +674,11 @@ export async function getSellerDashboardStats(profile: Profile): Promise<Dashboa
         helper: "Orders awaiting action"
       },
       {
-        label: "Wallet Balance",
-        value: "$0",
-        helper: "Dummy wallet balance"
+        label: "Available Balance",
+        value: formatCompactCurrency(wallet.available_balance),
+        helper: wallet.pending_balance > 0
+          ? `${formatCompactCurrency(wallet.pending_balance)} pending`
+          : "Ready for withdrawal"
       }
     ];
   } catch {
@@ -620,7 +686,7 @@ export async function getSellerDashboardStats(profile: Profile): Promise<Dashboa
       { label: "Total Listings", value: "0", helper: "All account listings" },
       { label: "Active Listings", value: "0", helper: "Approved and live" },
       { label: "Pending Orders", value: "0", helper: "Orders awaiting action" },
-      { label: "Wallet Balance", value: "$0", helper: "Dummy wallet balance" }
+      { label: "Available Balance", value: "$0", helper: "Ready for withdrawal" }
     ];
   }
 }

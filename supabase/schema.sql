@@ -217,9 +217,16 @@ alter table public.orders add column if not exists payment_reference text not nu
 alter table public.orders add column if not exists payment_channel text not null default '';
 alter table public.orders add column if not exists payment_last4 text not null default '';
 alter table public.orders add column if not exists paid_at timestamp with time zone;
+alter table public.orders add column if not exists escrow_status text not null default 'not_started';
+alter table public.orders add column if not exists seller_hold_expires_at timestamp with time zone;
+alter table public.orders add column if not exists seller_released_at timestamp with time zone;
+alter table public.orders add column if not exists seller_released_by uuid references public.profiles(id) on delete set null;
 alter table public.orders drop constraint if exists orders_payment_status_check;
 alter table public.orders add constraint orders_payment_status_check
   check (payment_status in ('pending', 'successful', 'failed'));
+alter table public.orders drop constraint if exists orders_escrow_status_check;
+alter table public.orders add constraint orders_escrow_status_check
+  check (escrow_status in ('not_started', 'holding', 'released', 'refunded', 'disputed'));
 update public.orders as order_row
 set buyer_id = profile.id
 from public.profiles as profile
@@ -230,6 +237,283 @@ set listing_title = coalesce(listing.title, order_row.listing_title, '')
 from public.listings as listing
 where order_row.listing_id = listing.id
   and order_row.listing_title = '';
+
+create table if not exists public.wallets (
+  profile_id uuid primary key references public.profiles(id) on delete cascade,
+  available_balance numeric(12, 2) not null default 0 check (available_balance >= 0),
+  pending_balance numeric(12, 2) not null default 0 check (pending_balance >= 0),
+  total_earned numeric(12, 2) not null default 0 check (total_earned >= 0),
+  total_deposited numeric(12, 2) not null default 0 check (total_deposited >= 0),
+  total_withdrawn numeric(12, 2) not null default 0 check (total_withdrawn >= 0),
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now()
+);
+
+alter table public.wallets add column if not exists available_balance numeric(12, 2) not null default 0;
+alter table public.wallets add column if not exists pending_balance numeric(12, 2) not null default 0;
+alter table public.wallets add column if not exists total_earned numeric(12, 2) not null default 0;
+alter table public.wallets add column if not exists total_deposited numeric(12, 2) not null default 0;
+alter table public.wallets add column if not exists total_withdrawn numeric(12, 2) not null default 0;
+alter table public.wallets add column if not exists updated_at timestamp with time zone not null default now();
+alter table public.wallets alter column available_balance type numeric(18, 2);
+alter table public.wallets alter column pending_balance type numeric(18, 2);
+alter table public.wallets alter column total_earned type numeric(18, 2);
+alter table public.wallets alter column total_deposited type numeric(18, 2);
+alter table public.wallets alter column total_withdrawn type numeric(18, 2);
+alter table public.wallets drop constraint if exists wallets_available_balance_check;
+alter table public.wallets add constraint wallets_available_balance_check check (available_balance >= 0);
+alter table public.wallets drop constraint if exists wallets_pending_balance_check;
+alter table public.wallets add constraint wallets_pending_balance_check check (pending_balance >= 0);
+alter table public.wallets drop constraint if exists wallets_total_earned_check;
+alter table public.wallets add constraint wallets_total_earned_check check (total_earned >= 0);
+alter table public.wallets drop constraint if exists wallets_total_deposited_check;
+alter table public.wallets add constraint wallets_total_deposited_check check (total_deposited >= 0);
+alter table public.wallets drop constraint if exists wallets_total_withdrawn_check;
+alter table public.wallets add constraint wallets_total_withdrawn_check check (total_withdrawn >= 0);
+
+insert into public.wallets (profile_id)
+select profile.id
+from public.profiles as profile
+on conflict (profile_id) do nothing;
+
+create table if not exists public.wallet_transactions (
+  id uuid primary key default gen_random_uuid(),
+  wallet_profile_id uuid not null references public.wallets(profile_id) on delete cascade,
+  type text not null check (
+    type in (
+      'deposit',
+      'purchase_hold',
+      'seller_pending_earning',
+      'seller_release',
+      'withdrawal_request',
+      'withdrawal_paid',
+      'withdrawal_rejected',
+      'refund',
+      'admin_adjustment'
+    )
+  ),
+  direction text not null check (direction in ('credit', 'debit')),
+  balance_bucket text not null default 'available' check (balance_bucket in ('available', 'pending', 'external')),
+  status text not null default 'completed' check (status in ('pending', 'completed', 'failed', 'cancelled')),
+  amount numeric(12, 2) not null check (amount > 0),
+  order_id uuid references public.orders(id) on delete set null,
+  listing_id uuid references public.listings(id) on delete set null,
+  payment_reference text not null default '',
+  description text not null default '',
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.wallet_transactions add column if not exists order_id uuid references public.orders(id) on delete set null;
+alter table public.wallet_transactions add column if not exists listing_id uuid references public.listings(id) on delete set null;
+alter table public.wallet_transactions add column if not exists payment_reference text not null default '';
+alter table public.wallet_transactions add column if not exists description text not null default '';
+alter table public.wallet_transactions add column if not exists metadata jsonb not null default '{}'::jsonb;
+alter table public.wallet_transactions alter column amount type numeric(18, 2);
+alter table public.wallet_transactions drop constraint if exists wallet_transactions_type_check;
+alter table public.wallet_transactions add constraint wallet_transactions_type_check
+  check (
+    type in (
+      'deposit',
+      'purchase_hold',
+      'seller_pending_earning',
+      'seller_release',
+      'withdrawal_request',
+      'withdrawal_paid',
+      'withdrawal_rejected',
+      'refund',
+      'admin_adjustment'
+    )
+  );
+alter table public.wallet_transactions drop constraint if exists wallet_transactions_direction_check;
+alter table public.wallet_transactions add constraint wallet_transactions_direction_check
+  check (direction in ('credit', 'debit'));
+alter table public.wallet_transactions drop constraint if exists wallet_transactions_balance_bucket_check;
+alter table public.wallet_transactions add constraint wallet_transactions_balance_bucket_check
+  check (balance_bucket in ('available', 'pending', 'external'));
+alter table public.wallet_transactions drop constraint if exists wallet_transactions_status_check;
+alter table public.wallet_transactions add constraint wallet_transactions_status_check
+  check (status in ('pending', 'completed', 'failed', 'cancelled'));
+alter table public.wallet_transactions drop constraint if exists wallet_transactions_amount_check;
+alter table public.wallet_transactions add constraint wallet_transactions_amount_check check (amount > 0);
+
+create table if not exists public.withdrawal_requests (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  amount numeric(12, 2) not null check (amount > 0),
+  bank_name text not null default '',
+  account_number text not null default '',
+  account_name text not null default '',
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'paid', 'cancelled')),
+  admin_note text not null default '',
+  reviewed_by uuid references public.profiles(id) on delete set null,
+  reviewed_at timestamp with time zone,
+  paid_at timestamp with time zone,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.withdrawal_requests add column if not exists bank_name text not null default '';
+alter table public.withdrawal_requests add column if not exists account_number text not null default '';
+alter table public.withdrawal_requests add column if not exists account_name text not null default '';
+alter table public.withdrawal_requests add column if not exists admin_note text not null default '';
+alter table public.withdrawal_requests add column if not exists reviewed_by uuid references public.profiles(id) on delete set null;
+alter table public.withdrawal_requests add column if not exists reviewed_at timestamp with time zone;
+alter table public.withdrawal_requests add column if not exists paid_at timestamp with time zone;
+alter table public.withdrawal_requests alter column amount type numeric(18, 2);
+alter table public.withdrawal_requests drop constraint if exists withdrawal_requests_status_check;
+alter table public.withdrawal_requests add constraint withdrawal_requests_status_check
+  check (status in ('pending', 'approved', 'rejected', 'paid', 'cancelled'));
+alter table public.withdrawal_requests drop constraint if exists withdrawal_requests_amount_check;
+alter table public.withdrawal_requests add constraint withdrawal_requests_amount_check check (amount > 0);
+
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  type text not null default 'general',
+  title text not null,
+  message text not null default '',
+  link_path text not null default '',
+  metadata jsonb not null default '{}'::jsonb,
+  read_at timestamp with time zone,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.notifications add column if not exists type text not null default 'general';
+alter table public.notifications add column if not exists link_path text not null default '';
+alter table public.notifications add column if not exists metadata jsonb not null default '{}'::jsonb;
+alter table public.notifications add column if not exists read_at timestamp with time zone;
+
+create or replace function public.ensure_profile_wallet()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.wallets (profile_id)
+  values (new.id)
+  on conflict (profile_id) do nothing;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists ensure_profile_wallet_after_insert on public.profiles;
+create trigger ensure_profile_wallet_after_insert
+  after insert on public.profiles
+  for each row execute procedure public.ensure_profile_wallet();
+
+create or replace function public.record_seller_pending_earning(target_order_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  paid_order public.orders%rowtype;
+  hold_expires_at timestamp with time zone;
+begin
+  select *
+  into paid_order
+  from public.orders
+  where id = target_order_id
+  for update;
+
+  if not found then
+    raise exception 'Order not found.';
+  end if;
+
+  if paid_order.payment_status <> 'successful'
+    or paid_order.status not in ('processing', 'completed') then
+    raise exception 'Order payment is not confirmed.';
+  end if;
+
+  if paid_order.escrow_status in ('holding', 'released') then
+    return;
+  end if;
+
+  if auth.uid() is not null
+    and auth.uid() is distinct from paid_order.buyer_id
+    and not exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    ) then
+    raise exception 'Only the buyer or an admin can record this order escrow.';
+  end if;
+
+  hold_expires_at := coalesce(paid_order.paid_at, now()) + interval '24 hours';
+
+  insert into public.wallets (profile_id)
+  values (paid_order.seller_id)
+  on conflict (profile_id) do nothing;
+
+  update public.wallets
+  set
+    pending_balance = pending_balance + paid_order.amount,
+    updated_at = now()
+  where profile_id = paid_order.seller_id;
+
+  insert into public.wallet_transactions (
+    wallet_profile_id,
+    type,
+    direction,
+    balance_bucket,
+    status,
+    amount,
+    order_id,
+    listing_id,
+    payment_reference,
+    description,
+    metadata
+  )
+  values (
+    paid_order.seller_id,
+    'seller_pending_earning',
+    'credit',
+    'pending',
+    'completed',
+    paid_order.amount,
+    paid_order.id,
+    paid_order.listing_id,
+    paid_order.payment_reference,
+    'Sale funds are pending buyer protection release.',
+    jsonb_build_object(
+      'hold_expires_at', hold_expires_at,
+      'listing_title', paid_order.listing_title
+    )
+  );
+
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values (
+    paid_order.seller_id,
+    'seller_sale',
+    'New sale pending release',
+    'A buyer paid for ' || paid_order.listing_title || '. The funds are now in your pending balance.',
+    '/seller/orders',
+    jsonb_build_object(
+      'order_id', paid_order.id,
+      'listing_id', paid_order.listing_id,
+      'amount', paid_order.amount,
+      'hold_expires_at', hold_expires_at
+    )
+  );
+
+  update public.orders
+  set
+    escrow_status = 'holding',
+    seller_hold_expires_at = hold_expires_at
+  where id = paid_order.id;
+end;
+$$;
 
 create table if not exists public.seller_ratings (
   id uuid primary key default gen_random_uuid(),
@@ -317,14 +601,20 @@ alter table public.kyc_submissions enable row level security;
 alter table public.listings enable row level security;
 alter table public.listing_delivery_details enable row level security;
 alter table public.orders enable row level security;
+alter table public.wallets enable row level security;
+alter table public.wallet_transactions enable row level security;
+alter table public.withdrawal_requests enable row level security;
+alter table public.notifications enable row level security;
 alter table public.seller_ratings enable row level security;
 
+drop policy if exists "profiles readable by authenticated users" on public.profiles;
 create policy "profiles readable by authenticated users"
   on public.profiles
   for select
   to authenticated
   using (true);
 
+drop policy if exists "users can update their own profile" on public.profiles;
 create policy "users can update their own profile"
   on public.profiles
   for update
@@ -354,18 +644,21 @@ create policy "admins can update any profile"
     )
   );
 
+drop policy if exists "sellers can insert their own kyc submission" on public.kyc_submissions;
 create policy "sellers can insert their own kyc submission"
   on public.kyc_submissions
   for insert
   to authenticated
   with check (auth.uid() = seller_id);
 
+drop policy if exists "authenticated users can read kyc submissions" on public.kyc_submissions;
 create policy "authenticated users can read kyc submissions"
   on public.kyc_submissions
   for select
   to authenticated
   using (true);
 
+drop policy if exists "authenticated users can update kyc submissions" on public.kyc_submissions;
 create policy "authenticated users can update kyc submissions"
   on public.kyc_submissions
   for update
@@ -373,6 +666,7 @@ create policy "authenticated users can update kyc submissions"
   using (true)
   with check (true);
 
+drop policy if exists "sellers can insert their own listings" on public.listings;
 create policy "sellers can insert their own listings"
   on public.listings
   for insert
@@ -393,6 +687,7 @@ create policy "public can read live marketplace listings"
   to anon
   using (status in ('approved', 'sold', 'pending_review'));
 
+drop policy if exists "authenticated users can update listings" on public.listings;
 create policy "authenticated users can update listings"
   on public.listings
   for update
@@ -475,6 +770,7 @@ create policy "sellers can update their own listing delivery details"
   with check (auth.uid() = seller_id);
 
 drop policy if exists "authenticated users can read orders" on public.orders;
+drop policy if exists "buyers sellers and admins can read relevant orders" on public.orders;
 create policy "buyers sellers and admins can read relevant orders"
   on public.orders
   for select
@@ -497,6 +793,7 @@ create policy "buyers sellers and admins can read relevant orders"
   );
 
 drop policy if exists "authenticated users can insert orders" on public.orders;
+drop policy if exists "buyers can insert their own orders" on public.orders;
 create policy "buyers can insert their own orders"
   on public.orders
   for insert
@@ -553,22 +850,202 @@ create policy "admins can update any order"
       select 1
       from public.profiles as admin_profile
       where admin_profile.id = auth.uid()
+      and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "users can read their own wallet" on public.wallets;
+create policy "users can read their own wallet"
+  on public.wallets
+  for select
+  to authenticated
+  using (
+    auth.uid() = profile_id
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
         and admin_profile.role = 'admin'
     )
   );
 
+drop policy if exists "admins can update wallets" on public.wallets;
+create policy "admins can update wallets"
+  on public.wallets
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "users can read their own wallet transactions" on public.wallet_transactions;
+create policy "users can read their own wallet transactions"
+  on public.wallet_transactions
+  for select
+  to authenticated
+  using (
+    auth.uid() = wallet_profile_id
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "admins can insert wallet transactions" on public.wallet_transactions;
+create policy "admins can insert wallet transactions"
+  on public.wallet_transactions
+  for insert
+  to authenticated
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "admins can update wallet transactions" on public.wallet_transactions;
+create policy "admins can update wallet transactions"
+  on public.wallet_transactions
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "users can read their own withdrawal requests" on public.withdrawal_requests;
+create policy "users can read their own withdrawal requests"
+  on public.withdrawal_requests
+  for select
+  to authenticated
+  using (
+    auth.uid() = profile_id
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "users can submit their own withdrawal requests" on public.withdrawal_requests;
+create policy "users can submit their own withdrawal requests"
+  on public.withdrawal_requests
+  for insert
+  to authenticated
+  with check (auth.uid() = profile_id);
+
+drop policy if exists "users can cancel their pending withdrawal requests" on public.withdrawal_requests;
+create policy "users can cancel their pending withdrawal requests"
+  on public.withdrawal_requests
+  for update
+  to authenticated
+  using (auth.uid() = profile_id and status = 'pending')
+  with check (auth.uid() = profile_id and status = 'cancelled');
+
+drop policy if exists "admins can update withdrawal requests" on public.withdrawal_requests;
+create policy "admins can update withdrawal requests"
+  on public.withdrawal_requests
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "users can read their own notifications" on public.notifications;
+create policy "users can read their own notifications"
+  on public.notifications
+  for select
+  to authenticated
+  using (
+    auth.uid() = profile_id
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "users can mark their notifications read" on public.notifications;
+create policy "users can mark their notifications read"
+  on public.notifications
+  for update
+  to authenticated
+  using (auth.uid() = profile_id)
+  with check (auth.uid() = profile_id);
+
+drop policy if exists "admins can insert notifications" on public.notifications;
+create policy "admins can insert notifications"
+  on public.notifications
+  for insert
+  to authenticated
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "seller ratings readable by everyone" on public.seller_ratings;
 create policy "seller ratings readable by everyone"
   on public.seller_ratings
   for select
   to anon, authenticated
   using (true);
 
+drop policy if exists "buyers can insert their own seller ratings" on public.seller_ratings;
 create policy "buyers can insert their own seller ratings"
   on public.seller_ratings
   for insert
   to authenticated
   with check (auth.uid() = buyer_id);
 
+drop policy if exists "buyers can update their own seller ratings" on public.seller_ratings;
 create policy "buyers can update their own seller ratings"
   on public.seller_ratings
   for update
