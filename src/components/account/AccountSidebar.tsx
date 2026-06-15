@@ -4,8 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bookmark,
+  Bell,
+  CreditCard,
+  Landmark,
   LayoutDashboard,
   PackageCheck,
+  ReceiptText,
   Settings,
   ShieldPlus,
   ShoppingCart,
@@ -38,6 +42,10 @@ export default function AccountSidebar({
     { href: "/account/saved", label: "Saved Listings", icon: Bookmark },
     { href: "/account/cart", label: "Cart", icon: ShoppingCart },
     { href: "/account/orders", label: "Order History", icon: PackageCheck },
+    { href: "/account/wallet", label: "Wallet", icon: CreditCard },
+    { href: "/account/withdrawals", label: "Withdrawals", icon: Landmark },
+    { href: "/account/transactions", label: "Transactions", icon: ReceiptText },
+    { href: "/account/notifications", label: "Notifications", icon: Bell },
     {
       href: "/account/seller",
       label: profile.seller_enabled ? "Seller Center" : "Become a Seller",

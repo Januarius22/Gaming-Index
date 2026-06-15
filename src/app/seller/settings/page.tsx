@@ -27,7 +27,7 @@ export default async function SellerSettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      {/* <Card>
         <CardHeader>
           <CardTitle>Workspace preferences</CardTitle>
           <CardDescription>Reserved for notification settings, payout preferences, and profile edits.</CardDescription>
@@ -36,7 +36,7 @@ export default async function SellerSettingsPage() {
           <p>Email notifications for order updates will live here later.</p>
           <p>Password management and payout preferences can be added without disturbing layout boundaries.</p>
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   );
 }

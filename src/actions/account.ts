@@ -610,6 +610,119 @@ export async function revealOrderDeliveryAction(formData: FormData) {
   redirect(`/account/orders/${orderId}?notice=delivery-revealed&showDelivery=1${fromPageQuery}`);
 }
 
+export async function submitOrderDisputeAction(
+  _previousState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  await requireAccountProfile();
+  const orderId = String(formData.get("orderId") ?? "").trim();
+  const reason = String(formData.get("reason") ?? "").trim();
+  const details = String(formData.get("details") ?? "").trim();
+
+  if (!orderId || !reason || details.length < 20) {
+    return {
+      status: "error",
+      message: "Select a reason and add clear dispute details."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error",
+      message: "Connect Supabase to open disputes."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase!.rpc("submit_order_dispute", {
+    target_order_id: orderId,
+    dispute_reason: reason,
+    dispute_details: details
+  });
+
+  if (error) {
+    return {
+      status: "error",
+      message: error.message
+    };
+  }
+
+  revalidatePath(`/account/orders/${orderId}`);
+  revalidatePath("/account/orders");
+  revalidatePath("/seller/orders");
+  revalidatePath("/seller/notifications");
+  revalidatePath("/admin/disputes");
+  revalidatePath("/admin/notifications");
+  revalidatePath("/admin/dashboard");
+
+  return {
+    status: "success",
+    message: "Dispute opened. Admin will review this order."
+  };
+}
+
+export async function requestBuyerWithdrawalAction(
+  _previousState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  await requireAccountProfile();
+
+  const amount = Number(String(formData.get("amount") ?? "").trim());
+  const bankName = String(formData.get("bankName") ?? "").trim();
+  const accountNumber = String(formData.get("accountNumber") ?? "").trim();
+  const accountName = String(formData.get("accountName") ?? "").trim();
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return {
+      status: "error",
+      message: "Enter a valid withdrawal amount."
+    };
+  }
+
+  if (!bankName || !accountNumber || !accountName) {
+    return {
+      status: "error",
+      message: "Add your complete bank details."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error",
+      message: "Connect Supabase to request withdrawals."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase!.rpc("submit_withdrawal_request", {
+    withdrawal_amount: amount,
+    withdrawal_bank_name: bankName,
+    withdrawal_account_number: accountNumber,
+    withdrawal_account_name: accountName
+  });
+
+  if (error) {
+    return {
+      status: "error",
+      message: error.message
+    };
+  }
+
+  revalidatePath("/account/wallet");
+  revalidatePath("/account/withdrawals");
+  revalidatePath("/account/transactions");
+  revalidatePath("/account/notifications");
+  revalidatePath("/account/dashboard");
+  revalidatePath("/admin/withdrawals");
+  revalidatePath("/admin/notifications");
+  revalidatePath("/admin/dashboard");
+
+  return {
+    status: "success",
+    message: "Withdrawal request submitted."
+  };
+}
+
 export async function completeCheckoutAction(formData: FormData) {
   const profile = await requireAccountProfile();
   const orderId = String(formData.get("orderId") ?? "").trim();

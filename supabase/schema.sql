@@ -238,6 +238,37 @@ from public.listings as listing
 where order_row.listing_id = listing.id
   and order_row.listing_title = '';
 
+create table if not exists public.disputes (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  listing_id uuid references public.listings(id) on delete set null,
+  buyer_id uuid not null references public.profiles(id) on delete cascade,
+  seller_id uuid not null references public.profiles(id) on delete cascade,
+  reason text not null,
+  details text not null,
+  status text not null default 'open' check (status in ('open', 'reviewing', 'resolved', 'rejected', 'refunded')),
+  admin_note text not null default '',
+  reviewed_by uuid references public.profiles(id) on delete set null,
+  reviewed_at timestamp with time zone,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.disputes add column if not exists listing_id uuid references public.listings(id) on delete set null;
+alter table public.disputes add column if not exists buyer_id uuid references public.profiles(id) on delete cascade;
+alter table public.disputes add column if not exists seller_id uuid references public.profiles(id) on delete cascade;
+alter table public.disputes add column if not exists reason text not null default '';
+alter table public.disputes add column if not exists details text not null default '';
+alter table public.disputes add column if not exists status text not null default 'open';
+alter table public.disputes add column if not exists admin_note text not null default '';
+alter table public.disputes add column if not exists reviewed_by uuid references public.profiles(id) on delete set null;
+alter table public.disputes add column if not exists reviewed_at timestamp with time zone;
+alter table public.disputes drop constraint if exists disputes_status_check;
+alter table public.disputes add constraint disputes_status_check
+  check (status in ('open', 'reviewing', 'resolved', 'rejected', 'refunded'));
+alter table public.disputes drop constraint if exists disputes_details_check;
+alter table public.disputes add constraint disputes_details_check
+  check (length(trim(details)) >= 20);
+
 create table if not exists public.wallets (
   profile_id uuid primary key references public.profiles(id) on delete cascade,
   available_balance numeric(12, 2) not null default 0 check (available_balance >= 0),
@@ -604,6 +635,440 @@ create trigger notify_admins_on_listing_created_after_insert
   after insert on public.listings
   for each row execute procedure public.notify_admins_on_listing_created();
 
+create or replace function public.submit_order_dispute(
+  target_order_id uuid,
+  dispute_reason text,
+  dispute_details text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  requester_id uuid;
+  target_order public.orders%rowtype;
+  dispute_id uuid;
+begin
+  requester_id := auth.uid();
+
+  if requester_id is null then
+    raise exception 'You must be signed in to open a dispute.';
+  end if;
+
+  if trim(dispute_reason) = ''
+    or length(trim(dispute_details)) < 20 then
+    raise exception 'Select a reason and add dispute details.';
+  end if;
+
+  select *
+  into target_order
+  from public.orders
+  where id = target_order_id
+  for update;
+
+  if not found then
+    raise exception 'Order not found.';
+  end if;
+
+  if target_order.buyer_id is distinct from requester_id
+    and not exists (
+      select 1
+      from public.profiles as buyer_profile
+      where buyer_profile.id = requester_id
+        and lower(buyer_profile.email) = lower(target_order.buyer_email)
+    ) then
+    raise exception 'Only the buyer can open a dispute for this order.';
+  end if;
+
+  if target_order.payment_status <> 'successful'
+    or target_order.status not in ('processing', 'completed') then
+    raise exception 'Only paid orders can be disputed.';
+  end if;
+
+  if exists (
+    select 1
+    from public.disputes as existing_dispute
+    where existing_dispute.order_id = target_order.id
+      and existing_dispute.status in ('open', 'reviewing')
+  ) then
+    raise exception 'A dispute is already open for this order.';
+  end if;
+
+  insert into public.disputes (
+    order_id,
+    listing_id,
+    buyer_id,
+    seller_id,
+    reason,
+    details
+  )
+  values (
+    target_order.id,
+    target_order.listing_id,
+    requester_id,
+    target_order.seller_id,
+    trim(dispute_reason),
+    trim(dispute_details)
+  )
+  returning id into dispute_id;
+
+  update public.orders
+  set escrow_status = 'disputed'
+  where id = target_order.id;
+
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values
+  (
+    requester_id,
+    'buyer_dispute_opened',
+    'Dispute opened',
+    'Your dispute has been sent to admin review.',
+    '/account/orders/' || target_order.id,
+    jsonb_build_object(
+      'dispute_id', dispute_id,
+      'order_id', target_order.id,
+      'reason', trim(dispute_reason)
+    )
+  ),
+  (
+    target_order.seller_id,
+    'seller_dispute_opened',
+    'Order dispute opened',
+    'A buyer opened a dispute for ' || target_order.listing_title || '.',
+    '/seller/orders',
+    jsonb_build_object(
+      'dispute_id', dispute_id,
+      'order_id', target_order.id,
+      'listing_id', target_order.listing_id,
+      'reason', trim(dispute_reason)
+    )
+  );
+
+  perform public.notify_admins(
+    'admin_dispute_opened',
+    'New dispute opened',
+    'A buyer opened a dispute for ' || target_order.listing_title || '.',
+    '/admin/disputes',
+    jsonb_build_object(
+      'dispute_id', dispute_id,
+      'order_id', target_order.id,
+      'buyer_id', requester_id,
+      'seller_id', target_order.seller_id,
+      'listing_id', target_order.listing_id,
+      'amount', target_order.amount,
+      'reason', trim(dispute_reason),
+      'details', trim(dispute_details)
+    )
+  );
+
+  return dispute_id;
+end;
+$$;
+
+create or replace function public.review_order_dispute(
+  target_dispute_id uuid,
+  next_status text,
+  review_note text default ''
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  dispute_row public.disputes%rowtype;
+  linked_order public.orders%rowtype;
+begin
+  if not exists (
+    select 1
+    from public.profiles as admin_profile
+    where admin_profile.id = auth.uid()
+      and admin_profile.role = 'admin'
+  ) then
+    raise exception 'Only admins can review disputes.';
+  end if;
+
+  if next_status not in ('reviewing', 'resolved', 'rejected') then
+    raise exception 'Invalid dispute status.';
+  end if;
+
+  if next_status in ('resolved', 'rejected') and trim(review_note) = '' then
+    raise exception 'Add a review note before closing this dispute.';
+  end if;
+
+  select *
+  into dispute_row
+  from public.disputes
+  where id = target_dispute_id
+  for update;
+
+  if not found then
+    raise exception 'Dispute not found.';
+  end if;
+
+  if dispute_row.status in ('resolved', 'rejected', 'refunded') then
+    raise exception 'This dispute is already closed.';
+  end if;
+
+  select *
+  into linked_order
+  from public.orders
+  where id = dispute_row.order_id
+  for update;
+
+  update public.disputes
+  set
+    status = next_status,
+    admin_note = case
+      when trim(review_note) = '' then admin_note
+      else trim(review_note)
+    end,
+    reviewed_by = auth.uid(),
+    reviewed_at = now()
+  where id = dispute_row.id;
+
+  if next_status in ('resolved', 'rejected') then
+    update public.orders
+    set escrow_status = case
+      when escrow_status = 'disputed' then 'holding'
+      else escrow_status
+    end
+    where id = dispute_row.order_id;
+  end if;
+
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values
+  (
+    dispute_row.buyer_id,
+    'buyer_dispute_' || next_status,
+    case
+      when next_status = 'reviewing' then 'Dispute under review'
+      when next_status = 'resolved' then 'Dispute resolved'
+      else 'Dispute rejected'
+    end,
+    case
+      when next_status = 'reviewing' then 'Admin is reviewing your dispute.'
+      when next_status = 'resolved' then 'Your dispute has been resolved: ' || trim(review_note)
+      else 'Your dispute was rejected: ' || trim(review_note)
+    end,
+    '/account/orders/' || dispute_row.order_id,
+    jsonb_build_object(
+      'dispute_id', dispute_row.id,
+      'order_id', dispute_row.order_id,
+      'status', next_status,
+      'note', trim(review_note)
+    )
+  ),
+  (
+    dispute_row.seller_id,
+    'seller_dispute_' || next_status,
+    case
+      when next_status = 'reviewing' then 'Dispute under review'
+      when next_status = 'resolved' then 'Dispute resolved'
+      else 'Dispute rejected'
+    end,
+    case
+      when next_status = 'reviewing' then 'Admin is reviewing a dispute on your order.'
+      when next_status = 'resolved' then 'A dispute on your order was resolved: ' || trim(review_note)
+      else 'A dispute on your order was rejected: ' || trim(review_note)
+    end,
+    '/seller/orders',
+    jsonb_build_object(
+      'dispute_id', dispute_row.id,
+      'order_id', dispute_row.order_id,
+      'listing_id', dispute_row.listing_id,
+      'status', next_status,
+      'note', trim(review_note)
+    )
+  );
+end;
+$$;
+
+create or replace function public.refund_order_dispute(
+  target_dispute_id uuid,
+  refund_note text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  dispute_row public.disputes%rowtype;
+  linked_order public.orders%rowtype;
+begin
+  if not exists (
+    select 1
+    from public.profiles as admin_profile
+    where admin_profile.id = auth.uid()
+      and admin_profile.role = 'admin'
+  ) then
+    raise exception 'Only admins can refund disputes.';
+  end if;
+
+  if trim(refund_note) = '' then
+    raise exception 'Add a refund note.';
+  end if;
+
+  select *
+  into dispute_row
+  from public.disputes
+  where id = target_dispute_id
+  for update;
+
+  if not found then
+    raise exception 'Dispute not found.';
+  end if;
+
+  if dispute_row.status in ('resolved', 'rejected', 'refunded') then
+    raise exception 'This dispute is already closed.';
+  end if;
+
+  select *
+  into linked_order
+  from public.orders
+  where id = dispute_row.order_id
+  for update;
+
+  if not found then
+    raise exception 'Order not found.';
+  end if;
+
+  if linked_order.payment_status <> 'successful'
+    or linked_order.escrow_status not in ('holding', 'disputed') then
+    raise exception 'This order is not eligible for refund.';
+  end if;
+
+  insert into public.wallets (profile_id)
+  values (dispute_row.buyer_id)
+  on conflict (profile_id) do nothing;
+
+  insert into public.wallets (profile_id)
+  values (dispute_row.seller_id)
+  on conflict (profile_id) do nothing;
+
+  update public.wallets
+  set
+    available_balance = available_balance + linked_order.amount,
+    total_deposited = total_deposited + linked_order.amount,
+    updated_at = now()
+  where profile_id = dispute_row.buyer_id;
+
+  update public.wallets
+  set
+    pending_balance = greatest(pending_balance - linked_order.amount, 0),
+    updated_at = now()
+  where profile_id = dispute_row.seller_id;
+
+  update public.orders
+  set
+    status = 'cancelled',
+    escrow_status = 'refunded'
+  where id = linked_order.id;
+
+  update public.disputes
+  set
+    status = 'refunded',
+    admin_note = trim(refund_note),
+    reviewed_by = auth.uid(),
+    reviewed_at = now()
+  where id = dispute_row.id;
+
+  insert into public.wallet_transactions (
+    wallet_profile_id,
+    type,
+    direction,
+    balance_bucket,
+    status,
+    amount,
+    order_id,
+    listing_id,
+    payment_reference,
+    description,
+    metadata
+  )
+  values
+  (
+    dispute_row.buyer_id,
+    'refund',
+    'credit',
+    'available',
+    'completed',
+    linked_order.amount,
+    linked_order.id,
+    linked_order.listing_id,
+    linked_order.payment_reference,
+    'Order refund issued.',
+    jsonb_build_object('dispute_id', dispute_row.id, 'note', trim(refund_note))
+  ),
+  (
+    dispute_row.seller_id,
+    'refund',
+    'debit',
+    'pending',
+    'completed',
+    linked_order.amount,
+    linked_order.id,
+    linked_order.listing_id,
+    linked_order.payment_reference,
+    'Sale funds returned to buyer.',
+    jsonb_build_object('dispute_id', dispute_row.id, 'note', trim(refund_note))
+  );
+
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values
+  (
+    dispute_row.buyer_id,
+    'buyer_refund_issued',
+    'Refund issued',
+    'A refund was issued for your disputed order.',
+    '/account/orders/' || linked_order.id,
+    jsonb_build_object(
+      'dispute_id', dispute_row.id,
+      'order_id', linked_order.id,
+      'amount', linked_order.amount,
+      'note', trim(refund_note)
+    )
+  ),
+  (
+    dispute_row.seller_id,
+    'seller_dispute_refunded',
+    'Order refunded',
+    'A disputed order was refunded.',
+    '/seller/orders',
+    jsonb_build_object(
+      'dispute_id', dispute_row.id,
+      'order_id', linked_order.id,
+      'listing_id', linked_order.listing_id,
+      'amount', linked_order.amount,
+      'note', trim(refund_note)
+    )
+  );
+end;
+$$;
+
 create or replace function public.record_seller_pending_earning(target_order_id uuid)
 returns void
 language plpgsql
@@ -629,7 +1094,7 @@ begin
     raise exception 'Order payment is not confirmed.';
   end if;
 
-  if paid_order.escrow_status in ('holding', 'released') then
+  if paid_order.escrow_status in ('holding', 'released', 'disputed', 'refunded') then
     return;
   end if;
 
@@ -848,6 +1313,7 @@ as $$
 declare
   requester_id uuid;
   request_id uuid;
+  requester_profile public.profiles%rowtype;
 begin
   requester_id := auth.uid();
 
@@ -864,6 +1330,11 @@ begin
     or trim(withdrawal_account_name) = '' then
     raise exception 'Bank details are required.';
   end if;
+
+  select *
+  into requester_profile
+  from public.profiles
+  where id = requester_id;
 
   insert into public.wallets (profile_id)
   values (requester_id)
@@ -930,18 +1401,28 @@ begin
     'withdrawal_request',
     'Withdrawal request submitted',
     'Your withdrawal request is waiting for admin review.',
-    '/seller/withdrawals',
+    case
+      when requester_profile.seller_enabled then '/seller/withdrawals'
+      else '/account/withdrawals'
+    end,
     jsonb_build_object('withdrawal_request_id', request_id, 'amount', withdrawal_amount)
   );
 
   perform public.notify_admins(
     'admin_withdrawal_request',
     'New withdrawal request',
-    'A seller requested a withdrawal.',
+    case
+      when requester_profile.seller_enabled then 'A seller requested a withdrawal.'
+      else 'A buyer requested a refund withdrawal.'
+    end,
     '/admin/withdrawals',
     jsonb_build_object(
       'withdrawal_request_id', request_id,
       'profile_id', requester_id,
+      'profile_role', case
+        when requester_profile.seller_enabled then 'seller'
+        else 'buyer'
+      end,
       'amount', withdrawal_amount,
       'bank_name', trim(withdrawal_bank_name),
       'account_name', trim(withdrawal_account_name)
@@ -963,6 +1444,7 @@ set search_path = public
 as $$
 declare
   withdrawal public.withdrawal_requests%rowtype;
+  withdrawal_profile public.profiles%rowtype;
 begin
   if not exists (
     select 1
@@ -986,6 +1468,11 @@ begin
   if withdrawal.status <> 'pending' then
     raise exception 'Only pending withdrawals can be rejected.';
   end if;
+
+  select *
+  into withdrawal_profile
+  from public.profiles
+  where id = withdrawal.profile_id;
 
   update public.wallets
   set
@@ -1035,7 +1522,10 @@ begin
     'withdrawal_rejected',
     'Withdrawal rejected',
     'Your withdrawal request was rejected: ' || coalesce(nullif(trim(rejection_note), ''), 'Rejected by admin.'),
-    '/seller/withdrawals',
+    case
+      when withdrawal_profile.seller_enabled then '/seller/withdrawals'
+      else '/account/withdrawals'
+    end,
     jsonb_build_object(
       'withdrawal_request_id',
       withdrawal.id,
@@ -1056,6 +1546,7 @@ set search_path = public
 as $$
 declare
   withdrawal public.withdrawal_requests%rowtype;
+  withdrawal_profile public.profiles%rowtype;
 begin
   if not exists (
     select 1
@@ -1079,6 +1570,11 @@ begin
   if withdrawal.status not in ('pending', 'approved') then
     raise exception 'This withdrawal cannot be marked paid.';
   end if;
+
+  select *
+  into withdrawal_profile
+  from public.profiles
+  where id = withdrawal.profile_id;
 
   update public.wallets
   set
@@ -1128,7 +1624,10 @@ begin
     'withdrawal_paid',
     'Withdrawal paid',
     'Your withdrawal request has been marked paid.',
-    '/seller/withdrawals',
+    case
+      when withdrawal_profile.seller_enabled then '/seller/withdrawals'
+      else '/account/withdrawals'
+    end,
     jsonb_build_object('withdrawal_request_id', withdrawal.id, 'amount', withdrawal.amount)
   );
 end;
@@ -1220,6 +1719,7 @@ alter table public.kyc_submissions enable row level security;
 alter table public.listings enable row level security;
 alter table public.listing_delivery_details enable row level security;
 alter table public.orders enable row level security;
+alter table public.disputes enable row level security;
 alter table public.wallets enable row level security;
 alter table public.wallet_transactions enable row level security;
 alter table public.withdrawal_requests enable row level security;
@@ -1471,6 +1971,51 @@ create policy "admins can update any order"
       from public.profiles as admin_profile
       where admin_profile.id = auth.uid()
       and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "buyers sellers and admins can read relevant disputes" on public.disputes;
+create policy "buyers sellers and admins can read relevant disputes"
+  on public.disputes
+  for select
+  to authenticated
+  using (
+    auth.uid() = buyer_id
+    or auth.uid() = seller_id
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "buyers can insert their own disputes" on public.disputes;
+create policy "buyers can insert their own disputes"
+  on public.disputes
+  for insert
+  to authenticated
+  with check (auth.uid() = buyer_id);
+
+drop policy if exists "admins can update disputes" on public.disputes;
+create policy "admins can update disputes"
+  on public.disputes
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
     )
   );
 

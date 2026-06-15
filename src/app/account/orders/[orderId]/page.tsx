@@ -2,6 +2,8 @@ import Link from "next/link";
 import { LockKeyhole, ReceiptText, ShieldCheck } from "lucide-react";
 import { revealOrderDeliveryAction } from "@/actions/account";
 import FormMessage from "@/components/auth/FormMessage";
+import CopyValueButton from "@/components/account/CopyValueButton";
+import OrderDisputeForm from "@/components/account/OrderDisputeForm";
 import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
 import Badge from "@/components/ui/Badge";
 import Button, { buttonClassName } from "@/components/ui/Button";
@@ -14,12 +16,12 @@ function getNoticeMessage(notice?: string) {
   switch (notice) {
     case "payment-confirmed":
       return {
-        message: "Payment was completed successfully and this order is now ready for delivery access.",
+        message: "Payment confirmed. Delivery access is ready.",
         tone: "success" as const
       };
     case "payment-already-confirmed":
       return {
-        message: "This order has already been paid, so you can move straight into the delivery vault.",
+        message: "This order has already been paid.",
         tone: "success" as const
       };
     case "delivery-revealed":
@@ -29,7 +31,7 @@ function getNoticeMessage(notice?: string) {
       };
     case "delivery-locked":
       return {
-        message: "Delivery details stay locked until the order is in a paid status.",
+        message: "Delivery details unlock after payment.",
         tone: "error" as const
       };
     case "delivery-unavailable":
@@ -103,6 +105,10 @@ export default async function AccountOrderDetailPage({
   const { order, listing, paymentConfirmed, deliveryAvailable, deliveryDetails } = orderDetail;
   const deliveryVisible = Boolean(showDelivery && deliveryDetails && paymentConfirmed);
   const revealedDeliveryDetails = deliveryVisible ? deliveryDetails : null;
+  const canOpenDispute =
+    paymentConfirmed &&
+    order.escrow_status !== "disputed" &&
+    order.escrow_status !== "refunded";
 
   return (
     <div className="space-y-6">
@@ -110,7 +116,7 @@ export default async function AccountOrderDetailPage({
         <CardHeader>
           <CardTitle>Order details</CardTitle>
           <CardDescription>
-            Review your order record and only reveal private login details after payment is confirmed.
+            Review payment status and delivery access for this order.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -251,7 +257,7 @@ export default async function AccountOrderDetailPage({
             <CardHeader>
               <CardTitle>Delivery vault</CardTitle>
               <CardDescription>
-                Private login details stay hidden until the order reaches a paid status.
+                Private account access for this purchase.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -264,9 +270,7 @@ export default async function AccountOrderDetailPage({
                     <div>
                       <p className="font-semibold text-foreground">Delivery details are locked</p>
                       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                        This order is currently <span className="font-semibold">{order.status}</span>.
-                        Once payment is confirmed, this page can unlock the private login details
-                        stored for the buyer.
+                        Complete payment to unlock the account details.
                       </p>
                       <Link
                         href={`/account/checkout/${order.id}`}
@@ -289,8 +293,7 @@ export default async function AccountOrderDetailPage({
                       <div>
                         <p className="font-semibold text-foreground">Delivery details revealed</p>
                         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                          Change the password, linked recovery email, and any connected phone number
-                          immediately after a successful handoff.
+                          Use the details below to access the account.
                         </p>
                       </div>
                     </div>
@@ -298,27 +301,44 @@ export default async function AccountOrderDetailPage({
 
                   <div className="grid gap-4">
                     <div className="rounded-3xl bg-surface p-5">
-                      <p className="text-sm text-muted-foreground">Account login email or username</p>
-                      <p className="mt-2 break-all font-semibold text-foreground">
-                        {revealedDeliveryDetails.account_login_id}
-                      </p>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-sm text-muted-foreground">Account login</p>
+                          <p className="mt-2 break-all font-semibold text-foreground">
+                            {revealedDeliveryDetails.account_login_id}
+                          </p>
+                        </div>
+                        <CopyValueButton value={revealedDeliveryDetails.account_login_id} />
+                      </div>
                     </div>
                     <div className="rounded-3xl bg-surface p-5">
-                      <p className="text-sm text-muted-foreground">Account password</p>
-                      <p className="mt-2 break-all font-semibold text-foreground">
-                        {revealedDeliveryDetails.account_password}
-                      </p>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-sm text-muted-foreground">Password</p>
+                          <p className="mt-2 break-all font-semibold text-foreground">
+                            {revealedDeliveryDetails.account_password}
+                          </p>
+                        </div>
+                        <CopyValueButton value={revealedDeliveryDetails.account_password} />
+                      </div>
                     </div>
                     <div className="rounded-3xl bg-surface p-5">
-                      <p className="text-sm text-muted-foreground">Recovery details or backup codes</p>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-sm text-muted-foreground">Recovery details</p>
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-foreground">
+                            {revealedDeliveryDetails.recovery_details || "Not provided."}
+                          </p>
+                        </div>
+                        {revealedDeliveryDetails.recovery_details ? (
+                          <CopyValueButton value={revealedDeliveryDetails.recovery_details} />
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="rounded-3xl bg-surface p-5">
+                      <p className="text-sm text-muted-foreground">Transfer note</p>
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-foreground">
-                        {revealedDeliveryDetails.recovery_details || "No recovery details were added."}
-                      </p>
-                    </div>
-                    <div className="rounded-3xl bg-surface p-5">
-                      <p className="text-sm text-muted-foreground">Seller transfer note</p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-foreground">
-                        {revealedDeliveryDetails.transfer_note || "No transfer note was added."}
+                        {revealedDeliveryDetails.transfer_note || "Not provided."}
                       </p>
                     </div>
                   </div>
@@ -332,28 +352,27 @@ export default async function AccountOrderDetailPage({
                     value={resolvedSearchParams.fromPage ?? "1"}
                   />
                   <div className="rounded-3xl border border-primary/12 bg-primary-soft/55 p-5">
-                    <p className="font-semibold text-foreground">This order can unlock delivery details</p>
+                    <p className="font-semibold text-foreground">Delivery details are ready</p>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      Reveal the private login details only when you are ready to secure the account
-                      and change the credentials immediately.
+                      Reveal the private account access for this order.
                     </p>
                     <Button type="submit" className="mt-4 rounded-2xl">
-                      Reveal Delivery Details
+                      Reveal delivery details
                     </Button>
                   </div>
                 </form>
               ) : (
                 <div className="rounded-3xl border border-border bg-surface p-5">
-                  <p className="font-semibold text-foreground">No delivery details have been released yet</p>
+                  <p className="font-semibold text-foreground">Delivery details unavailable</p>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    The seller has not supplied releasable delivery credentials for this order yet.
+                    No delivery details are attached to this order.
                   </p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {paymentConfirmed ? (
+          {canOpenDispute ? (
             <Card className="border-border/70">
               <CardHeader>
                 <CardTitle>Payment record</CardTitle>
@@ -392,14 +411,28 @@ export default async function AccountOrderDetailPage({
             </Card>
           ) : null}
 
+          {paymentConfirmed ? (
+            <Card className="border-border/70">
+              <CardHeader>
+                <CardTitle>Report a problem</CardTitle>
+                <CardDescription>
+                  Open a dispute if the delivered account has an issue.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <OrderDisputeForm orderId={order.id} />
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card className="border-border/70">
             <CardHeader>
-              <CardTitle>After you receive access</CardTitle>
+              <CardTitle>Secure the account</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
-              <p>Change the account password immediately.</p>
-              <p>Change the linked recovery email or phone if the platform allows it.</p>
-              <p>Save screenshots of the delivery details and order record for disputes.</p>
+              <p>Change the password.</p>
+              <p>Update recovery email or phone where available.</p>
+              <p>Keep this order record for reference.</p>
             </CardContent>
           </Card>
         </div>

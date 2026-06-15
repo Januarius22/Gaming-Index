@@ -183,6 +183,11 @@ export async function markWithdrawalPaidAction(formData: FormData) {
   revalidatePath("/seller/transactions");
   revalidatePath("/seller/notifications");
   revalidatePath("/seller/dashboard");
+  revalidatePath("/account/wallet");
+  revalidatePath("/account/withdrawals");
+  revalidatePath("/account/transactions");
+  revalidatePath("/account/notifications");
+  revalidatePath("/account/dashboard");
 
   return {
     status: "success" as const,
@@ -237,6 +242,11 @@ export async function rejectWithdrawalAction(formData: FormData) {
   revalidatePath("/seller/transactions");
   revalidatePath("/seller/notifications");
   revalidatePath("/seller/dashboard");
+  revalidatePath("/account/wallet");
+  revalidatePath("/account/withdrawals");
+  revalidatePath("/account/transactions");
+  revalidatePath("/account/notifications");
+  revalidatePath("/account/dashboard");
 
   return {
     status: "success" as const,
@@ -439,6 +449,135 @@ export async function rejectSuspensionAppealAction(formData: FormData) {
     status: "success" as const,
     message: "Appeal rejected.",
     appealId,
+    adminNote
+  };
+}
+
+export async function updateOrderDisputeAction(formData: FormData) {
+  await requireAdminProfile();
+  const disputeId = String(formData.get("disputeId") ?? "").trim();
+  const orderId = String(formData.get("orderId") ?? "").trim();
+  const nextStatus = String(formData.get("nextStatus") ?? "").trim();
+  const adminNote = String(formData.get("adminNote") ?? "").trim();
+
+  if (
+    !disputeId ||
+    !orderId ||
+    (nextStatus !== "reviewing" && nextStatus !== "resolved" && nextStatus !== "rejected")
+  ) {
+    return {
+      status: "error" as const,
+      message: "Dispute update is invalid."
+    };
+  }
+
+  if ((nextStatus === "resolved" || nextStatus === "rejected") && !adminNote) {
+    return {
+      status: "error" as const,
+      message: "Add a note before closing this dispute."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to manage disputes."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase!.rpc("review_order_dispute", {
+    target_dispute_id: disputeId,
+    next_status: nextStatus,
+    review_note: adminNote
+  });
+
+  if (error) {
+    return {
+      status: "error" as const,
+      message: error.message
+    };
+  }
+
+  revalidatePath("/admin/disputes");
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin/dashboard");
+  revalidatePath(`/account/orders/${orderId}`);
+  revalidatePath("/account/orders");
+  revalidatePath("/seller/orders");
+  revalidatePath("/seller/notifications");
+  revalidatePath("/admin/notifications");
+
+  return {
+    status: "success" as const,
+    message:
+      nextStatus === "reviewing"
+        ? "Dispute marked as reviewing."
+        : nextStatus === "resolved"
+          ? "Dispute resolved."
+          : "Dispute rejected.",
+    disputeId,
+    nextStatus,
+    adminNote
+  };
+}
+
+export async function refundOrderDisputeAction(formData: FormData) {
+  await requireAdminProfile();
+  const disputeId = String(formData.get("disputeId") ?? "").trim();
+  const orderId = String(formData.get("orderId") ?? "").trim();
+  const adminNote = String(formData.get("adminNote") ?? "").trim();
+
+  if (!disputeId || !orderId) {
+    return {
+      status: "error" as const,
+      message: "Refund request is invalid."
+    };
+  }
+
+  if (!adminNote) {
+    return {
+      status: "error" as const,
+      message: "Add a refund note."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to refund disputes."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase!.rpc("refund_order_dispute", {
+    target_dispute_id: disputeId,
+    refund_note: adminNote
+  });
+
+  if (error) {
+    return {
+      status: "error" as const,
+      message: error.message
+    };
+  }
+
+  revalidatePath("/admin/disputes");
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin/dashboard");
+  revalidatePath(`/account/orders/${orderId}`);
+  revalidatePath("/account/orders");
+  revalidatePath("/seller/orders");
+  revalidatePath("/seller/wallet");
+  revalidatePath("/seller/transactions");
+  revalidatePath("/seller/notifications");
+  revalidatePath("/admin/notifications");
+
+  return {
+    status: "success" as const,
+    message: "Refund issued.",
+    disputeId,
+    nextStatus: "refunded" as const,
     adminNote
   };
 }

@@ -23,6 +23,7 @@ import {
 import type {
   ActivityItem,
   DashboardStat,
+  Dispute,
   KycSubmission,
   Listing,
   ListingDeliveryDetails,
@@ -481,6 +482,10 @@ export async function getSellerWithdrawalRequests(profileId: string) {
   }
 }
 
+export async function getProfileWithdrawalRequests(profileId: string) {
+  return getSellerWithdrawalRequests(profileId);
+}
+
 export async function getProfileWalletTransactions(profileId: string, limit = 10) {
   if (!hasSupabaseEnv) {
     return [] as WalletTransaction[];
@@ -652,6 +657,91 @@ export async function getAdminSuspensionAppeals() {
     );
   } catch {
     return [] as SuspensionAppeal[];
+  }
+}
+
+function normalizeDispute(
+  dispute: Dispute,
+  order?: Order | null,
+  buyer?: Pick<Profile, "full_name" | "email"> | null,
+  seller?: Pick<Profile, "full_name" | "username"> | null
+): Dispute {
+  return {
+    ...dispute,
+    reason: dispute.reason ?? "",
+    details: dispute.details ?? "",
+    status: dispute.status ?? "open",
+    admin_note: dispute.admin_note ?? "",
+    reviewed_by: dispute.reviewed_by ?? null,
+    reviewed_at: dispute.reviewed_at ?? null,
+    listing_title: order?.listing_title ?? dispute.listing_title ?? "",
+    buyer_name: buyer?.full_name ?? order?.buyer_name ?? dispute.buyer_name ?? "",
+    buyer_email: buyer?.email ?? order?.buyer_email ?? dispute.buyer_email ?? "",
+    seller_name: seller?.full_name ?? dispute.seller_name ?? "",
+    seller_username: seller?.username ?? dispute.seller_username ?? "",
+    amount: Number(order?.amount ?? dispute.amount ?? 0)
+  };
+}
+
+export async function getAdminDisputes() {
+  if (!hasSupabaseEnv) {
+    return [] as Dispute[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("disputes")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    const disputes = (data as Dispute[] | null) ?? [];
+    const orderIds = Array.from(new Set(disputes.map((dispute) => dispute.order_id)));
+    const profileIds = Array.from(
+      new Set(disputes.flatMap((dispute) => [dispute.buyer_id, dispute.seller_id]))
+    );
+    const { data: orders } =
+      orderIds.length > 0
+        ? await supabase
+            .from("orders")
+            .select("*")
+            .in("id", orderIds)
+        : { data: [] as Order[] };
+    const { data: profiles } =
+      profileIds.length > 0
+        ? await supabase
+            .from("profiles")
+            .select("id, full_name, email, username")
+            .in("id", profileIds)
+        : { data: [] as Array<Profile & { id: string }> };
+    const orderMap = new Map(
+      ((orders as Order[] | null) ?? []).map((order) => [
+        order.id,
+        normalizeOrder(order)
+      ])
+    );
+    const profileMap = new Map(
+      ((profiles as Array<Profile & { id: string }> | null) ?? []).map((profile) => [
+        profile.id,
+        profile
+      ])
+    );
+
+    return disputes.map((dispute) =>
+      normalizeDispute(
+        dispute,
+        orderMap.get(dispute.order_id),
+        profileMap.get(dispute.buyer_id),
+        profileMap.get(dispute.seller_id)
+      )
+    );
+  } catch {
+    return [] as Dispute[];
   }
 }
 
@@ -917,9 +1007,10 @@ export async function getSellerDashboardStats(profile: Profile): Promise<Dashboa
 }
 
 export async function getAccountDashboardStats(profile: Profile): Promise<DashboardStat[]> {
-  const [savedListingIds, cartListingIds] = await Promise.all([
+  const [savedListingIds, cartListingIds, wallet] = await Promise.all([
     getSavedListingIds(),
-    getCartListingIds()
+    getCartListingIds(),
+    getProfileWallet(profile.id)
   ]);
 
   return [
@@ -944,6 +1035,11 @@ export async function getAccountDashboardStats(profile: Profile): Promise<Dashbo
       label: "Saved Listings",
       value: String(savedListingIds.length),
       helper: "Buyer favorites ready for later"
+    },
+    {
+      label: "Wallet Credit",
+      value: formatCompactCurrency(wallet.available_balance),
+      helper: "Available after refunds"
     }
   ];
 }

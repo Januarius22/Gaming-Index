@@ -1,8 +1,8 @@
-import { Bookmark, Compass, PackageCheck, ShieldPlus } from "lucide-react";
+import { Bookmark, Compass, PackageCheck, ShieldPlus, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import type { DashboardStat } from "@/types";
 
-const icons = [Compass, ShieldPlus, PackageCheck, Bookmark];
+const icons = [Compass, ShieldPlus, PackageCheck, Bookmark, Wallet];
 
 export default function AccountStatsCards({ stats }: { stats: DashboardStat[] }) {
   return (

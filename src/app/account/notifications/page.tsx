@@ -1,44 +1,49 @@
-import AdminDisputesTable from "@/components/admin/AdminDisputesTable";
+import NotificationList from "@/components/notifications/NotificationList";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import PaginationControls from "@/components/ui/PaginationControls";
-import { getAdminDisputes } from "@/lib/data";
+import { requireAccountProfile } from "@/lib/auth";
+import { getProfileNotifications } from "@/lib/data";
 import { paginateItems, parsePageParam } from "@/lib/utils";
 
-export default async function AdminDisputesPage({
+export default async function AccountNotificationsPage({
   searchParams
 }: {
   searchParams?: Promise<{ page?: string }>;
 }) {
-  const disputes = await getAdminDisputes();
+  const profile = await requireAccountProfile();
+  const notifications = await getProfileNotifications(profile.id, 100);
   const params = (await searchParams) ?? {};
   const requestedPage = parsePageParam(params.page);
   const {
-    items: paginatedDisputes,
+    items: paginatedNotifications,
     currentPage,
     totalPages,
     totalCount,
     pageStart,
     pageEnd
-  } = paginateItems(disputes, requestedPage, 10);
+  } = paginateItems(notifications, requestedPage, 5);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Disputes</CardTitle>
-        <CardDescription>Review buyer reports tied to paid orders.</CardDescription>
+        <CardTitle>Notifications</CardTitle>
+        <CardDescription>Order, refund, dispute, and wallet updates.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {pageStart}-{pageEnd} of {totalCount} disputes
+            Showing {pageStart}-{pageEnd} of {totalCount} notifications
           </p>
           <PaginationControls
-            pathname="/admin/disputes"
+            pathname="/account/notifications"
             currentPage={currentPage}
             totalPages={totalPages}
           />
         </div>
-        <AdminDisputesTable disputes={paginatedDisputes} />
+        <NotificationList
+          notifications={paginatedNotifications}
+          emptyMessage="No account notifications yet."
+        />
       </CardContent>
     </Card>
   );

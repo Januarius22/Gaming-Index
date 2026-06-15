@@ -1,6 +1,7 @@
 "use client";
 
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import Link from "next/link";
+import { Bell, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import AnimatedMenuButton from "@/components/ui/AnimatedMenuButton";
 import Button from "@/components/ui/Button";
@@ -46,13 +47,26 @@ export default function AccountTopbar({
             </h1>
           </div>
         </div>
-        <div className="hidden sm:block">
-          <Badge
-            variant={profile.seller_enabled ? "info" : "neutral"}
-            className="max-w-[11rem] text-center leading-5"
+        <div className="col-start-2 row-start-1 flex shrink-0 items-center justify-end gap-3 self-start sm:self-auto">
+          <Link
+            href="/account/notifications"
+            aria-label="Open account notifications"
+            className="inline-flex h-11 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-foreground shadow-sm transition hover:border-primary/30 hover:bg-primary-soft/70 hover:text-primary-dark"
           >
-            {profile.seller_enabled ? "Seller access enabled" : "Buyer account"}
-          </Badge>
+            <span className="relative">
+              <Bell className="h-4 w-4" />
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary ring-2 ring-white" />
+            </span>
+            <span className="hidden md:inline">Notifications</span>
+          </Link>
+          <div className="hidden sm:block">
+            <Badge
+              variant={profile.seller_enabled ? "info" : "neutral"}
+              className="max-w-[11rem] text-center leading-5"
+            >
+              {profile.seller_enabled ? "Seller access enabled" : "Buyer account"}
+            </Badge>
+          </div>
         </div>
       </div>
     </div>

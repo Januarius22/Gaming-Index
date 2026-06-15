@@ -166,10 +166,7 @@ export default function SellerUploadForm({
                 These details stay hidden from the marketplace.
               </h3>
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                Enter the login details that should only be released to the buyer after successful
-                payment. Do not use a personal inbox or private login you still want to keep for
-                yourself. If possible, switch the account to a transfer-safe email before
-                publishing.
+                Add the account access details the buyer should receive after payment.
               </p>
             </div>
 
@@ -205,7 +202,7 @@ export default function SellerUploadForm({
                   id="deliveryRecoveryInfo"
                   name="deliveryRecoveryInfo"
                   className="min-h-28"
-                  placeholder="Add linked recovery info, backup codes, or any access steps the buyer may need."
+                  placeholder="Recovery email, backup codes, or recovery steps."
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
@@ -217,7 +214,7 @@ export default function SellerUploadForm({
                   id="deliveryTransferNote"
                   name="deliveryTransferNote"
                   className="min-h-24"
-                  placeholder="Example: log in first, then change password and recovery email immediately."
+                  placeholder="Short handoff note for the buyer."
                 />
               </div>
             </div>
@@ -232,8 +229,7 @@ export default function SellerUploadForm({
                   className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
                 />
                 <span>
-                  I understand these private delivery details will be released to the buyer after a
-                  successful payment flow.
+                  I understand these details will be released after successful payment.
                 </span>
               </label>
               <label className="flex items-start gap-3 rounded-2xl border border-amber-200/80 bg-white/85 px-4 py-3 text-sm text-foreground shadow-sm">
@@ -245,8 +241,7 @@ export default function SellerUploadForm({
                   className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
                 />
                 <span>
-                  I confirm I am not submitting a personal inbox or private login I still want to
-                  keep for myself outside this sale.
+                  I confirm these details are for the account being sold.
                 </span>
               </label>
             </div>
