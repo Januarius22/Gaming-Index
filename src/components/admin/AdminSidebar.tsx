@@ -23,19 +23,44 @@ import Button from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 
-const navItems = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/sellers", label: "Sellers", icon: UserSquare2 },
-  { href: "/admin/listings", label: "Listings", icon: Store },
-  { href: "/admin/listing-history", label: "Listing History", icon: History },
-  { href: "/admin/kyc", label: "KYC Reviews", icon: FileCheck2 },
-  { href: "/admin/orders", label: "Orders", icon: ListOrdered },
-  { href: "/admin/withdrawals", label: "Withdrawals", icon: Landmark },
-  { href: "/admin/appeals", label: "Appeals", icon: LifeBuoy },
-  { href: "/admin/disputes", label: "Disputes", icon: ShieldAlert },
-  { href: "/admin/notifications", label: "Notifications", icon: Bell },
-  { href: "/admin/settings", label: "Settings", icon: Settings }
+const dashboardItem = { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard };
+const navGroups = [
+  {
+    label: "Members",
+    items: [
+      { href: "/admin/users", label: "Users", icon: Users },
+      { href: "/admin/sellers", label: "Sellers", icon: UserSquare2 }
+    ]
+  },
+  {
+    label: "Marketplace",
+    items: [
+      { href: "/admin/listings", label: "Listings", icon: Store },
+      { href: "/admin/listing-history", label: "Listing History", icon: History }
+    ]
+  },
+  {
+    label: "Reviews",
+    items: [
+      { href: "/admin/kyc", label: "KYC Reviews", icon: FileCheck2 },
+      { href: "/admin/appeals", label: "Appeals", icon: LifeBuoy },
+      { href: "/admin/disputes", label: "Disputes", icon: ShieldAlert }
+    ]
+  },
+  {
+    label: "Finance",
+    items: [
+      { href: "/admin/orders", label: "Orders", icon: ListOrdered },
+      { href: "/admin/withdrawals", label: "Withdrawals", icon: Landmark }
+    ]
+  },
+  {
+    label: "Account",
+    items: [
+      { href: "/admin/notifications", label: "Notifications", icon: Bell },
+      { href: "/admin/settings", label: "Settings", icon: Settings }
+    ]
+  }
 ];
 
 export default function AdminSidebar({
@@ -114,7 +139,7 @@ export default function AdminSidebar({
           collapsedDesktop ? "px-3" : "px-4"
         )}
       >
-        {navItems.map((item) => {
+        {[dashboardItem].map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href;
           return (
@@ -143,6 +168,50 @@ export default function AdminSidebar({
             </Link>
           );
         })}
+        {navGroups.map((group) => (
+          <div key={group.label} className="pt-4 first:pt-0">
+            <p
+              className={cn(
+                "px-4 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground transition-all duration-300 ease-in-out",
+                collapsedDesktop ? "max-h-0 overflow-hidden p-0 opacity-0" : "max-h-8 opacity-100"
+              )}
+            >
+              {group.label}
+            </p>
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = pathname === item.href;
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onNavigate}
+                    title={collapsedDesktop ? item.label : undefined}
+                    className={cn(
+                      "flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
+                      collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
+                      active
+                        ? "bg-primary !text-white visited:!text-white hover:!text-white shadow-[0_18px_30px_-20px_rgba(0,87,255,0.8)]"
+                        : "text-muted-foreground hover:bg-primary-soft hover:text-primary-dark"
+                    )}
+                  >
+                    <Icon className={cn("h-5 w-5 shrink-0 transition-transform duration-300 ease-in-out", collapsedDesktop && "scale-105")} />
+                    <span
+                      className={cn(
+                        "overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out",
+                        collapsedDesktop ? "max-w-0 opacity-0" : "max-w-[10rem] opacity-100"
+                      )}
+                    >
+                      {item.label}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       <div

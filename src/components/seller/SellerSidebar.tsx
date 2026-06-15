@@ -23,18 +23,36 @@ import Button, { buttonClassName } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 
-const navItems = [
-  { href: "/seller/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/seller/kyc", label: "KYC Verification", icon: FileCheck2 },
-  { href: "/seller/upload", label: "Upload Account", icon: Upload },
-  { href: "/seller/listings", label: "My Listings", icon: ListChecks },
-  { href: "/seller/history", label: "Listing History", icon: History },
-  { href: "/seller/orders", label: "Orders", icon: PackageCheck },
-  { href: "/seller/wallet", label: "Wallet", icon: CreditCard },
-  { href: "/seller/withdrawals", label: "Withdrawals", icon: Landmark },
-  { href: "/seller/transactions", label: "Transactions", icon: ReceiptText },
-  { href: "/seller/notifications", label: "Notifications", icon: Bell },
-  { href: "/seller/settings", label: "Settings", icon: Settings }
+const dashboardItem = { href: "/seller/dashboard", label: "Dashboard", icon: LayoutDashboard };
+const navGroups = [
+  {
+    label: "Listings",
+    items: [
+      { href: "/seller/kyc", label: "KYC Verification", icon: FileCheck2 },
+      { href: "/seller/upload", label: "Upload Account", icon: Upload },
+      { href: "/seller/listings", label: "My Listings", icon: ListChecks },
+      { href: "/seller/history", label: "Listing History", icon: History }
+    ]
+  },
+  {
+    label: "Sales",
+    items: [{ href: "/seller/orders", label: "Orders", icon: PackageCheck }]
+  },
+  {
+    label: "Wallet",
+    items: [
+      { href: "/seller/wallet", label: "Wallet", icon: CreditCard },
+      { href: "/seller/withdrawals", label: "Withdrawals", icon: Landmark },
+      { href: "/seller/transactions", label: "Transactions", icon: ReceiptText }
+    ]
+  },
+  {
+    label: "Account",
+    items: [
+      { href: "/seller/notifications", label: "Notifications", icon: Bell },
+      { href: "/seller/settings", label: "Settings", icon: Settings }
+    ]
+  }
 ];
 
 export default function SellerSidebar({
@@ -114,41 +132,9 @@ export default function SellerSidebar({
           collapsedDesktop ? "px-3" : "px-4"
         )}
       >
-        {navItems.map((item) => {
+        {[dashboardItem].map((item) => {
           const Icon = item.icon;
-          const locked = item.href === "/seller/upload" && uploadLocked;
-          const active = !locked && pathname === item.href;
-          const label = locked ? "Upload Account (KYC pending approval)" : item.label;
-
-          if (locked) {
-            return (
-              <div
-                key={item.href}
-                title={collapsedDesktop ? label : undefined}
-                className={cn(
-                  "flex cursor-not-allowed items-center rounded-2xl py-3 text-sm font-medium text-blue-100/45 transition-all duration-300 ease-in-out",
-                  collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
-                  "bg-white/5"
-                )}
-              >
-                <Icon
-                  className={cn(
-                    "h-5 w-5 shrink-0 transition-transform duration-300 ease-in-out",
-                    collapsedDesktop && "scale-105"
-                  )}
-                />
-                <span
-                  className={cn(
-                    "overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out",
-                    collapsedDesktop ? "max-w-0 opacity-0" : "max-w-[14rem] opacity-100"
-                  )}
-                >
-                  {label}
-                </span>
-              </div>
-            );
-          }
-
+          const active = pathname === item.href;
           return (
             <Link
               key={item.href}
@@ -175,6 +161,81 @@ export default function SellerSidebar({
             </Link>
           );
         })}
+        {navGroups.map((group) => (
+          <div key={group.label} className="pt-4 first:pt-0">
+            <p
+              className={cn(
+                "px-4 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-blue-100/55 transition-all duration-300 ease-in-out",
+                collapsedDesktop ? "max-h-0 overflow-hidden p-0 opacity-0" : "max-h-8 opacity-100"
+              )}
+            >
+              {group.label}
+            </p>
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const locked = item.href === "/seller/upload" && uploadLocked;
+                const active = !locked && pathname === item.href;
+                const label = locked ? "Upload Account (KYC pending approval)" : item.label;
+
+                if (locked) {
+                  return (
+                    <div
+                      key={item.href}
+                      title={collapsedDesktop ? label : undefined}
+                      className={cn(
+                        "flex cursor-not-allowed items-center rounded-2xl py-3 text-sm font-medium text-blue-100/45 transition-all duration-300 ease-in-out",
+                        collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
+                        "bg-white/5"
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          "h-5 w-5 shrink-0 transition-transform duration-300 ease-in-out",
+                          collapsedDesktop && "scale-105"
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out",
+                          collapsedDesktop ? "max-w-0 opacity-0" : "max-w-[14rem] opacity-100"
+                        )}
+                      >
+                        {label}
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onNavigate}
+                    title={collapsedDesktop ? item.label : undefined}
+                    className={cn(
+                      "flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
+                      collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
+                      active
+                        ? "bg-white !text-primary-dark visited:!text-primary-dark hover:!text-primary-dark shadow-sm"
+                        : "text-blue-100/85 hover:bg-white/10 hover:text-white"
+                    )}
+                  >
+                    <Icon className={cn("h-5 w-5 shrink-0 transition-transform duration-300 ease-in-out", collapsedDesktop && "scale-105")} />
+                    <span
+                      className={cn(
+                        "overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out",
+                        collapsedDesktop ? "max-w-0 opacity-0" : "max-w-[10rem] opacity-100"
+                      )}
+                    >
+                      {item.label}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       <div

@@ -36,22 +36,42 @@ export default function AccountSidebar({
 }) {
   const pathname = usePathname();
   const collapsedDesktop = collapsed && !mobile;
-  const navItems = [
-    { href: "/account/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/account/marketplace", label: "Marketplace", icon: Store },
-    { href: "/account/saved", label: "Saved Listings", icon: Bookmark },
-    { href: "/account/cart", label: "Cart", icon: ShoppingCart },
-    { href: "/account/orders", label: "Order History", icon: PackageCheck },
-    { href: "/account/wallet", label: "Wallet", icon: CreditCard },
-    { href: "/account/withdrawals", label: "Withdrawals", icon: Landmark },
-    { href: "/account/transactions", label: "Transactions", icon: ReceiptText },
-    { href: "/account/notifications", label: "Notifications", icon: Bell },
+  const dashboardItem = { href: "/account/dashboard", label: "Dashboard", icon: LayoutDashboard };
+  const navGroups = [
     {
-      href: "/account/seller",
-      label: profile.seller_enabled ? "Seller Center" : "Become a Seller",
-      icon: ShieldPlus
+      label: "Explore",
+      items: [
+        { href: "/account/marketplace", label: "Marketplace", icon: Store },
+        { href: "/account/saved", label: "Saved Listings", icon: Bookmark }
+      ]
     },
-    { href: "/account/settings", label: "Settings", icon: Settings }
+    {
+      label: "Purchases",
+      items: [
+        { href: "/account/cart", label: "Cart", icon: ShoppingCart },
+        { href: "/account/orders", label: "Order History", icon: PackageCheck }
+      ]
+    },
+    {
+      label: "Wallet",
+      items: [
+        { href: "/account/wallet", label: "Wallet", icon: CreditCard },
+        { href: "/account/withdrawals", label: "Withdrawals", icon: Landmark },
+        { href: "/account/transactions", label: "Transactions", icon: ReceiptText }
+      ]
+    },
+    {
+      label: "Account",
+      items: [
+        { href: "/account/notifications", label: "Notifications", icon: Bell },
+        {
+          href: "/account/seller",
+          label: profile.seller_enabled ? "Seller Center" : "Become a Seller",
+          icon: ShieldPlus
+        },
+        { href: "/account/settings", label: "Settings", icon: Settings }
+      ]
+    }
   ];
 
   return (
@@ -128,7 +148,7 @@ export default function AccountSidebar({
           collapsedDesktop ? "px-3" : "px-4"
         )}
       >
-        {navItems.map((item) => {
+        {[dashboardItem].map((item) => {
           const Icon = item.icon;
           const active =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -159,6 +179,51 @@ export default function AccountSidebar({
             </Link>
           );
         })}
+        {navGroups.map((group) => (
+          <div key={group.label} className="pt-4 first:pt-0">
+            <p
+              className={cn(
+                "px-4 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground transition-all duration-300 ease-in-out",
+                collapsedDesktop ? "max-h-0 overflow-hidden p-0 opacity-0" : "max-h-8 opacity-100"
+              )}
+            >
+              {group.label}
+            </p>
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active =
+                  pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onNavigate}
+                    title={collapsedDesktop ? item.label : undefined}
+                    className={cn(
+                      "flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
+                      collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
+                      active
+                        ? "bg-primary-dark !text-white visited:!text-white hover:!text-white shadow-sm"
+                        : "text-muted-foreground hover:bg-primary-soft hover:text-foreground"
+                    )}
+                  >
+                    <Icon className={cn("h-5 w-5 shrink-0 transition-transform duration-300 ease-in-out", collapsedDesktop && "scale-105")} />
+                    <span
+                      className={cn(
+                        "overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out",
+                        collapsedDesktop ? "max-w-0 opacity-0" : "max-w-[10rem] opacity-100"
+                      )}
+                    >
+                      {item.label}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       <div

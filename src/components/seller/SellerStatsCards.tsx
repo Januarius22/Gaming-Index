@@ -1,5 +1,7 @@
-import { BarChart3, CreditCard, PackageCheck, Store } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, BarChart3, CreditCard, PackageCheck, Store } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { cn } from "@/lib/utils";
 import type { DashboardStat } from "@/types";
 
 const icons = [Store, BarChart3, PackageCheck, CreditCard];
@@ -10,8 +12,8 @@ export default function SellerStatsCards({ stats }: { stats: DashboardStat[] }) 
       {stats.map((stat, index) => {
         const Icon = icons[index] ?? Store;
 
-        return (
-          <Card key={stat.label}>
+        const content = (
+          <Card className={cn("h-full transition", stat.href && "hover:-translate-y-0.5 hover:shadow-lg")}>
             <CardHeader className="flex flex-row items-start justify-between gap-4 pb-3">
               <div>
                 <CardTitle className="text-lg">{stat.label}</CardTitle>
@@ -21,12 +23,21 @@ export default function SellerStatsCards({ stats }: { stats: DashboardStat[] }) 
                 <Icon className="h-5 w-5" />
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex items-end justify-between gap-3">
               <p className="font-heading text-4xl font-semibold text-foreground">
                 {stat.value}
               </p>
+              {stat.href ? <ArrowRight className="h-5 w-5 text-muted-foreground" /> : null}
             </CardContent>
           </Card>
+        );
+
+        return stat.href ? (
+          <Link key={stat.label} href={stat.href} className="block h-full">
+            {content}
+          </Link>
+        ) : (
+          <div key={stat.label}>{content}</div>
         );
       })}
     </div>

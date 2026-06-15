@@ -924,24 +924,28 @@ export async function getSellerDashboardStats(profile: Profile): Promise<Dashboa
       {
         label: "Total Listings",
         value: String(sellerListings.length),
-        helper: "All account listings"
+        helper: "All account listings",
+        href: "/seller/listings"
       },
       {
         label: "Active Listings",
         value: String(
           sellerListings.filter((listing) => listing.status === "approved").length
         ),
-        helper: "Approved and live"
+        helper: "Approved and live",
+        href: "/seller/listings"
       },
       {
         label: "Pending Orders",
         value: String(pendingOrders.length),
-        helper: "Orders awaiting action"
+        helper: "Orders awaiting action",
+        href: "/seller/orders"
       },
       {
         label: "Available Balance",
         value: formatCompactCurrency(wallet.available_balance),
-        helper: "Ready for withdrawal"
+        helper: "Ready for withdrawal",
+        href: "/seller/wallet"
       }
     ];
   }
@@ -976,32 +980,36 @@ export async function getSellerDashboardStats(profile: Profile): Promise<Dashboa
       {
         label: "Total Listings",
         value: String(totalListingsResult?.count ?? 0),
-        helper: "All account listings"
+        helper: "All account listings",
+        href: "/seller/listings"
       },
       {
         label: "Active Listings",
         value: String(activeListingsResult?.count ?? 0),
-        helper: "Approved and live"
+        helper: "Approved and live",
+        href: "/seller/listings"
       },
       {
         label: "Pending Orders",
         value: String(pendingOrdersResult?.count ?? 0),
-        helper: "Orders awaiting action"
+        helper: "Orders awaiting action",
+        href: "/seller/orders"
       },
       {
         label: "Available Balance",
         value: formatCompactCurrency(wallet.available_balance),
         helper: wallet.pending_balance > 0
           ? `${formatCompactCurrency(wallet.pending_balance)} pending`
-          : "Ready for withdrawal"
+          : "Ready for withdrawal",
+        href: "/seller/wallet"
       }
     ];
   } catch {
     return [
-      { label: "Total Listings", value: "0", helper: "All account listings" },
-      { label: "Active Listings", value: "0", helper: "Approved and live" },
-      { label: "Pending Orders", value: "0", helper: "Orders awaiting action" },
-      { label: "Available Balance", value: "$0", helper: "Ready for withdrawal" }
+      { label: "Total Listings", value: "0", helper: "All account listings", href: "/seller/listings" },
+      { label: "Active Listings", value: "0", helper: "Approved and live", href: "/seller/listings" },
+      { label: "Pending Orders", value: "0", helper: "Orders awaiting action", href: "/seller/orders" },
+      { label: "Available Balance", value: "$0", helper: "Ready for withdrawal", href: "/seller/wallet" }
     ];
   }
 }
@@ -1017,29 +1025,34 @@ export async function getAccountDashboardStats(profile: Profile): Promise<Dashbo
     {
       label: "Marketplace Access",
       value: "Live",
-      helper: "Browse public and in-account listings"
+      helper: "Browse public and in-account listings",
+      href: "/account/marketplace"
     },
     {
       label: "Seller Access",
       value: profile.seller_enabled ? "Enabled" : "Locked",
       helper: profile.seller_enabled
         ? "Seller workspace is ready"
-        : "Unlock it to start KYC and list accounts"
+        : "Unlock it to start KYC and list accounts",
+      href: "/account/seller"
     },
     {
       label: "Cart Items",
       value: String(cartListingIds.length),
-      helper: "Accounts staged for checkout"
+      helper: "Accounts staged for checkout",
+      href: "/account/cart"
     },
     {
       label: "Saved Listings",
       value: String(savedListingIds.length),
-      helper: "Buyer favorites ready for later"
+      helper: "Buyer favorites ready for later",
+      href: "/account/saved"
     },
     {
       label: "Wallet Credit",
       value: formatCompactCurrency(wallet.available_balance),
-      helper: "Available after refunds"
+      helper: "Available after refunds",
+      href: "/account/wallet"
     }
   ];
 }
@@ -1237,25 +1250,28 @@ export async function getAdminDashboardStats() {
 
     return {
       stats: [
-        { label: "Total Users", value: String(profiles.length), helper: "Registered users" },
+        { label: "Total Users", value: String(profiles.length), helper: "Registered users", href: "/admin/users" },
         {
           label: "Total Sellers",
           value: String(profiles.filter((profile) => profile.seller_enabled).length),
-          helper: "Seller-enabled users"
+          helper: "Seller-enabled users",
+          href: "/admin/sellers"
         },
         {
           label: "Pending KYC",
           value: String(kyc.filter((submission) => submission.status === "pending").length),
-          helper: "Awaiting review"
+          helper: "Awaiting review",
+          href: "/admin/kyc"
         },
         {
           label: "Live Listings",
           value: String(
             listings.filter((listing) => listing.status === "approved").length
           ),
-          helper: "Published in marketplace"
+          helper: "Published in marketplace",
+          href: "/admin/listings"
         },
-        { label: "Total Sales", value: "$0", helper: "Dummy transaction total" }
+        { label: "Total Sales", value: "$0", helper: "Dummy transaction total", href: "/admin/orders" }
       ],
       activity: seededActivity
     };
@@ -1275,28 +1291,32 @@ export async function getAdminDashboardStats() {
 
     return {
       stats: [
-        { label: "Total Users", value: String(profiles.length), helper: "Registered users" },
+        { label: "Total Users", value: String(profiles.length), helper: "Registered users", href: "/admin/users" },
         {
           label: "Total Sellers",
           value: String(profiles.filter((profile) => profile.seller_enabled).length),
-          helper: "Seller-enabled users"
+          helper: "Seller-enabled users",
+          href: "/admin/sellers"
         },
         {
           label: "Pending KYC",
           value: String(kyc.filter((submission) => submission.status === "pending").length),
-          helper: "Awaiting review"
+          helper: "Awaiting review",
+          href: "/admin/kyc"
         },
         {
           label: "Live Listings",
           value: String(
             listings.filter((listing) => listing.status === "approved").length
           ),
-          helper: "Published in marketplace"
+          helper: "Published in marketplace",
+          href: "/admin/listings"
         },
         {
           label: "Total Sales",
           value: formatCompactCurrency(totalSales),
-          helper: "Completed order value"
+          helper: "Completed order value",
+          href: "/admin/orders"
         }
       ],
       activity: seededActivity
@@ -1304,11 +1324,11 @@ export async function getAdminDashboardStats() {
   } catch {
     return {
       stats: [
-        { label: "Total Users", value: "0", helper: "Registered users" },
-        { label: "Total Sellers", value: "0", helper: "Seller-enabled users" },
-        { label: "Pending KYC", value: "0", helper: "Awaiting review" },
-        { label: "Live Listings", value: "0", helper: "Published in marketplace" },
-        { label: "Total Sales", value: "$0", helper: "Completed order value" }
+        { label: "Total Users", value: "0", helper: "Registered users", href: "/admin/users" },
+        { label: "Total Sellers", value: "0", helper: "Seller-enabled users", href: "/admin/sellers" },
+        { label: "Pending KYC", value: "0", helper: "Awaiting review", href: "/admin/kyc" },
+        { label: "Live Listings", value: "0", helper: "Published in marketplace", href: "/admin/listings" },
+        { label: "Total Sales", value: "$0", helper: "Completed order value", href: "/admin/orders" }
       ],
       activity: seededActivity
     };

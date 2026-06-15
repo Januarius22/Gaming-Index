@@ -252,6 +252,7 @@ export interface DashboardStat {
   label: string;
   value: string;
   helper: string;
+  href?: string;
 }
 
 export type SessionProfile = Profile;
