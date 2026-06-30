@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { FileImage, Paperclip, Send, Video, X } from "lucide-react";
-import { sendDisputeMessageRedirectAction } from "@/actions/disputes";
 import FormMessage from "@/components/auth/FormMessage";
-import SubmitButton from "@/components/auth/SubmitButton";
+import Button from "@/components/ui/Button";
 import Textarea from "@/components/ui/Textarea";
 const MAX_FILES = 5;
 const MAX_IMAGES = 4;
@@ -28,10 +28,14 @@ export default function DisputeMessageForm({
   returnTo: string;
   disabled?: boolean;
 }) {
+  const router = useRouter();
   const [fileError, setFileError] = useState("");
+  const [feedback, setFeedback] = useState<{ message: string; tone: "success" | "error" } | null>(null);
+  const [pending, setPending] = useState(false);
   const [durations, setDurations] = useState<number[]>([]);
   const [selectedEvidence, setSelectedEvidence] = useState<SelectedEvidence[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
 
   const checkFiles = async (files: FileList | null) => {
     setFileError("");
@@ -126,8 +130,54 @@ export default function DisputeMessageForm({
     );
   }
 
+  const submitMessage = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFeedback(null);
+
+    if (fileError || pending) {
+      return;
+    }
+
+    const formData = new FormData(event.currentTarget);
+    setPending(true);
+
+    try {
+      const response = await fetch("/api/disputes/messages", {
+        method: "POST",
+        body: formData
+      });
+      const result = (await response.json()) as { status: "success" | "error"; message?: string };
+
+      if (!response.ok || result.status === "error") {
+        setFeedback({
+          message: result.message ?? "Message could not be sent.",
+          tone: "error"
+        });
+        return;
+      }
+
+      formRef.current?.reset();
+      clearFiles();
+      setFeedback({ message: "Message sent.", tone: "success" });
+      router.refresh();
+    } catch {
+      setFeedback({
+        message: "Message could not be sent. Please try again.",
+        tone: "error"
+      });
+    } finally {
+      setPending(false);
+    }
+  };
+
   return (
-    <form action={sendDisputeMessageRedirectAction} className="space-y-4 rounded-3xl border border-border bg-white p-4 shadow-sm">
+    <form
+      ref={formRef}
+      onSubmit={(event) => {
+        void submitMessage(event);
+      }}
+      className="space-y-4 rounded-3xl border border-border bg-white p-4 shadow-sm"
+    >
       <input type="hidden" name="disputeId" value={disputeId} />
       <input type="hidden" name="orderId" value={orderId ?? ""} />
       <input type="hidden" name="returnTo" value={returnTo} />
@@ -156,10 +206,10 @@ export default function DisputeMessageForm({
             }}
           />
         </label>
-        <SubmitButton pendingLabel="Sending..." disabled={Boolean(fileError)}>
+        <Button type="submit" disabled={Boolean(fileError) || pending}>
           <Send className="mr-2 h-4 w-4" />
-          Send message
-        </SubmitButton>
+          {pending ? "Sending..." : "Send message"}
+        </Button>
       </div>
       {selectedEvidence.length > 0 ? (
         <div className="rounded-2xl border border-border bg-surface p-3">
@@ -196,8 +246,8 @@ export default function DisputeMessageForm({
         </div>
       ) : null}
       <FormMessage
-        message={fileError}
-        tone="error"
+        message={fileError || feedback?.message}
+        tone={fileError ? "error" : feedback?.tone ?? "error"}
       />
     </form>
   );

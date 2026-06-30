@@ -113,7 +113,7 @@ export async function sendDisputeMessageRedirectAction(formData: FormData) {
   redirect(getReturnPathWithNotice(returnTo, "message-sent"));
 }
 
-async function submitDisputeMessage(formData: FormData): Promise<ActionState> {
+export async function submitDisputeMessage(formData: FormData): Promise<ActionState> {
   const profile = await getCurrentProfile();
   const disputeId = String(formData.get("disputeId") ?? "").trim();
   const orderId = String(formData.get("orderId") ?? "").trim();
