@@ -29,6 +29,18 @@ function safeReturnPath(value: string, fallback: string) {
     : fallback;
 }
 
+function getReturnPathWithNotice(pathname: string, notice: string, message?: string) {
+  const [basePath, existingQuery = ""] = pathname.split("?");
+  const searchParams = new URLSearchParams(existingQuery);
+  searchParams.set("notice", notice);
+
+  if (message) {
+    searchParams.set("message", message);
+  }
+
+  return `${basePath}?${searchParams.toString()}`;
+}
+
 function revalidateDisputePaths(disputeId: string, orderId?: string) {
   revalidatePath("/account/disputes");
   revalidatePath(`/account/disputes/${disputeId}`);
@@ -87,6 +99,21 @@ export async function sendDisputeMessageAction(
   _previousState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  return submitDisputeMessage(formData);
+}
+
+export async function sendDisputeMessageRedirectAction(formData: FormData) {
+  const returnTo = safeReturnPath(String(formData.get("returnTo") ?? ""), "/account/disputes");
+  const result = await submitDisputeMessage(formData);
+
+  if (result.status === "error") {
+    redirect(getReturnPathWithNotice(returnTo, "message-error", result.message ?? "Message could not be sent."));
+  }
+
+  redirect(getReturnPathWithNotice(returnTo, "message-sent"));
+}
+
+async function submitDisputeMessage(formData: FormData): Promise<ActionState> {
   const profile = await getCurrentProfile();
   const disputeId = String(formData.get("disputeId") ?? "").trim();
   const orderId = String(formData.get("orderId") ?? "").trim();

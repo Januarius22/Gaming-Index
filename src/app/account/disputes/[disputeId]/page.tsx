@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import CaseAutoRefresh from "@/components/disputes/CaseAutoRefresh";
 import DisputeInstructions from "@/components/disputes/DisputeInstructions";
 import DisputeMessageForm from "@/components/disputes/DisputeMessageForm";
+import DisputeNotice from "@/components/disputes/DisputeNotice";
 import DisputeThread from "@/components/disputes/DisputeThread";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -20,12 +21,17 @@ const statusVariant = {
 } as const;
 
 export default async function AccountDisputeCasePage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ disputeId: string }>;
+  searchParams?: Promise<{ notice?: string; message?: string }>;
 }) {
   const profile = await requireAccountProfile();
-  const { disputeId } = await params;
+  const [{ disputeId }, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams ?? Promise.resolve<{ notice?: string; message?: string }>({})
+  ]);
   const caseData = await getDisputeCase(profile, disputeId, "buyer");
 
   if (!caseData) {
@@ -40,6 +46,7 @@ export default async function AccountDisputeCasePage({
   return (
     <div className="space-y-6">
       <CaseAutoRefresh />
+      <DisputeNotice notice={resolvedSearchParams.notice} message={resolvedSearchParams.message} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-muted-foreground">Dispute Case</p>

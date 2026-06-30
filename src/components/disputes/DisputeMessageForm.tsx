@@ -1,15 +1,11 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useRef, useState } from "react";
 import { FileImage, Paperclip, Send, Video, X } from "lucide-react";
-import { sendDisputeMessageAction } from "@/actions/disputes";
+import { sendDisputeMessageRedirectAction } from "@/actions/disputes";
 import FormMessage from "@/components/auth/FormMessage";
 import SubmitButton from "@/components/auth/SubmitButton";
 import Textarea from "@/components/ui/Textarea";
-import type { ActionState } from "@/types";
-
-const initialState: ActionState = { status: "idle", message: "" };
 const MAX_FILES = 5;
 const MAX_IMAGES = 4;
 const MAX_VIDEOS = 1;
@@ -32,8 +28,6 @@ export default function DisputeMessageForm({
   returnTo: string;
   disabled?: boolean;
 }) {
-  const router = useRouter();
-  const [state, formAction] = useActionState(sendDisputeMessageAction, initialState);
   const [fileError, setFileError] = useState("");
   const [durations, setDurations] = useState<number[]>([]);
   const [selectedEvidence, setSelectedEvidence] = useState<SelectedEvidence[]>([]);
@@ -124,13 +118,6 @@ export default function DisputeMessageForm({
     setSelectedEvidence([]);
   }, []);
 
-  useEffect(() => {
-    if (state.status === "success") {
-      clearFiles();
-      router.refresh();
-    }
-  }, [clearFiles, router, state.status]);
-
   if (disabled) {
     return (
       <div className="rounded-2xl border border-border bg-surface p-4 text-sm text-muted-foreground">
@@ -140,7 +127,7 @@ export default function DisputeMessageForm({
   }
 
   return (
-    <form action={formAction} className="space-y-4 rounded-3xl border border-border bg-white p-4 shadow-sm">
+    <form action={sendDisputeMessageRedirectAction} className="space-y-4 rounded-3xl border border-border bg-white p-4 shadow-sm">
       <input type="hidden" name="disputeId" value={disputeId} />
       <input type="hidden" name="orderId" value={orderId ?? ""} />
       <input type="hidden" name="returnTo" value={returnTo} />
@@ -209,8 +196,8 @@ export default function DisputeMessageForm({
         </div>
       ) : null}
       <FormMessage
-        message={fileError || state.message}
-        tone={fileError || state.status !== "success" ? "error" : "success"}
+        message={fileError}
+        tone="error"
       />
     </form>
   );
