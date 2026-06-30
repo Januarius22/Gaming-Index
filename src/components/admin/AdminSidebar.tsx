@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   ListOrdered,
   Landmark,
+  MessageSquareText,
   Settings,
   ShieldAlert,
   Store,
@@ -40,12 +41,13 @@ const navGroups = [
     ]
   },
   {
-    label: "Reviews",
-    items: [
-      { href: "/admin/kyc", label: "KYC Reviews", icon: FileCheck2 },
-      { href: "/admin/appeals", label: "Appeals", icon: LifeBuoy },
-      { href: "/admin/disputes", label: "Disputes", icon: ShieldAlert }
-    ]
+      label: "Reviews",
+      items: [
+        { href: "/admin/kyc", label: "KYC Reviews", icon: FileCheck2 },
+        { href: "/admin/appeals", label: "Appeals", icon: LifeBuoy },
+        { href: "/admin/disputes", label: "Disputes", icon: ShieldAlert },
+        { href: "/admin/feedback", label: "Feedback", icon: MessageSquareText }
+      ]
   },
   {
     label: "Finance",

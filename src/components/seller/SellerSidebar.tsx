@@ -11,6 +11,7 @@ import {
   Landmark,
   LayoutDashboard,
   ListChecks,
+  MessageSquareText,
   PackageCheck,
   ReceiptText,
   Settings,
@@ -51,11 +52,12 @@ const navGroups = [
     ]
   },
   {
-    label: "Account",
-    items: [
-      { href: "/seller/notifications", label: "Notifications", icon: Bell },
-      { href: "/seller/settings", label: "Settings", icon: Settings }
-    ]
+      label: "Account",
+      items: [
+        { href: "/seller/notifications", label: "Notifications", icon: Bell },
+        { href: "/seller/feedback", label: "Feedback", icon: MessageSquareText },
+        { href: "/seller/settings", label: "Settings", icon: Settings }
+      ]
   }
 ];
 

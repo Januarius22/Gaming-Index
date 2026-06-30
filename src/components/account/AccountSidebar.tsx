@@ -8,6 +8,7 @@ import {
   CreditCard,
   Landmark,
   LayoutDashboard,
+  MessageSquareText,
   PackageCheck,
   ReceiptText,
   Settings,
@@ -66,6 +67,7 @@ export default function AccountSidebar({
       label: "Account",
       items: [
         { href: "/account/notifications", label: "Notifications", icon: Bell },
+        { href: "/account/feedback", label: "Feedback", icon: MessageSquareText },
         {
           href: "/account/seller",
           label: profile.seller_enabled ? "Seller Center" : "Become a Seller",

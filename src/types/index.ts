@@ -241,6 +241,14 @@ export interface WithdrawalRequest {
 }
 
 export type SuspensionAppealStatus = "pending" | "reviewed" | "approved" | "rejected";
+export type SiteFeedbackStatus = "new" | "reviewed" | "planned" | "closed";
+export type SiteFeedbackCategory =
+  | "bug"
+  | "suggestion"
+  | "payment"
+  | "buyer_experience"
+  | "seller_experience"
+  | "other";
 
 export interface SuspensionAppeal {
   id: string;
@@ -258,6 +266,23 @@ export interface SuspensionAppeal {
   profile_username?: string;
   banned_reason?: string;
   banned_at?: string | null;
+}
+
+export interface SiteFeedback {
+  id: string;
+  profile_id: string;
+  workspace: "account" | "seller";
+  category: SiteFeedbackCategory;
+  rating?: number | null;
+  message: string;
+  status: SiteFeedbackStatus;
+  admin_note: string;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
+  profile_name?: string;
+  profile_email?: string;
+  profile_username?: string;
 }
 
 export interface WalletTransaction {

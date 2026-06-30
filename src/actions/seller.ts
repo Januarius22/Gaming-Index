@@ -90,10 +90,7 @@ export async function requestWithdrawalAction(
   revalidatePath("/admin/notifications");
   revalidatePath("/admin/dashboard");
 
-  return {
-    status: "success",
-    message: "Withdrawal request submitted for admin review."
-  };
+  redirect("/seller/withdrawals/processing");
 }
 
 function normalizeDuplicateValue(value: string) {

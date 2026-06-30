@@ -510,6 +510,45 @@ alter table public.suspension_appeals drop constraint if exists suspension_appea
 alter table public.suspension_appeals add constraint suspension_appeals_appeal_reason_check
   check (length(trim(appeal_reason)) >= 20);
 
+create table if not exists public.site_feedback (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  workspace text not null default 'account' check (workspace in ('account', 'seller')),
+  category text not null default 'suggestion' check (category in ('bug', 'suggestion', 'payment', 'buyer_experience', 'seller_experience', 'other')),
+  rating integer check (rating between 1 and 5),
+  message text not null,
+  status text not null default 'new' check (status in ('new', 'reviewed', 'planned', 'closed')),
+  admin_note text not null default '',
+  reviewed_by uuid references public.profiles(id) on delete set null,
+  reviewed_at timestamp with time zone,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.site_feedback add column if not exists profile_id uuid references public.profiles(id) on delete cascade;
+alter table public.site_feedback add column if not exists workspace text not null default 'account';
+alter table public.site_feedback add column if not exists category text not null default 'suggestion';
+alter table public.site_feedback add column if not exists rating integer;
+alter table public.site_feedback add column if not exists message text not null default '';
+alter table public.site_feedback add column if not exists status text not null default 'new';
+alter table public.site_feedback add column if not exists admin_note text not null default '';
+alter table public.site_feedback add column if not exists reviewed_by uuid references public.profiles(id) on delete set null;
+alter table public.site_feedback add column if not exists reviewed_at timestamp with time zone;
+alter table public.site_feedback drop constraint if exists site_feedback_workspace_check;
+alter table public.site_feedback add constraint site_feedback_workspace_check
+  check (workspace in ('account', 'seller'));
+alter table public.site_feedback drop constraint if exists site_feedback_category_check;
+alter table public.site_feedback add constraint site_feedback_category_check
+  check (category in ('bug', 'suggestion', 'payment', 'buyer_experience', 'seller_experience', 'other'));
+alter table public.site_feedback drop constraint if exists site_feedback_rating_check;
+alter table public.site_feedback add constraint site_feedback_rating_check
+  check (rating is null or rating between 1 and 5);
+alter table public.site_feedback drop constraint if exists site_feedback_status_check;
+alter table public.site_feedback add constraint site_feedback_status_check
+  check (status in ('new', 'reviewed', 'planned', 'closed'));
+alter table public.site_feedback drop constraint if exists site_feedback_message_check;
+alter table public.site_feedback add constraint site_feedback_message_check
+  check (length(trim(message)) >= 10);
+
 create table if not exists public.notifications (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.profiles(id) on delete cascade,
@@ -2270,6 +2309,7 @@ alter table public.wallets enable row level security;
 alter table public.wallet_transactions enable row level security;
 alter table public.withdrawal_requests enable row level security;
 alter table public.suspension_appeals enable row level security;
+alter table public.site_feedback enable row level security;
 alter table public.notifications enable row level security;
 alter table public.seller_ratings enable row level security;
 
@@ -2865,6 +2905,50 @@ create policy "users can submit their own suspension appeals"
 drop policy if exists "admins can update suspension appeals" on public.suspension_appeals;
 create policy "admins can update suspension appeals"
   on public.suspension_appeals
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "users can read their own site feedback" on public.site_feedback;
+create policy "users can read their own site feedback"
+  on public.site_feedback
+  for select
+  to authenticated
+  using (
+    auth.uid() = profile_id
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "users can submit their own site feedback" on public.site_feedback;
+create policy "users can submit their own site feedback"
+  on public.site_feedback
+  for insert
+  to authenticated
+  with check (auth.uid() = profile_id);
+
+drop policy if exists "admins can update site feedback" on public.site_feedback;
+create policy "admins can update site feedback"
+  on public.site_feedback
   for update
   to authenticated
   using (

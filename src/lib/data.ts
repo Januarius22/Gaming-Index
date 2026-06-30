@@ -34,6 +34,7 @@ import type {
   Profile,
   SellerRating,
   SellerEnforcement,
+  SiteFeedback,
   SuspensionAppeal,
   Wallet,
   WalletTransaction,
@@ -661,6 +662,93 @@ export async function getAdminSuspensionAppeals() {
     );
   } catch {
     return [] as SuspensionAppeal[];
+  }
+}
+
+function normalizeSiteFeedback(
+  feedback: SiteFeedback,
+  profile?: Pick<Profile, "full_name" | "email" | "username"> | null
+): SiteFeedback {
+  return {
+    ...feedback,
+    workspace: feedback.workspace ?? "account",
+    category: feedback.category ?? "other",
+    rating: feedback.rating ?? null,
+    message: feedback.message ?? "",
+    status: feedback.status ?? "new",
+    admin_note: feedback.admin_note ?? "",
+    reviewed_by: feedback.reviewed_by ?? null,
+    reviewed_at: feedback.reviewed_at ?? null,
+    profile_name: profile?.full_name,
+    profile_email: profile?.email,
+    profile_username: profile?.username
+  };
+}
+
+export async function getProfileFeedback(profileId: string) {
+  if (!hasSupabaseEnv) {
+    return [] as SiteFeedback[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("site_feedback")
+      .select("*")
+      .eq("profile_id", profileId)
+      .order("created_at", { ascending: false });
+
+    return ((data as SiteFeedback[] | null) ?? []).map((feedback) =>
+      normalizeSiteFeedback(feedback)
+    );
+  } catch {
+    return [] as SiteFeedback[];
+  }
+}
+
+export async function getAdminFeedback() {
+  if (!hasSupabaseEnv) {
+    return [] as SiteFeedback[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("site_feedback")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    const feedbackItems = (data as SiteFeedback[] | null) ?? [];
+    const profileIds = Array.from(new Set(feedbackItems.map((feedback) => feedback.profile_id)));
+    const { data: profiles } =
+      profileIds.length > 0
+        ? await supabase
+            .from("profiles")
+            .select("id, full_name, email, username")
+            .in("id", profileIds)
+        : { data: [] as Array<Profile & { id: string }> };
+    const profileMap = new Map(
+      ((profiles as Array<Profile & { id: string }> | null) ?? []).map((profile) => [
+        profile.id,
+        profile
+      ])
+    );
+
+    return feedbackItems.map((feedback) =>
+      normalizeSiteFeedback(feedback, profileMap.get(feedback.profile_id))
+    );
+  } catch {
+    return [] as SiteFeedback[];
   }
 }
 

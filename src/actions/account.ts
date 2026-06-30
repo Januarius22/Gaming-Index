@@ -742,10 +742,7 @@ export async function requestBuyerWithdrawalAction(
   revalidatePath("/admin/notifications");
   revalidatePath("/admin/dashboard");
 
-  return {
-    status: "success",
-    message: "Withdrawal request submitted."
-  };
+  redirect("/account/withdrawals/processing");
 }
 
 export async function completeCheckoutAction(formData: FormData) {
