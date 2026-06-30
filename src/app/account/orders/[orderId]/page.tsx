@@ -4,7 +4,6 @@ import { revealOrderDeliveryAction } from "@/actions/account";
 import FormMessage from "@/components/auth/FormMessage";
 import SubmitButton from "@/components/auth/SubmitButton";
 import CopyValueButton from "@/components/account/CopyValueButton";
-import OrderDisputeForm from "@/components/account/OrderDisputeForm";
 import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
 import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
@@ -417,11 +416,19 @@ export default async function AccountOrderDetailPage({
               <CardHeader>
                 <CardTitle>Report a problem</CardTitle>
                 <CardDescription>
-                  Open a dispute if the delivered account has an issue.
+                  Use the Dispute Center to open or follow a case for this order.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <OrderDisputeForm orderId={order.id} />
+              <CardContent className="flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/account/disputes"
+                  className={buttonClassName({
+                    variant: canOpenDispute ? "danger" : "secondary",
+                    className: "rounded-2xl"
+                  })}
+                >
+                  {canOpenDispute ? "Open dispute" : "View dispute cases"}
+                </Link>
               </CardContent>
             </Card>
           ) : null}
