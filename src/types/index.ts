@@ -23,6 +23,9 @@ export interface Profile {
   role: AppRole;
   seller_enabled: boolean;
   kyc_status: KycStatus;
+  seller_strikes?: number;
+  seller_restricted_until?: string | null;
+  seller_restriction_reason?: string;
   is_banned: boolean;
   banned_at?: string | null;
   banned_reason?: string;
@@ -155,8 +158,12 @@ export interface Dispute {
   details: string;
   status: DisputeStatus;
   admin_note: string;
+  resolution?: string;
+  opened_by?: string | null;
   reviewed_by?: string | null;
   reviewed_at?: string | null;
+  closed_at?: string | null;
+  last_message_at?: string | null;
   created_at: string;
   listing_title?: string;
   buyer_name?: string;
@@ -164,6 +171,42 @@ export interface Dispute {
   seller_name?: string;
   seller_username?: string;
   amount?: number;
+}
+
+export interface DisputeAttachment {
+  id: string;
+  dispute_id: string;
+  message_id?: string | null;
+  uploader_id: string;
+  file_name: string;
+  file_path: string;
+  file_type: "image" | "video";
+  duration_seconds?: number | null;
+  file_url?: string;
+  created_at: string;
+}
+
+export interface DisputeMessage {
+  id: string;
+  dispute_id: string;
+  sender_id: string;
+  sender_role: "buyer" | "seller" | "admin";
+  message: string;
+  created_at: string;
+  sender_name?: string;
+  attachments?: DisputeAttachment[];
+}
+
+export interface SellerEnforcement {
+  id: string;
+  seller_id: string;
+  dispute_id?: string | null;
+  action: "warning" | "temporary_restriction" | "seller_suspension";
+  reason: string;
+  strike_count: number;
+  restricted_until?: string | null;
+  created_by?: string | null;
+  created_at: string;
 }
 
 export interface Wallet {

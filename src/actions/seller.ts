@@ -217,6 +217,13 @@ function getUploadedFile(value: FormDataEntryValue | null) {
   return value;
 }
 
+function sellerRestrictionActive(seller: Profile) {
+  return Boolean(
+    seller.seller_restricted_until &&
+      new Date(seller.seller_restricted_until).getTime() > Date.now()
+  );
+}
+
 async function removeKycAssets(
   supabase: NonNullable<Awaited<ReturnType<typeof getSupabaseServerClient>>>,
   assetPaths: string[]
@@ -620,6 +627,13 @@ export async function saveListingSubmission({
     return {
       status: "error",
       message: "Your account is suspended. Seller features are unavailable."
+    };
+  }
+
+  if (sellerRestrictionActive(seller)) {
+    return {
+      status: "error",
+      message: "Your seller uploads are temporarily restricted."
     };
   }
 

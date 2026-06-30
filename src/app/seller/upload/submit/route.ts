@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     return redirectTo(request, "/account/seller");
   }
 
-  if (!canUploadAccounts(profile.kyc_status)) {
+  if (!canUploadAccounts(profile.kyc_status, profile)) {
     return redirectTo(request, "/seller/upload");
   }
 

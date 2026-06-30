@@ -24,6 +24,8 @@ import type {
   ActivityItem,
   DashboardStat,
   Dispute,
+  DisputeAttachment,
+  DisputeMessage,
   KycSubmission,
   Listing,
   ListingDeliveryDetails,
@@ -39,6 +41,7 @@ import type {
 
 const KYC_STORAGE_BUCKET = "kyc-documents";
 const LISTING_STORAGE_BUCKET = "listing-media";
+const DISPUTE_EVIDENCE_BUCKET = "dispute-evidence";
 
 const seededMarketplaceListings: Listing[] = [
   {
@@ -672,8 +675,12 @@ function normalizeDispute(
     details: dispute.details ?? "",
     status: dispute.status ?? "open",
     admin_note: dispute.admin_note ?? "",
+    resolution: dispute.resolution ?? "",
+    opened_by: dispute.opened_by ?? null,
     reviewed_by: dispute.reviewed_by ?? null,
     reviewed_at: dispute.reviewed_at ?? null,
+    closed_at: dispute.closed_at ?? null,
+    last_message_at: dispute.last_message_at ?? dispute.created_at,
     listing_title: order?.listing_title ?? dispute.listing_title ?? "",
     buyer_name: buyer?.full_name ?? order?.buyer_name ?? dispute.buyer_name ?? "",
     buyer_email: buyer?.email ?? order?.buyer_email ?? dispute.buyer_email ?? "",
@@ -698,7 +705,7 @@ export async function getAdminDisputes() {
     const { data } = await supabase
       .from("disputes")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("last_message_at", { ascending: false });
 
     const disputes = (data as Dispute[] | null) ?? [];
     const orderIds = Array.from(new Set(disputes.map((dispute) => dispute.order_id)));
@@ -742,6 +749,260 @@ export async function getAdminDisputes() {
     );
   } catch {
     return [] as Dispute[];
+  }
+}
+
+async function getDisputeOrderMap(disputes: Dispute[]) {
+  const orderIds = Array.from(new Set(disputes.map((dispute) => dispute.order_id)));
+
+  if (orderIds.length === 0) {
+    return new Map<string, Order>();
+  }
+
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    return new Map<string, Order>();
+  }
+
+  const { data } = await supabase
+    .from("orders")
+    .select("*")
+    .in("id", orderIds);
+
+  return new Map(
+    ((data as Order[] | null) ?? []).map((order) => [
+      order.id,
+      normalizeOrder(order)
+    ])
+  );
+}
+
+async function getDisputeProfileMap(disputes: Dispute[]) {
+  const profileIds = Array.from(
+    new Set(disputes.flatMap((dispute) => [dispute.buyer_id, dispute.seller_id]))
+  );
+
+  if (profileIds.length === 0) {
+    return new Map<string, Pick<Profile, "id" | "full_name" | "email" | "username">>();
+  }
+
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    return new Map<string, Pick<Profile, "id" | "full_name" | "email" | "username">>();
+  }
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, full_name, email, username")
+    .in("id", profileIds);
+
+  return new Map(
+    ((data as Array<Pick<Profile, "id" | "full_name" | "email" | "username">> | null) ?? []).map(
+      (profile) => [profile.id, profile]
+    )
+  );
+}
+
+async function enrichDisputes(disputes: Dispute[]) {
+  const [orderMap, profileMap] = await Promise.all([
+    getDisputeOrderMap(disputes),
+    getDisputeProfileMap(disputes)
+  ]);
+
+  return disputes.map((dispute) =>
+    normalizeDispute(
+      dispute,
+      orderMap.get(dispute.order_id),
+      profileMap.get(dispute.buyer_id),
+      profileMap.get(dispute.seller_id)
+    )
+  );
+}
+
+export async function getBuyerDisputeCandidates(profile: Profile) {
+  const [orders, disputes] = await Promise.all([
+    getBuyerOrders(profile),
+    getBuyerDisputes(profile)
+  ]);
+  const disputeByOrderId = new Map(disputes.map((dispute) => [dispute.order_id, dispute]));
+
+  return orders
+    .filter((order) =>
+      order.payment_status === "successful" &&
+      (order.status === "processing" || order.status === "completed") &&
+      order.escrow_status !== "refunded"
+    )
+    .map((order) => ({
+      order,
+      dispute: disputeByOrderId.get(order.id) ?? null
+    }));
+}
+
+export async function getBuyerDisputes(profile: Profile) {
+  if (!hasSupabaseEnv) {
+    return [] as Dispute[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [] as Dispute[];
+    }
+
+    const { data } = await supabase
+      .from("disputes")
+      .select("*")
+      .eq("buyer_id", profile.id)
+      .order("last_message_at", { ascending: false });
+
+    return enrichDisputes((data as Dispute[] | null) ?? []);
+  } catch {
+    return [] as Dispute[];
+  }
+}
+
+export async function getSellerDisputes(profile: Profile) {
+  if (!hasSupabaseEnv) {
+    return [] as Dispute[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [] as Dispute[];
+    }
+
+    const { data } = await supabase
+      .from("disputes")
+      .select("*")
+      .eq("seller_id", profile.id)
+      .order("last_message_at", { ascending: false });
+
+    return enrichDisputes((data as Dispute[] | null) ?? []);
+  } catch {
+    return [] as Dispute[];
+  }
+}
+
+export async function getDisputeCase(
+  profile: Profile,
+  disputeId: string,
+  scope: "buyer" | "seller" | "admin"
+) {
+  if (!hasSupabaseEnv) {
+    return null as {
+      dispute: Dispute;
+      order: Order | null;
+      messages: DisputeMessage[];
+      buyerProfile: Pick<Profile, "id" | "full_name" | "email" | "username" | "seller_strikes" | "seller_restricted_until" | "seller_restriction_reason"> | null;
+      sellerProfile: Pick<Profile, "id" | "full_name" | "email" | "username" | "seller_strikes" | "seller_restricted_until" | "seller_restriction_reason"> | null;
+    } | null;
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return null;
+    }
+
+    const { data: disputeData } = await supabase
+      .from("disputes")
+      .select("*")
+      .eq("id", disputeId)
+      .maybeSingle();
+
+    const dispute = disputeData as Dispute | null;
+
+    if (!dispute) {
+      return null;
+    }
+
+    const allowed =
+      scope === "admin" ||
+      (scope === "buyer" && dispute.buyer_id === profile.id) ||
+      (scope === "seller" && dispute.seller_id === profile.id);
+
+    if (!allowed) {
+      return null;
+    }
+
+    const [{ data: orderData }, { data: profilesData }, { data: messagesData }, { data: attachmentsData }] =
+      await Promise.all([
+        supabase.from("orders").select("*").eq("id", dispute.order_id).maybeSingle(),
+        supabase
+          .from("profiles")
+          .select("id, full_name, email, username, seller_strikes, seller_restricted_until, seller_restriction_reason")
+          .in("id", [dispute.buyer_id, dispute.seller_id]),
+        supabase
+          .from("dispute_messages")
+          .select("*")
+          .eq("dispute_id", dispute.id)
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("dispute_attachments")
+          .select("*")
+          .eq("dispute_id", dispute.id)
+          .order("created_at", { ascending: true })
+      ]);
+
+    const order = orderData ? normalizeOrder(orderData as Order) : null;
+    const profileMap = new Map(
+      ((profilesData as Array<Pick<Profile, "id" | "full_name" | "email" | "username" | "seller_strikes" | "seller_restricted_until" | "seller_restriction_reason">> | null) ?? []).map(
+        (entry) => [entry.id, entry]
+      )
+    );
+    const attachments = (attachmentsData as DisputeAttachment[] | null) ?? [];
+    const signedAttachments = await Promise.all(
+      attachments.map(async (attachment) => {
+        const { data } = await supabase.storage
+          .from(DISPUTE_EVIDENCE_BUCKET)
+          .createSignedUrl(attachment.file_path, 60 * 15);
+
+        return {
+          ...attachment,
+          duration_seconds:
+            attachment.duration_seconds === null || attachment.duration_seconds === undefined
+              ? null
+              : Number(attachment.duration_seconds),
+          file_url: data?.signedUrl
+        };
+      })
+    );
+    const attachmentMap = new Map<string, DisputeAttachment[]>();
+
+    signedAttachments.forEach((attachment) => {
+      const key = attachment.message_id ?? "";
+      attachmentMap.set(key, [...(attachmentMap.get(key) ?? []), attachment]);
+    });
+
+    const messages = ((messagesData as DisputeMessage[] | null) ?? []).map((message) => ({
+      ...message,
+      sender_name:
+        message.sender_role === "admin"
+          ? "Gaming Index"
+          : profileMap.get(message.sender_id)?.full_name ?? message.sender_role,
+      attachments: attachmentMap.get(message.id) ?? []
+    }));
+
+    return {
+      dispute: normalizeDispute(
+        dispute,
+        order,
+        profileMap.get(dispute.buyer_id),
+        profileMap.get(dispute.seller_id)
+      ),
+      order,
+      messages,
+      buyerProfile: profileMap.get(dispute.buyer_id) ?? null,
+      sellerProfile: profileMap.get(dispute.seller_id) ?? null
+    };
+  } catch {
+    return null;
   }
 }
 

@@ -1,6 +1,7 @@
 import KycRequiredCard from "@/components/seller/KycRequiredCard";
+import SellerRestrictedCard from "@/components/seller/SellerRestrictedCard";
 import SellerUploadForm from "@/components/seller/SellerUploadForm";
-import { canUploadAccounts, requireSellerProfile } from "@/lib/auth";
+import { canUploadAccounts, isSellerRestrictionActive, requireSellerProfile } from "@/lib/auth";
 
 export default async function SellerUploadPage({
   searchParams
@@ -10,7 +11,16 @@ export default async function SellerUploadPage({
   const profile = await requireSellerProfile();
   const params = (await searchParams) ?? {};
 
-  if (!canUploadAccounts(profile.kyc_status)) {
+  if (isSellerRestrictionActive(profile)) {
+    return (
+      <SellerRestrictedCard
+        restrictedUntil={profile.seller_restricted_until}
+        reason={profile.seller_restriction_reason}
+      />
+    );
+  }
+
+  if (!canUploadAccounts(profile.kyc_status, profile)) {
     return <KycRequiredCard status={profile.kyc_status} />;
   }
 

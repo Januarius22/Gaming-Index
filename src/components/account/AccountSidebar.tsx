@@ -11,6 +11,7 @@ import {
   PackageCheck,
   ReceiptText,
   Settings,
+  ShieldAlert,
   ShieldPlus,
   ShoppingCart,
   Store,
@@ -49,7 +50,8 @@ export default function AccountSidebar({
       label: "Purchases",
       items: [
         { href: "/account/cart", label: "Cart", icon: ShoppingCart },
-        { href: "/account/orders", label: "Order History", icon: PackageCheck }
+        { href: "/account/orders", label: "Order History", icon: PackageCheck },
+        { href: "/account/disputes", label: "Disputes", icon: ShieldAlert }
       ]
     },
     {

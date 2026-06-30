@@ -148,8 +148,15 @@ export async function requireAdminProfile() {
   return profile;
 }
 
-export function canUploadAccounts(kycStatus: KycStatus) {
-  return kycStatus === "approved";
+export function isSellerRestrictionActive(profile: Pick<Profile, "seller_restricted_until">) {
+  return Boolean(
+    profile.seller_restricted_until &&
+      new Date(profile.seller_restricted_until).getTime() > Date.now()
+  );
+}
+
+export function canUploadAccounts(kycStatus: KycStatus, profile?: Pick<Profile, "seller_restricted_until">) {
+  return kycStatus === "approved" && (!profile || !isSellerRestrictionActive(profile));
 }
 
 export async function signOutServerSession() {

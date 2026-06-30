@@ -7,6 +7,9 @@ create table if not exists public.profiles (
   seller_enabled boolean not null default false,
   kyc_status text not null default 'not_started' check (kyc_status in ('not_started', 'pending', 'approved', 'rejected')),
   is_banned boolean not null default false,
+  seller_strikes integer not null default 0 check (seller_strikes >= 0),
+  seller_restricted_until timestamp with time zone,
+  seller_restriction_reason text not null default '',
   banned_at timestamp with time zone,
   banned_reason text not null default '',
   banned_by uuid references public.profiles(id) on delete set null,
@@ -15,6 +18,9 @@ create table if not exists public.profiles (
 
 alter table public.profiles add column if not exists seller_enabled boolean not null default false;
 alter table public.profiles add column if not exists is_banned boolean not null default false;
+alter table public.profiles add column if not exists seller_strikes integer not null default 0;
+alter table public.profiles add column if not exists seller_restricted_until timestamp with time zone;
+alter table public.profiles add column if not exists seller_restriction_reason text not null default '';
 alter table public.profiles add column if not exists banned_at timestamp with time zone;
 alter table public.profiles add column if not exists banned_reason text not null default '';
 alter table public.profiles add column if not exists banned_by uuid references public.profiles(id) on delete set null;
@@ -23,6 +29,8 @@ update public.profiles set role = 'user' where role = 'seller';
 alter table public.profiles alter column role set default 'user';
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check check (role in ('user', 'admin'));
+alter table public.profiles drop constraint if exists profiles_seller_strikes_check;
+alter table public.profiles add constraint profiles_seller_strikes_check check (seller_strikes >= 0);
 
 create table if not exists public.kyc_submissions (
   id uuid primary key default gen_random_uuid(),
@@ -91,6 +99,10 @@ on conflict (id) do nothing;
 
 insert into storage.buckets (id, name, public)
 values ('listing-media', 'listing-media', false)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public)
+values ('dispute-evidence', 'dispute-evidence', false)
 on conflict (id) do nothing;
 
 create table if not exists public.listings (
@@ -248,8 +260,12 @@ create table if not exists public.disputes (
   details text not null,
   status text not null default 'open' check (status in ('open', 'reviewing', 'resolved', 'rejected', 'refunded')),
   admin_note text not null default '',
+  resolution text not null default '',
+  opened_by uuid references public.profiles(id) on delete set null,
   reviewed_by uuid references public.profiles(id) on delete set null,
   reviewed_at timestamp with time zone,
+  closed_at timestamp with time zone,
+  last_message_at timestamp with time zone not null default now(),
   created_at timestamp with time zone not null default now()
 );
 
@@ -260,14 +276,84 @@ alter table public.disputes add column if not exists reason text not null defaul
 alter table public.disputes add column if not exists details text not null default '';
 alter table public.disputes add column if not exists status text not null default 'open';
 alter table public.disputes add column if not exists admin_note text not null default '';
+alter table public.disputes add column if not exists resolution text not null default '';
+alter table public.disputes add column if not exists opened_by uuid references public.profiles(id) on delete set null;
 alter table public.disputes add column if not exists reviewed_by uuid references public.profiles(id) on delete set null;
 alter table public.disputes add column if not exists reviewed_at timestamp with time zone;
+alter table public.disputes add column if not exists closed_at timestamp with time zone;
+alter table public.disputes add column if not exists last_message_at timestamp with time zone not null default now();
 alter table public.disputes drop constraint if exists disputes_status_check;
 alter table public.disputes add constraint disputes_status_check
   check (status in ('open', 'reviewing', 'resolved', 'rejected', 'refunded'));
 alter table public.disputes drop constraint if exists disputes_details_check;
 alter table public.disputes add constraint disputes_details_check
   check (length(trim(details)) >= 20);
+update public.disputes
+set last_message_at = coalesce(reviewed_at, created_at, now())
+where last_message_at is null;
+
+create table if not exists public.dispute_messages (
+  id uuid primary key default gen_random_uuid(),
+  dispute_id uuid not null references public.disputes(id) on delete cascade,
+  sender_id uuid not null references public.profiles(id) on delete cascade,
+  sender_role text not null check (sender_role in ('buyer', 'seller', 'admin')),
+  message text not null default '',
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.dispute_messages add column if not exists sender_role text not null default 'buyer';
+alter table public.dispute_messages add column if not exists message text not null default '';
+alter table public.dispute_messages drop constraint if exists dispute_messages_sender_role_check;
+alter table public.dispute_messages add constraint dispute_messages_sender_role_check
+  check (sender_role in ('buyer', 'seller', 'admin'));
+
+create table if not exists public.dispute_attachments (
+  id uuid primary key default gen_random_uuid(),
+  dispute_id uuid not null references public.disputes(id) on delete cascade,
+  message_id uuid references public.dispute_messages(id) on delete cascade,
+  uploader_id uuid not null references public.profiles(id) on delete cascade,
+  file_name text not null default '',
+  file_path text not null default '',
+  file_type text not null check (file_type in ('image', 'video')),
+  duration_seconds numeric(6, 2),
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.dispute_attachments add column if not exists message_id uuid references public.dispute_messages(id) on delete cascade;
+alter table public.dispute_attachments add column if not exists uploader_id uuid references public.profiles(id) on delete cascade;
+alter table public.dispute_attachments add column if not exists file_name text not null default '';
+alter table public.dispute_attachments add column if not exists file_path text not null default '';
+alter table public.dispute_attachments add column if not exists file_type text not null default 'image';
+alter table public.dispute_attachments add column if not exists duration_seconds numeric(6, 2);
+alter table public.dispute_attachments drop constraint if exists dispute_attachments_file_type_check;
+alter table public.dispute_attachments add constraint dispute_attachments_file_type_check
+  check (file_type in ('image', 'video'));
+alter table public.dispute_attachments drop constraint if exists dispute_attachments_video_duration_check;
+alter table public.dispute_attachments add constraint dispute_attachments_video_duration_check
+  check (file_type <> 'video' or duration_seconds is null or duration_seconds <= 10);
+
+create table if not exists public.seller_enforcements (
+  id uuid primary key default gen_random_uuid(),
+  seller_id uuid not null references public.profiles(id) on delete cascade,
+  dispute_id uuid references public.disputes(id) on delete set null,
+  action text not null check (action in ('warning', 'temporary_restriction', 'seller_suspension')),
+  reason text not null default '',
+  strike_count integer not null default 0 check (strike_count >= 0),
+  restricted_until timestamp with time zone,
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.seller_enforcements add column if not exists dispute_id uuid references public.disputes(id) on delete set null;
+alter table public.seller_enforcements add column if not exists reason text not null default '';
+alter table public.seller_enforcements add column if not exists strike_count integer not null default 0;
+alter table public.seller_enforcements add column if not exists restricted_until timestamp with time zone;
+alter table public.seller_enforcements add column if not exists created_by uuid references public.profiles(id) on delete set null;
+alter table public.seller_enforcements drop constraint if exists seller_enforcements_action_check;
+alter table public.seller_enforcements add constraint seller_enforcements_action_check
+  check (action in ('warning', 'temporary_restriction', 'seller_suspension'));
+alter table public.seller_enforcements drop constraint if exists seller_enforcements_strike_count_check;
+alter table public.seller_enforcements add constraint seller_enforcements_strike_count_check check (strike_count >= 0);
 
 create table if not exists public.wallets (
   profile_id uuid primary key references public.profiles(id) on delete cascade,
@@ -701,7 +787,9 @@ begin
     buyer_id,
     seller_id,
     reason,
-    details
+    details,
+    opened_by,
+    last_message_at
   )
   values (
     target_order.id,
@@ -709,9 +797,24 @@ begin
     requester_id,
     target_order.seller_id,
     trim(dispute_reason),
-    trim(dispute_details)
+    trim(dispute_details),
+    requester_id,
+    now()
   )
   returning id into dispute_id;
+
+  insert into public.dispute_messages (
+    dispute_id,
+    sender_id,
+    sender_role,
+    message
+  )
+  values (
+    dispute_id,
+    requester_id,
+    'buyer',
+    trim(dispute_details)
+  );
 
   update public.orders
   set escrow_status = 'disputed'
@@ -731,7 +834,7 @@ begin
     'buyer_dispute_opened',
     'Dispute opened',
     'Your dispute has been sent to admin review.',
-    '/account/orders/' || target_order.id,
+    '/account/disputes/' || dispute_id,
     jsonb_build_object(
       'dispute_id', dispute_id,
       'order_id', target_order.id,
@@ -743,7 +846,7 @@ begin
     'seller_dispute_opened',
     'Order dispute opened',
     'A buyer opened a dispute for ' || target_order.listing_title || '.',
-    '/seller/orders',
+    '/seller/disputes/' || dispute_id,
     jsonb_build_object(
       'dispute_id', dispute_id,
       'order_id', target_order.id,
@@ -756,7 +859,7 @@ begin
     'admin_dispute_opened',
     'New dispute opened',
     'A buyer opened a dispute for ' || target_order.listing_title || '.',
-    '/admin/disputes',
+    '/admin/disputes/' || dispute_id,
     jsonb_build_object(
       'dispute_id', dispute_id,
       'order_id', target_order.id,
@@ -770,6 +873,190 @@ begin
   );
 
   return dispute_id;
+end;
+$$;
+
+create or replace function public.send_dispute_message(
+  target_dispute_id uuid,
+  message_body text default '',
+  attachment_file_names text[] default array[]::text[],
+  attachment_file_paths text[] default array[]::text[],
+  attachment_file_types text[] default array[]::text[],
+  attachment_duration_seconds numeric[] default array[]::numeric[]
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  requester_id uuid;
+  dispute_row public.disputes%rowtype;
+  sender_role text;
+  message_id uuid;
+  attachment_count integer;
+  attachment_index integer;
+  attachment_type text;
+  attachment_duration numeric;
+begin
+  requester_id := auth.uid();
+
+  if requester_id is null then
+    raise exception 'You must be signed in to send a message.';
+  end if;
+
+  select *
+  into dispute_row
+  from public.disputes
+  where id = target_dispute_id
+  for update;
+
+  if not found then
+    raise exception 'Dispute not found.';
+  end if;
+
+  if dispute_row.status in ('resolved', 'rejected', 'refunded') then
+    raise exception 'This dispute is closed.';
+  end if;
+
+  if requester_id = dispute_row.buyer_id then
+    sender_role := 'buyer';
+  elsif requester_id = dispute_row.seller_id then
+    sender_role := 'seller';
+  elsif exists (
+    select 1
+    from public.profiles as admin_profile
+    where admin_profile.id = requester_id
+      and admin_profile.role = 'admin'
+  ) then
+    sender_role := 'admin';
+  else
+    raise exception 'You cannot message this dispute.';
+  end if;
+
+  attachment_count := coalesce(array_length(attachment_file_paths, 1), 0);
+
+  if trim(coalesce(message_body, '')) = '' and attachment_count = 0 then
+    raise exception 'Add a message or evidence.';
+  end if;
+
+  if attachment_count <> coalesce(array_length(attachment_file_names, 1), 0)
+    or attachment_count <> coalesce(array_length(attachment_file_types, 1), 0) then
+    raise exception 'Evidence details are incomplete.';
+  end if;
+
+  insert into public.dispute_messages (
+    dispute_id,
+    sender_id,
+    sender_role,
+    message
+  )
+  values (
+    dispute_row.id,
+    requester_id,
+    sender_role,
+    trim(coalesce(message_body, ''))
+  )
+  returning id into message_id;
+
+  for attachment_index in 1..attachment_count loop
+    attachment_type := attachment_file_types[attachment_index];
+    attachment_duration := attachment_duration_seconds[attachment_index];
+
+    if attachment_type not in ('image', 'video') then
+      raise exception 'Evidence file type is invalid.';
+    end if;
+
+    if attachment_type = 'video'
+      and attachment_duration is not null
+      and attachment_duration > 10 then
+      raise exception 'Video evidence must be 10 seconds or less.';
+    end if;
+
+    if attachment_file_paths[attachment_index] is null
+      or attachment_file_paths[attachment_index] = ''
+      or split_part(attachment_file_paths[attachment_index], '/', 1) <> requester_id::text then
+      raise exception 'Evidence path is invalid.';
+    end if;
+
+    insert into public.dispute_attachments (
+      dispute_id,
+      message_id,
+      uploader_id,
+      file_name,
+      file_path,
+      file_type,
+      duration_seconds
+    )
+    values (
+      dispute_row.id,
+      message_id,
+      requester_id,
+      coalesce(attachment_file_names[attachment_index], ''),
+      attachment_file_paths[attachment_index],
+      attachment_type,
+      attachment_duration
+    );
+  end loop;
+
+  update public.disputes
+  set
+    status = case
+      when sender_role = 'admin' and status = 'open' then 'reviewing'
+      else status
+    end,
+    last_message_at = now()
+  where id = dispute_row.id;
+
+  if sender_role <> 'buyer' then
+    insert into public.notifications (
+      profile_id,
+      type,
+      title,
+      message,
+      link_path,
+      metadata
+    )
+    values (
+      dispute_row.buyer_id,
+      'buyer_dispute_message',
+      'Dispute update',
+      'There is a new message on your dispute case.',
+      '/account/disputes/' || dispute_row.id,
+      jsonb_build_object('dispute_id', dispute_row.id, 'message_id', message_id)
+    );
+  end if;
+
+  if sender_role <> 'seller' then
+    insert into public.notifications (
+      profile_id,
+      type,
+      title,
+      message,
+      link_path,
+      metadata
+    )
+    values (
+      dispute_row.seller_id,
+      'seller_dispute_message',
+      'Dispute update',
+      'There is a new message on an order dispute.',
+      '/seller/disputes/' || dispute_row.id,
+      jsonb_build_object('dispute_id', dispute_row.id, 'message_id', message_id)
+    );
+  end if;
+
+  if sender_role <> 'admin' then
+    perform public.notify_admins(
+      'admin_dispute_message',
+      'Dispute message',
+      'A dispute case has a new message.',
+      '/admin/disputes/' || dispute_row.id,
+      jsonb_build_object('dispute_id', dispute_row.id, 'message_id', message_id)
+    );
+  end if;
+
+  return message_id;
 end;
 $$;
 
@@ -831,9 +1118,34 @@ begin
       when trim(review_note) = '' then admin_note
       else trim(review_note)
     end,
+    resolution = case
+      when next_status in ('resolved', 'rejected') then trim(review_note)
+      else resolution
+    end,
     reviewed_by = auth.uid(),
-    reviewed_at = now()
+    reviewed_at = now(),
+    closed_at = case
+      when next_status in ('resolved', 'rejected') then now()
+      else closed_at
+    end,
+    last_message_at = now()
   where id = dispute_row.id;
+
+  insert into public.dispute_messages (
+    dispute_id,
+    sender_id,
+    sender_role,
+    message
+  )
+  values (
+    dispute_row.id,
+    auth.uid(),
+    'admin',
+    case
+      when trim(review_note) = '' then 'This dispute is now under review.'
+      else trim(review_note)
+    end
+  );
 
   if next_status in ('resolved', 'rejected') then
     update public.orders
@@ -866,7 +1178,7 @@ begin
       when next_status = 'resolved' then 'Your dispute has been resolved: ' || trim(review_note)
       else 'Your dispute was rejected: ' || trim(review_note)
     end,
-    '/account/orders/' || dispute_row.order_id,
+    '/account/disputes/' || dispute_row.id,
     jsonb_build_object(
       'dispute_id', dispute_row.id,
       'order_id', dispute_row.order_id,
@@ -887,7 +1199,7 @@ begin
       when next_status = 'resolved' then 'A dispute on your order was resolved: ' || trim(review_note)
       else 'A dispute on your order was rejected: ' || trim(review_note)
     end,
-    '/seller/orders',
+    '/seller/disputes/' || dispute_row.id,
     jsonb_build_object(
       'dispute_id', dispute_row.id,
       'order_id', dispute_row.order_id,
@@ -985,9 +1297,25 @@ begin
   set
     status = 'refunded',
     admin_note = trim(refund_note),
+    resolution = trim(refund_note),
     reviewed_by = auth.uid(),
-    reviewed_at = now()
+    reviewed_at = now(),
+    closed_at = now(),
+    last_message_at = now()
   where id = dispute_row.id;
+
+  insert into public.dispute_messages (
+    dispute_id,
+    sender_id,
+    sender_role,
+    message
+  )
+  values (
+    dispute_row.id,
+    auth.uid(),
+    'admin',
+    trim(refund_note)
+  );
 
   insert into public.wallet_transactions (
     wallet_profile_id,
@@ -1044,7 +1372,7 @@ begin
     'buyer_refund_issued',
     'Refund issued',
     'A refund was issued for your disputed order.',
-    '/account/orders/' || linked_order.id,
+    '/account/disputes/' || dispute_row.id,
     jsonb_build_object(
       'dispute_id', dispute_row.id,
       'order_id', linked_order.id,
@@ -1057,7 +1385,7 @@ begin
     'seller_dispute_refunded',
     'Order refunded',
     'A disputed order was refunded.',
-    '/seller/orders',
+    '/seller/disputes/' || dispute_row.id,
     jsonb_build_object(
       'dispute_id', dispute_row.id,
       'order_id', linked_order.id,
@@ -1065,6 +1393,174 @@ begin
       'amount', linked_order.amount,
       'note', trim(refund_note)
     )
+  );
+end;
+$$;
+
+create or replace function public.enforce_seller_for_dispute(
+  target_dispute_id uuid,
+  enforcement_action text,
+  enforcement_reason text,
+  restriction_days integer default 0
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  dispute_row public.disputes%rowtype;
+  restriction_until timestamp with time zone;
+  new_strike_count integer;
+begin
+  if not exists (
+    select 1
+    from public.profiles as admin_profile
+    where admin_profile.id = auth.uid()
+      and admin_profile.role = 'admin'
+  ) then
+    raise exception 'Only admins can enforce seller penalties.';
+  end if;
+
+  if enforcement_action not in ('warning', 'temporary_restriction', 'seller_suspension') then
+    raise exception 'Invalid seller enforcement action.';
+  end if;
+
+  if trim(enforcement_reason) = '' then
+    raise exception 'Add an enforcement reason.';
+  end if;
+
+  if enforcement_action = 'temporary_restriction'
+    and (restriction_days is null or restriction_days <= 0) then
+    raise exception 'Add the restriction duration.';
+  end if;
+
+  select *
+  into dispute_row
+  from public.disputes
+  where id = target_dispute_id
+  for update;
+
+  if not found then
+    raise exception 'Dispute not found.';
+  end if;
+
+  restriction_until := case
+    when enforcement_action = 'temporary_restriction' then now() + make_interval(days => restriction_days)
+    else null
+  end;
+
+  update public.profiles
+  set
+    seller_strikes = seller_strikes + 1,
+    seller_restricted_until = case
+      when enforcement_action = 'temporary_restriction' then restriction_until
+      when enforcement_action = 'seller_suspension' then null
+      else seller_restricted_until
+    end,
+    seller_restriction_reason = case
+      when enforcement_action in ('temporary_restriction', 'seller_suspension') then trim(enforcement_reason)
+      else seller_restriction_reason
+    end,
+    seller_enabled = case
+      when enforcement_action = 'seller_suspension' then false
+      else seller_enabled
+    end
+  where id = dispute_row.seller_id
+  returning seller_strikes into new_strike_count;
+
+  insert into public.seller_enforcements (
+    seller_id,
+    dispute_id,
+    action,
+    reason,
+    strike_count,
+    restricted_until,
+    created_by
+  )
+  values (
+    dispute_row.seller_id,
+    dispute_row.id,
+    enforcement_action,
+    trim(enforcement_reason),
+    new_strike_count,
+    restriction_until,
+    auth.uid()
+  );
+
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values (
+    dispute_row.seller_id,
+    'seller_enforcement_' || enforcement_action,
+    case
+      when enforcement_action = 'warning' then 'Seller warning issued'
+      when enforcement_action = 'temporary_restriction' then 'Seller uploads restricted'
+      else 'Seller access suspended'
+    end,
+    case
+      when enforcement_action = 'warning' then trim(enforcement_reason)
+      when enforcement_action = 'temporary_restriction' then trim(enforcement_reason)
+      else trim(enforcement_reason)
+    end,
+    '/seller/disputes/' || dispute_row.id,
+    jsonb_build_object(
+      'dispute_id', dispute_row.id,
+      'action', enforcement_action,
+      'strike_count', new_strike_count,
+      'restricted_until', restriction_until,
+      'reason', trim(enforcement_reason)
+    )
+  );
+end;
+$$;
+
+create or replace function public.clear_seller_restriction(
+  target_seller_id uuid,
+  admin_note text default ''
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1
+    from public.profiles as admin_profile
+    where admin_profile.id = auth.uid()
+      and admin_profile.role = 'admin'
+  ) then
+    raise exception 'Only admins can clear seller restrictions.';
+  end if;
+
+  update public.profiles
+  set
+    seller_restricted_until = null,
+    seller_restriction_reason = ''
+  where id = target_seller_id;
+
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values (
+    target_seller_id,
+    'seller_restriction_cleared',
+    'Seller restriction cleared',
+    coalesce(nullif(trim(admin_note), ''), 'Your seller upload restriction has been cleared.'),
+    '/seller/dashboard',
+    jsonb_build_object('note', trim(admin_note))
   );
 end;
 $$;
@@ -1170,6 +1666,29 @@ begin
       'listing_id', paid_order.listing_id,
       'amount', paid_order.amount,
       'hold_expires_at', hold_expires_at
+    )
+  );
+
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values (
+    paid_order.buyer_id,
+    'buyer_purchase_successful',
+    'Purchase successful',
+    'Your payment for ' || paid_order.listing_title || ' was successful.',
+    '/account/orders/' || paid_order.id,
+    jsonb_build_object(
+      'order_id', paid_order.id,
+      'listing_id', paid_order.listing_id,
+      'seller_id', paid_order.seller_id,
+      'amount', paid_order.amount,
+      'payment_reference', paid_order.payment_reference
     )
   );
 
@@ -1671,6 +2190,27 @@ begin
   )
   on conflict (id) do nothing;
 
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values (
+    new.id,
+    'account_created',
+    'Welcome to Gaming Index',
+    'Your account is ready.',
+    '/account/dashboard',
+    jsonb_build_object(
+      'profile_id', new.id,
+      'email', new.email
+    )
+  )
+  on conflict do nothing;
+
   return new;
 end;
 $$;
@@ -1696,6 +2236,9 @@ begin
     if
       new.role is distinct from old.role
       or new.kyc_status is distinct from old.kyc_status
+      or new.seller_strikes is distinct from old.seller_strikes
+      or new.seller_restricted_until is distinct from old.seller_restricted_until
+      or new.seller_restriction_reason is distinct from old.seller_restriction_reason
       or new.is_banned is distinct from old.is_banned
       or new.banned_at is distinct from old.banned_at
       or new.banned_reason is distinct from old.banned_reason
@@ -1720,6 +2263,9 @@ alter table public.listings enable row level security;
 alter table public.listing_delivery_details enable row level security;
 alter table public.orders enable row level security;
 alter table public.disputes enable row level security;
+alter table public.dispute_messages enable row level security;
+alter table public.dispute_attachments enable row level security;
+alter table public.seller_enforcements enable row level security;
 alter table public.wallets enable row level security;
 alter table public.wallet_transactions enable row level security;
 alter table public.withdrawal_requests enable row level security;
@@ -2010,6 +2556,132 @@ create policy "admins can update disputes"
         and admin_profile.role = 'admin'
     )
   )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "buyers sellers and admins can read dispute messages" on public.dispute_messages;
+create policy "buyers sellers and admins can read dispute messages"
+  on public.dispute_messages
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.disputes as dispute
+      where dispute.id = public.dispute_messages.dispute_id
+        and (
+          auth.uid() = dispute.buyer_id
+          or auth.uid() = dispute.seller_id
+          or exists (
+            select 1
+            from public.profiles as admin_profile
+            where admin_profile.id = auth.uid()
+              and admin_profile.role = 'admin'
+          )
+        )
+    )
+  );
+
+drop policy if exists "case participants can insert dispute messages" on public.dispute_messages;
+create policy "case participants can insert dispute messages"
+  on public.dispute_messages
+  for insert
+  to authenticated
+  with check (
+    auth.uid() = sender_id
+    and exists (
+      select 1
+      from public.disputes as dispute
+      where dispute.id = public.dispute_messages.dispute_id
+        and (
+          (sender_role = 'buyer' and auth.uid() = dispute.buyer_id)
+          or (sender_role = 'seller' and auth.uid() = dispute.seller_id)
+          or (
+            sender_role = 'admin'
+            and exists (
+              select 1
+              from public.profiles as admin_profile
+              where admin_profile.id = auth.uid()
+                and admin_profile.role = 'admin'
+            )
+          )
+        )
+    )
+  );
+
+drop policy if exists "buyers sellers and admins can read dispute attachments" on public.dispute_attachments;
+create policy "buyers sellers and admins can read dispute attachments"
+  on public.dispute_attachments
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.disputes as dispute
+      where dispute.id = public.dispute_attachments.dispute_id
+        and (
+          auth.uid() = dispute.buyer_id
+          or auth.uid() = dispute.seller_id
+          or exists (
+            select 1
+            from public.profiles as admin_profile
+            where admin_profile.id = auth.uid()
+              and admin_profile.role = 'admin'
+          )
+        )
+    )
+  );
+
+drop policy if exists "case participants can insert dispute attachments" on public.dispute_attachments;
+create policy "case participants can insert dispute attachments"
+  on public.dispute_attachments
+  for insert
+  to authenticated
+  with check (
+    auth.uid() = uploader_id
+    and exists (
+      select 1
+      from public.disputes as dispute
+      where dispute.id = public.dispute_attachments.dispute_id
+        and (
+          auth.uid() = dispute.buyer_id
+          or auth.uid() = dispute.seller_id
+          or exists (
+            select 1
+            from public.profiles as admin_profile
+            where admin_profile.id = auth.uid()
+              and admin_profile.role = 'admin'
+          )
+        )
+    )
+  );
+
+drop policy if exists "sellers can read their own enforcement history" on public.seller_enforcements;
+create policy "sellers can read their own enforcement history"
+  on public.seller_enforcements
+  for select
+  to authenticated
+  using (
+    auth.uid() = seller_id
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "admins can insert seller enforcements" on public.seller_enforcements;
+create policy "admins can insert seller enforcements"
+  on public.seller_enforcements
+  for insert
+  to authenticated
   with check (
     exists (
       select 1
@@ -2332,6 +3004,48 @@ create policy "admins can delete any listing media"
   to authenticated
   using (
     bucket_id = 'listing-media'
+    and exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "case participants can upload dispute evidence" on storage.objects;
+create policy "case participants can upload dispute evidence"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (
+    bucket_id = 'dispute-evidence'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+drop policy if exists "authenticated users can read dispute evidence" on storage.objects;
+create policy "authenticated users can read dispute evidence"
+  on storage.objects
+  for select
+  to authenticated
+  using (bucket_id = 'dispute-evidence');
+
+drop policy if exists "users can delete their own dispute evidence" on storage.objects;
+create policy "users can delete their own dispute evidence"
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'dispute-evidence'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+drop policy if exists "admins can delete any dispute evidence" on storage.objects;
+create policy "admins can delete any dispute evidence"
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'dispute-evidence'
     and exists (
       select 1
       from public.profiles as admin_profile

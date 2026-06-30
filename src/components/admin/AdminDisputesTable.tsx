@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { refundOrderDisputeAction, updateOrderDisputeAction } from "@/actions/admin";
 import FormMessage from "@/components/auth/FormMessage";
 import Badge from "@/components/ui/Badge";
@@ -139,6 +140,11 @@ export default function AdminDisputesTable({ disputes }: { disputes: Dispute[] }
                     <td className="px-4 py-4">{formatDate(dispute.created_at)}</td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap gap-2">
+                        <Link href={`/admin/disputes/${dispute.id}`}>
+                          <Button size="sm" type="button" variant="secondary">
+                            Open case
+                          </Button>
+                        </Link>
                         <form
                           onSubmit={(event) => {
                             event.preventDefault();

@@ -161,6 +161,7 @@ function revalidateBuyerCheckout(listingId: string, orderId: string) {
   revalidatePath(`/account/checkout/${orderId}`);
   revalidatePath(`/account/checkout/${orderId}/success`);
   revalidatePath(`/account/orders/${orderId}`);
+  revalidatePath("/account/notifications");
   revalidatePath("/seller/orders");
   revalidatePath("/seller/listings");
   revalidatePath("/seller/history");
@@ -399,8 +400,24 @@ export async function unlockSellerAccessAction(
       };
     }
 
+    await supabase!.from("notifications").insert([
+      {
+        profile_id: profile.id,
+        type: "seller_access_enabled",
+        title: "Seller access enabled",
+        message: "Your seller workspace is ready.",
+        link_path: "/seller/kyc",
+        metadata: {
+          profile_id: profile.id
+        }
+      }
+    ]);
+
     revalidatePath("/account/dashboard");
     revalidatePath("/account/seller");
+    revalidatePath("/account/notifications");
+    revalidatePath("/seller/notifications");
+    revalidatePath("/seller/dashboard");
     revalidatePath("/admin/users");
     revalidatePath("/admin/sellers");
     redirect("/seller/kyc");
@@ -410,6 +427,9 @@ export async function unlockSellerAccessAction(
 
   revalidatePath("/account/dashboard");
   revalidatePath("/account/seller");
+  revalidatePath("/account/notifications");
+  revalidatePath("/seller/notifications");
+  revalidatePath("/seller/dashboard");
   revalidatePath("/admin/users");
   revalidatePath("/admin/sellers");
   redirect("/seller/kyc");
@@ -634,7 +654,7 @@ export async function submitOrderDisputeAction(
   }
 
   const supabase = await getSupabaseServerClient();
-  const { error } = await supabase!.rpc("submit_order_dispute", {
+  const { data, error } = await supabase!.rpc("submit_order_dispute", {
     target_order_id: orderId,
     dispute_reason: reason,
     dispute_details: details
@@ -649,7 +669,14 @@ export async function submitOrderDisputeAction(
 
   revalidatePath(`/account/orders/${orderId}`);
   revalidatePath("/account/orders");
+  revalidatePath("/account/disputes");
+  if (data) {
+    revalidatePath(`/account/disputes/${data}`);
+    revalidatePath(`/seller/disputes/${data}`);
+    revalidatePath(`/admin/disputes/${data}`);
+  }
   revalidatePath("/seller/orders");
+  revalidatePath("/seller/disputes");
   revalidatePath("/seller/notifications");
   revalidatePath("/admin/disputes");
   revalidatePath("/admin/notifications");

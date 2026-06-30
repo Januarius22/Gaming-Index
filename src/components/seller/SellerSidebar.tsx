@@ -14,6 +14,7 @@ import {
   PackageCheck,
   ReceiptText,
   Settings,
+  ShieldAlert,
   Upload,
   X
 } from "lucide-react";
@@ -36,7 +37,10 @@ const navGroups = [
   },
   {
     label: "Sales",
-    items: [{ href: "/seller/orders", label: "Orders", icon: PackageCheck }]
+    items: [
+      { href: "/seller/orders", label: "Orders", icon: PackageCheck },
+      { href: "/seller/disputes", label: "Disputes", icon: ShieldAlert }
+    ]
   },
   {
     label: "Wallet",
@@ -68,7 +72,10 @@ export default function SellerSidebar({
 }) {
   const pathname = usePathname();
   const collapsedDesktop = collapsed && !mobile;
-  const uploadLocked = profile.kyc_status !== "approved";
+  const restrictedUntil = profile.seller_restricted_until
+    ? new Date(profile.seller_restricted_until).getTime()
+    : 0;
+  const uploadLocked = profile.kyc_status !== "approved" || restrictedUntil > Date.now();
 
   return (
     <aside
@@ -176,7 +183,11 @@ export default function SellerSidebar({
                 const Icon = item.icon;
                 const locked = item.href === "/seller/upload" && uploadLocked;
                 const active = !locked && pathname === item.href;
-                const label = locked ? "Upload Account (KYC pending approval)" : item.label;
+                const label = locked
+                  ? restrictedUntil > Date.now()
+                    ? "Upload Account (restricted)"
+                    : "Upload Account (KYC pending approval)"
+                  : item.label;
 
                 if (locked) {
                   return (

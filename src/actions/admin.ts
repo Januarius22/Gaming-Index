@@ -500,10 +500,16 @@ export async function updateOrderDisputeAction(formData: FormData) {
   }
 
   revalidatePath("/admin/disputes");
+  revalidatePath(`/admin/disputes/${disputeId}`);
   revalidatePath("/admin/orders");
   revalidatePath("/admin/dashboard");
   revalidatePath(`/account/orders/${orderId}`);
+  revalidatePath("/account/disputes");
+  revalidatePath(`/account/disputes/${disputeId}`);
   revalidatePath("/account/orders");
+  revalidatePath("/account/notifications");
+  revalidatePath("/seller/disputes");
+  revalidatePath(`/seller/disputes/${disputeId}`);
   revalidatePath("/seller/orders");
   revalidatePath("/seller/notifications");
   revalidatePath("/admin/notifications");
@@ -563,10 +569,18 @@ export async function refundOrderDisputeAction(formData: FormData) {
   }
 
   revalidatePath("/admin/disputes");
+  revalidatePath(`/admin/disputes/${disputeId}`);
   revalidatePath("/admin/orders");
   revalidatePath("/admin/dashboard");
   revalidatePath(`/account/orders/${orderId}`);
+  revalidatePath("/account/disputes");
+  revalidatePath(`/account/disputes/${disputeId}`);
   revalidatePath("/account/orders");
+  revalidatePath("/account/wallet");
+  revalidatePath("/account/transactions");
+  revalidatePath("/account/notifications");
+  revalidatePath("/seller/disputes");
+  revalidatePath(`/seller/disputes/${disputeId}`);
   revalidatePath("/seller/orders");
   revalidatePath("/seller/wallet");
   revalidatePath("/seller/transactions");
@@ -579,6 +593,120 @@ export async function refundOrderDisputeAction(formData: FormData) {
     disputeId,
     nextStatus: "refunded" as const,
     adminNote
+  };
+}
+
+export async function enforceSellerFromDisputeAction(formData: FormData) {
+  await requireAdminProfile();
+  const disputeId = String(formData.get("disputeId") ?? "").trim();
+  const sellerId = String(formData.get("sellerId") ?? "").trim();
+  const action = String(formData.get("enforcementAction") ?? "").trim();
+  const reason = String(formData.get("enforcementReason") ?? "").trim();
+  const restrictionDays = Number(String(formData.get("restrictionDays") ?? "0").trim());
+
+  if (
+    !disputeId ||
+    !sellerId ||
+    !reason ||
+    !["warning", "temporary_restriction", "seller_suspension"].includes(action)
+  ) {
+    return {
+      status: "error" as const,
+      message: "Seller enforcement is invalid."
+    };
+  }
+
+  if (action === "temporary_restriction" && (!Number.isFinite(restrictionDays) || restrictionDays <= 0)) {
+    return {
+      status: "error" as const,
+      message: "Add a valid restriction duration."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to enforce seller actions."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase!.rpc("enforce_seller_for_dispute", {
+    target_dispute_id: disputeId,
+    enforcement_action: action,
+    enforcement_reason: reason,
+    restriction_days: action === "temporary_restriction" ? restrictionDays : 0
+  });
+
+  if (error) {
+    return {
+      status: "error" as const,
+      message: error.message
+    };
+  }
+
+  revalidatePath(`/admin/disputes/${disputeId}`);
+  revalidatePath("/admin/disputes");
+  revalidatePath("/admin/sellers");
+  revalidatePath("/seller/dashboard");
+  revalidatePath("/seller/upload");
+  revalidatePath("/seller/notifications");
+  revalidatePath(`/seller/disputes/${disputeId}`);
+
+  return {
+    status: "success" as const,
+    message: "Seller enforcement saved.",
+    disputeId,
+    sellerId
+  };
+}
+
+export async function clearSellerRestrictionAction(formData: FormData) {
+  await requireAdminProfile();
+  const disputeId = String(formData.get("disputeId") ?? "").trim();
+  const sellerId = String(formData.get("sellerId") ?? "").trim();
+  const note = String(formData.get("note") ?? "").trim();
+
+  if (!sellerId) {
+    return {
+      status: "error" as const,
+      message: "Seller not found."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to clear restrictions."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase!.rpc("clear_seller_restriction", {
+    target_seller_id: sellerId,
+    admin_note: note
+  });
+
+  if (error) {
+    return {
+      status: "error" as const,
+      message: error.message
+    };
+  }
+
+  if (disputeId) {
+    revalidatePath(`/admin/disputes/${disputeId}`);
+    revalidatePath(`/seller/disputes/${disputeId}`);
+  }
+  revalidatePath("/admin/sellers");
+  revalidatePath("/seller/dashboard");
+  revalidatePath("/seller/upload");
+  revalidatePath("/seller/notifications");
+
+  return {
+    status: "success" as const,
+    message: "Seller restriction cleared.",
+    sellerId
   };
 }
 
