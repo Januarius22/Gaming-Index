@@ -7,6 +7,8 @@ import {
   updateOrderDisputeAction
 } from "@/actions/admin";
 import SubmitButton from "@/components/auth/SubmitButton";
+import CaseAutoRefresh from "@/components/disputes/CaseAutoRefresh";
+import DisputeInstructions from "@/components/disputes/DisputeInstructions";
 import DisputeMessageForm from "@/components/disputes/DisputeMessageForm";
 import DisputeThread from "@/components/disputes/DisputeThread";
 import Badge from "@/components/ui/Badge";
@@ -74,6 +76,7 @@ export default async function AdminDisputeCasePage({
 
   return (
     <div className="space-y-6">
+      <CaseAutoRefresh />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-muted-foreground">Dispute Case</p>
@@ -121,6 +124,7 @@ export default async function AdminDisputeCasePage({
             </CardContent>
           </Card>
 
+          <DisputeInstructions />
           <DisputeThread messages={caseData.messages} />
           <DisputeMessageForm
             disputeId={caseData.dispute.id}

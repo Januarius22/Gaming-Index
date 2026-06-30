@@ -11,6 +11,10 @@ import type { ActionState } from "@/types";
 const DISPUTE_EVIDENCE_BUCKET = "dispute-evidence";
 const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
 const MAX_VIDEO_SIZE = 25 * 1024 * 1024;
+const MAX_EVIDENCE_FILES = 5;
+const MAX_EVIDENCE_IMAGES = 4;
+const MAX_EVIDENCE_VIDEOS = 1;
+const MAX_VIDEO_SECONDS = 15;
 
 function safeFileName(fileName: string) {
   return fileName
@@ -117,10 +121,10 @@ export async function sendDisputeMessageAction(
     };
   }
 
-  if (files.length > 2) {
+  if (files.length > MAX_EVIDENCE_FILES) {
     return {
       status: "error",
-      message: "Upload up to two evidence files at once."
+      message: "Upload up to five evidence files at once."
     };
   }
 
@@ -137,6 +141,9 @@ export async function sendDisputeMessageAction(
   const fileTypes: string[] = [];
   const fileDurations: number[] = [];
 
+  let imageCount = 0;
+  let videoCount = 0;
+
   for (const [index, file] of files.entries()) {
     const isImage = file.type.startsWith("image/");
     const isVideo = file.type.startsWith("video/");
@@ -146,6 +153,21 @@ export async function sendDisputeMessageAction(
       return {
         status: "error",
         message: "Evidence must be an image or video."
+      };
+    }
+
+    if (isImage) {
+      imageCount += 1;
+    }
+
+    if (isVideo) {
+      videoCount += 1;
+    }
+
+    if (imageCount > MAX_EVIDENCE_IMAGES || videoCount > MAX_EVIDENCE_VIDEOS) {
+      return {
+        status: "error",
+        message: "Upload up to four images and one video."
       };
     }
 
@@ -163,10 +185,10 @@ export async function sendDisputeMessageAction(
       };
     }
 
-    if (isVideo && duration > 10) {
+    if (isVideo && duration > MAX_VIDEO_SECONDS) {
       return {
         status: "error",
-        message: "Video evidence must be 10 seconds or less."
+        message: "Video evidence must be 15 seconds or less."
       };
     }
 

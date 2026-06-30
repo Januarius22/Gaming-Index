@@ -33,6 +33,7 @@ import type {
   Notification,
   Profile,
   SellerRating,
+  SellerEnforcement,
   SuspensionAppeal,
   Wallet,
   WalletTransaction,
@@ -885,6 +886,32 @@ export async function getSellerDisputes(profile: Profile) {
     return enrichDisputes((data as Dispute[] | null) ?? []);
   } catch {
     return [] as Dispute[];
+  }
+}
+
+export async function getLatestSellerEnforcement(sellerId: string) {
+  if (!hasSupabaseEnv) {
+    return null as SellerEnforcement | null;
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return null;
+    }
+
+    const { data } = await supabase
+      .from("seller_enforcements")
+      .select("*")
+      .eq("seller_id", sellerId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    return (data as SellerEnforcement | null) ?? null;
+  } catch {
+    return null;
   }
 }
 

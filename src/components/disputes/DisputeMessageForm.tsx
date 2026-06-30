@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { Paperclip, Send } from "lucide-react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FileImage, Paperclip, Send, Video, X } from "lucide-react";
 import { sendDisputeMessageAction } from "@/actions/disputes";
 import FormMessage from "@/components/auth/FormMessage";
 import SubmitButton from "@/components/auth/SubmitButton";
@@ -9,6 +10,16 @@ import Textarea from "@/components/ui/Textarea";
 import type { ActionState } from "@/types";
 
 const initialState: ActionState = { status: "idle", message: "" };
+const MAX_FILES = 5;
+const MAX_IMAGES = 4;
+const MAX_VIDEOS = 1;
+const MAX_VIDEO_SECONDS = 15;
+
+type SelectedEvidence = {
+  name: string;
+  kind: "image" | "video";
+  duration: number;
+};
 
 export default function DisputeMessageForm({
   disputeId,
@@ -21,51 +32,104 @@ export default function DisputeMessageForm({
   returnTo: string;
   disabled?: boolean;
 }) {
+  const router = useRouter();
   const [state, formAction] = useActionState(sendDisputeMessageAction, initialState);
   const [fileError, setFileError] = useState("");
   const [durations, setDurations] = useState<number[]>([]);
+  const [selectedEvidence, setSelectedEvidence] = useState<SelectedEvidence[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const checkFiles = async (files: FileList | null) => {
     setFileError("");
     setDurations([]);
+    setSelectedEvidence([]);
 
     if (!files || files.length === 0) {
       return;
     }
 
-    if (files.length > 2) {
-      setFileError("Upload up to two files at once.");
+    const fileArray = Array.from(files);
+
+    if (fileArray.length > MAX_FILES) {
+      setFileError("Upload up to five files.");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       return;
     }
 
     const nextDurations: number[] = [];
+    const nextEvidence: SelectedEvidence[] = [];
+    let imageCount = 0;
+    let videoCount = 0;
 
-    for (const file of Array.from(files)) {
+    for (const file of fileArray) {
+      const isImage = file.type.startsWith("image/");
+      const isVideo = file.type.startsWith("video/");
+
+      if (!isImage && !isVideo) {
+        setFileError("Evidence must be images or one short video.");
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
+
+      if (isImage) {
+        imageCount += 1;
+      }
+
+      if (isVideo) {
+        videoCount += 1;
+      }
+
+      if (imageCount > MAX_IMAGES || videoCount > MAX_VIDEOS) {
+        setFileError("Upload up to four images and one video.");
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
+
       if (file.type.startsWith("video/")) {
-        const duration = await new Promise<number>((resolve) => {
-          const video = document.createElement("video");
-          video.preload = "metadata";
-          video.onloadedmetadata = () => {
-            URL.revokeObjectURL(video.src);
-            resolve(video.duration);
-          };
-          video.onerror = () => resolve(0);
-          video.src = URL.createObjectURL(file);
-        });
+        const duration = await getVideoDuration(file);
 
-        if (duration > 10) {
-          setFileError("Video evidence must be 10 seconds or less.");
+        if (duration > MAX_VIDEO_SECONDS) {
+          setFileError("Video evidence must be 15 seconds or less.");
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
           return;
         }
 
         nextDurations.push(duration);
+        nextEvidence.push({ name: file.name || "Video evidence", kind: "video", duration });
       } else {
         nextDurations.push(0);
+        nextEvidence.push({ name: file.name || "Image evidence", kind: "image", duration: 0 });
       }
     }
 
     setDurations(nextDurations);
+    setSelectedEvidence(nextEvidence);
   };
+
+  const clearFiles = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+
+    setFileError("");
+    setDurations([]);
+    setSelectedEvidence([]);
+  }, []);
+
+  useEffect(() => {
+    if (state.status === "success") {
+      clearFiles();
+      router.refresh();
+    }
+  }, [clearFiles, router, state.status]);
 
   if (disabled) {
     return (
@@ -94,6 +158,7 @@ export default function DisputeMessageForm({
           <Paperclip className="h-4 w-4" />
           Add evidence
           <input
+            ref={fileInputRef}
             className="sr-only"
             type="file"
             name="evidenceFiles"
@@ -109,10 +174,75 @@ export default function DisputeMessageForm({
           Send message
         </SubmitButton>
       </div>
+      {selectedEvidence.length > 0 ? (
+        <div className="rounded-2xl border border-border bg-surface p-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-foreground">
+              {selectedEvidence.length} file{selectedEvidence.length === 1 ? "" : "s"} selected
+            </p>
+            <button
+              type="button"
+              onClick={clearFiles}
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-white hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear
+            </button>
+          </div>
+          <div className="mt-3 grid gap-2">
+            {selectedEvidence.map((file, index) => (
+              <div key={`${file.name}-${index}`} className="flex min-w-0 items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm">
+                {file.kind === "video" ? (
+                  <Video className="h-4 w-4 shrink-0 text-primary" />
+                ) : (
+                  <FileImage className="h-4 w-4 shrink-0 text-primary" />
+                )}
+                <span className="min-w-0 flex-1 truncate text-foreground">{file.name}</span>
+                {file.kind === "video" ? (
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {Math.ceil(file.duration)}s
+                  </span>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <FormMessage
         message={fileError || state.message}
         tone={fileError || state.status !== "success" ? "error" : "success"}
       />
     </form>
   );
+}
+
+async function getVideoDuration(file: File) {
+  if (typeof document === "undefined") {
+    return 0;
+  }
+
+  return new Promise<number>((resolve) => {
+    const video = document.createElement("video");
+    const objectUrl = URL.createObjectURL(file);
+
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl);
+      video.removeAttribute("src");
+      video.load();
+    };
+
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.onloadedmetadata = () => {
+      const duration = Number.isFinite(video.duration) ? video.duration : 0;
+      cleanup();
+      resolve(duration);
+    };
+    video.onerror = () => {
+      cleanup();
+      resolve(0);
+    };
+    video.src = objectUrl;
+  });
 }

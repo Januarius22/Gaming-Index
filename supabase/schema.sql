@@ -330,7 +330,7 @@ alter table public.dispute_attachments add constraint dispute_attachments_file_t
   check (file_type in ('image', 'video'));
 alter table public.dispute_attachments drop constraint if exists dispute_attachments_video_duration_check;
 alter table public.dispute_attachments add constraint dispute_attachments_video_duration_check
-  check (file_type <> 'video' or duration_seconds is null or duration_seconds <= 10);
+  check (file_type <> 'video' or duration_seconds is null or duration_seconds <= 15);
 
 create table if not exists public.seller_enforcements (
   id uuid primary key default gen_random_uuid(),
@@ -969,8 +969,8 @@ begin
 
     if attachment_type = 'video'
       and attachment_duration is not null
-      and attachment_duration > 10 then
-      raise exception 'Video evidence must be 10 seconds or less.';
+      and attachment_duration > 15 then
+      raise exception 'Video evidence must be 15 seconds or less.';
     end if;
 
     if attachment_file_paths[attachment_index] is null

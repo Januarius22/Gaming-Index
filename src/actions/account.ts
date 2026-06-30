@@ -89,14 +89,12 @@ export async function submitSuspensionAppealAction(
 
   revalidatePath("/account-suspended");
   revalidatePath("/account-suspended/appeal");
+  revalidatePath("/account-suspended/appeal/submitted");
   revalidatePath("/admin/notifications");
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin/users");
 
-  return {
-    status: "success",
-    message: "Appeal submitted. An admin will review your request."
-  };
+  redirect("/account-suspended/appeal/submitted");
 }
 
 function getSafeReturnPath(value: string, fallback = "/account/marketplace") {

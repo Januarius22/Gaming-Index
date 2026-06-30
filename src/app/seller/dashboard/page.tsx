@@ -1,12 +1,14 @@
 import Link from "next/link";
 import FormMessage from "@/components/auth/FormMessage";
 import NotificationList from "@/components/notifications/NotificationList";
+import SellerEnforcementNoticeModal from "@/components/seller/SellerEnforcementNoticeModal";
 import KycReviewNoticeModal from "@/components/seller/KycReviewNoticeModal";
 import SellerStatsCards from "@/components/seller/SellerStatsCards";
 import Button, { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import {
   getLatestSellerKycSubmission,
+  getLatestSellerEnforcement,
   getProfileNotifications,
   getSellerDashboardStats
 } from "@/lib/data";
@@ -19,13 +21,14 @@ export default async function SellerDashboardPage({
   searchParams?: Promise<{ kyc?: string }>;
 }) {
   const profile = await requireSellerProfile();
-  const [stats, latestKycSubmission, notifications] = await Promise.all([
+  const [stats, latestKycSubmission, notifications, latestEnforcement] = await Promise.all([
     getSellerDashboardStats(profile),
     getLatestSellerKycSubmission(profile.id),
-    getProfileNotifications(profile.id, 3)
+    getProfileNotifications(profile.id, 3),
+    getLatestSellerEnforcement(profile.id)
   ]);
   const params = (await searchParams) ?? {};
-  const uploadUnlocked = canUploadAccounts(profile.kyc_status);
+  const uploadUnlocked = canUploadAccounts(profile.kyc_status, profile);
   const kycHeading =
     profile.kyc_status === "pending" ? "Pending review" : titleCase(profile.kyc_status);
   const kycDescription =
@@ -49,6 +52,7 @@ export default async function SellerDashboardPage({
         submissionId={latestKycSubmission?.status === "rejected" ? latestKycSubmission.id : undefined}
         rejectionReason={latestKycSubmission?.status === "rejected" ? latestKycSubmission.rejection_reason : undefined}
       />
+      <SellerEnforcementNoticeModal enforcement={latestEnforcement} />
       {params.kyc === "submitted" ? (
         <FormMessage
           message="KYC submitted successfully. Your verification is now pending admin review."
