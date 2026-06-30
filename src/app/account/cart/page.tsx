@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { Heart, ReceiptText, ShieldCheck, Trash2 } from "lucide-react";
+import { Heart, ReceiptText, Trash2 } from "lucide-react";
 import {
   buyNowAction,
   removeCartListingAction,
   toggleSavedListingAction
 } from "@/actions/account";
 import FormMessage from "@/components/auth/FormMessage";
+import SubmitButton from "@/components/auth/SubmitButton";
 import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
 import Badge from "@/components/ui/Badge";
-import Button, { buttonClassName } from "@/components/ui/Button";
+import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import PaginationControls from "@/components/ui/PaginationControls";
 import {
@@ -21,6 +22,8 @@ function getNoticeMessage(notice?: string) {
   switch (notice) {
     case "buy-now-failed":
       return { message: "We could not start checkout for that listing right now.", tone: "error" as const };
+    case "checkout-resumed":
+      return { message: "Checkout resumed for that account.", tone: "success" as const };
     case "cart-added":
       return { message: "Listing added to your cart.", tone: "success" as const };
     case "cart-removed":
@@ -52,7 +55,9 @@ export default async function AccountCartPage({
     getSavedMarketplaceListingIds()
   ]);
   const noticeState = getNoticeMessage(notice);
-  const cartTotal = cartListings.reduce((sum, listing) => sum + listing.price, 0);
+  const availableListingsCount = cartListings.filter((listing) => listing.status !== "sold").length;
+  const soldListingsCount = cartListings.length - availableListingsCount;
+  const estimatedTotal = cartListings.reduce((sum, listing) => sum + listing.price, 0);
   const requestedPage = parsePageParam(page);
   const {
     items: paginatedCartListings,
@@ -70,8 +75,7 @@ export default async function AccountCartPage({
         <CardHeader>
           <CardTitle>Cart</CardTitle>
           <CardDescription>
-            Review the accounts you have set aside and decide which ones you want to move
-            forward with next.
+            Review saved accounts and checkout one account at a time.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -89,8 +93,7 @@ export default async function AccountCartPage({
                 Your cart is empty
               </h2>
               <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">
-                Use the cart icon in your buyer dashboard to collect accounts here, then launch
-                checkout whenever you are ready.
+                Use the cart icon to keep accounts here while you compare them.
               </p>
               <Link
                 href="/account/marketplace"
@@ -112,24 +115,21 @@ export default async function AccountCartPage({
                 </p>
               </div>
               <div className="rounded-3xl bg-surface p-5">
-                <p className="text-sm text-muted-foreground">Cart total</p>
+                <p className="text-sm text-muted-foreground">Ready for checkout</p>
                 <p className="mt-2 font-heading text-4xl font-semibold text-foreground">
-                  {formatCompactCurrency(cartTotal)}
+                  {availableListingsCount}
                 </p>
+                {soldListingsCount > 0 ? (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {soldListingsCount} unavailable
+                  </p>
+                ) : null}
               </div>
-              <div className="rounded-3xl border border-primary/10 bg-primary-soft/60 p-5">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-2xl bg-white p-3 text-primary shadow-sm">
-                    <ShieldCheck className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-foreground">Checkout starts from the listings you trust</p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      Keep your shortlist here, compare details, and launch checkout only when
-                      you are ready to pay for a specific account.
-                    </p>
-                  </div>
-                </div>
+              <div className="rounded-3xl bg-surface p-5">
+                <p className="text-sm text-muted-foreground">Estimated total</p>
+                <p className="mt-2 font-heading text-4xl font-semibold text-foreground">
+                  {formatCompactCurrency(estimatedTotal)}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -212,9 +212,9 @@ export default async function AccountCartPage({
                           <form action={buyNowAction}>
                             <input type="hidden" name="listingId" value={listing.id} />
                             <input type="hidden" name="returnTo" value={returnTo} />
-                            <Button type="submit" className="rounded-2xl">
-                              Checkout
-                            </Button>
+                            <SubmitButton pendingLabel="Starting..." className="rounded-2xl">
+                              Checkout this account
+                            </SubmitButton>
                           </form>
                         ) : null}
 
@@ -231,29 +231,29 @@ export default async function AccountCartPage({
                         <form action={toggleSavedListingAction}>
                           <input type="hidden" name="listingId" value={listing.id} />
                           <input type="hidden" name="returnTo" value={returnTo} />
-                          <Button
-                            type="submit"
+                          <SubmitButton
                             variant={isSaved ? "danger" : "secondary"}
                             className="h-12 w-14 rounded-2xl px-0"
                             aria-label={isSaved ? "Remove from saved listings" : "Save listing"}
                             title={isSaved ? "Remove from saved listings" : "Save listing"}
+                            pendingLabel=""
                           >
                             <Heart className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`} />
-                          </Button>
+                          </SubmitButton>
                         </form>
 
                         <form action={removeCartListingAction}>
                           <input type="hidden" name="listingId" value={listing.id} />
                           <input type="hidden" name="returnTo" value={returnTo} />
-                          <Button
-                            type="submit"
+                          <SubmitButton
                             variant="ghost"
                             className="h-12 w-14 rounded-2xl px-0"
                             aria-label="Remove from cart"
                             title="Remove from cart"
+                            pendingLabel=""
                           >
                             <Trash2 className="h-4 w-4" />
-                          </Button>
+                          </SubmitButton>
                         </form>
                       </div>
 

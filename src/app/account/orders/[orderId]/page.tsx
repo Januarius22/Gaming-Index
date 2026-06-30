@@ -2,11 +2,12 @@ import Link from "next/link";
 import { LockKeyhole, ReceiptText, ShieldCheck } from "lucide-react";
 import { revealOrderDeliveryAction } from "@/actions/account";
 import FormMessage from "@/components/auth/FormMessage";
+import SubmitButton from "@/components/auth/SubmitButton";
 import CopyValueButton from "@/components/account/CopyValueButton";
 import OrderDisputeForm from "@/components/account/OrderDisputeForm";
 import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
 import Badge from "@/components/ui/Badge";
-import Button, { buttonClassName } from "@/components/ui/Button";
+import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrderDetail } from "@/lib/data";
@@ -356,9 +357,9 @@ export default async function AccountOrderDetailPage({
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
                       Reveal the private account access for this order.
                     </p>
-                    <Button type="submit" className="mt-4 rounded-2xl">
+                    <SubmitButton pendingLabel="Revealing..." className="mt-4 rounded-2xl">
                       Reveal delivery details
-                    </Button>
+                    </SubmitButton>
                   </div>
                 </form>
               ) : (

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Heart, ShoppingCart, SlidersHorizontal, Star } from "lucide-react";
+import { ArrowUpRight, Heart, Loader2, ShoppingCart, SlidersHorizontal, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   buyNowAction,
@@ -12,6 +12,7 @@ import {
 } from "@/actions/account";
 import { useAccountShellState } from "@/components/account/AccountShellContext";
 import FormMessage from "@/components/auth/FormMessage";
+import SubmitButton from "@/components/auth/SubmitButton";
 import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
 import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
@@ -466,10 +467,14 @@ export default function MarketplacePreview({
                                     void toggleCart(listing.id);
                                   }}
                                 >
-                                  <ShoppingCart
-                                    className="h-[18px] w-[18px] shrink-0"
-                                    strokeWidth={isInCart ? 2.75 : 2.35}
-                                  />
+                                  {isUpdatingCart ? (
+                                    <Loader2 className="h-[18px] w-[18px] shrink-0 animate-spin" />
+                                  ) : (
+                                    <ShoppingCart
+                                      className="h-[18px] w-[18px] shrink-0"
+                                      strokeWidth={isInCart ? 2.75 : 2.35}
+                                    />
+                                  )}
                                 </button>
                                 <button
                                   type="button"
@@ -481,27 +486,28 @@ export default function MarketplacePreview({
                                     void toggleSaved(listing.id);
                                   }}
                                 >
-                                  <Heart
-                                    className={`h-[18px] w-[18px] shrink-0 ${isSaved ? "fill-current" : ""}`}
-                                    strokeWidth={isSaved ? 2.75 : 2.35}
-                                  />
+                                  {isSaving ? (
+                                    <Loader2 className="h-[18px] w-[18px] shrink-0 animate-spin" />
+                                  ) : (
+                                    <Heart
+                                      className={`h-[18px] w-[18px] shrink-0 ${isSaved ? "fill-current" : ""}`}
+                                      strokeWidth={isSaved ? 2.75 : 2.35}
+                                    />
+                                  )}
                                 </button>
                                 <form action={buyNowAction} className="min-w-[10.25rem] flex-1 sm:flex-none">
                                   <input type="hidden" name="listingId" value={listing.id} />
                                   <input type="hidden" name="returnTo" value={pathname} />
-                                  <button
-                                    type="submit"
+                                  <SubmitButton
                                     disabled={isSold}
-                                    className={buttonClassName({
-                                      variant: isSold ? "secondary" : "primary",
-                                      size: "md",
-                                      className:
-                                        "w-full justify-center rounded-2xl whitespace-nowrap px-5"
-                                    })}
+                                    variant={isSold ? "secondary" : "primary"}
+                                    size="md"
+                                    pendingLabel="Starting..."
+                                    className="w-full justify-center rounded-2xl whitespace-nowrap px-5"
                                   >
                                     {isSold ? "Sold Out" : "Buy Now"}
                                     <ArrowUpRight className="h-4 w-4 shrink-0" />
-                                  </button>
+                                  </SubmitButton>
                                 </form>
                               </div>
                             </div>

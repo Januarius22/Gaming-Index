@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Heart, ShoppingCart } from "lucide-react";
+import { Heart, Loader2, ShoppingCart } from "lucide-react";
 import {
   toggleCartListingInlineAction,
   toggleSavedListingInlineAction
@@ -82,7 +82,11 @@ export default function BuyerListingDetailActions({
           aria-label={isInCart ? "Remove from cart" : "Add to cart"}
           title={isInCart ? "Remove from cart" : "Add to cart"}
         >
-          <ShoppingCart className="h-4 w-4" />
+          {isUpdatingCart ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <ShoppingCart className="h-4 w-4" />
+          )}
         </Button>
 
         <Button
@@ -96,7 +100,11 @@ export default function BuyerListingDetailActions({
           aria-label={isSaved ? "Remove from saved listings" : "Save listing"}
           title={isSaved ? "Remove from saved listings" : "Save listing"}
         >
-          <Heart className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`} />
+          {isSaving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Heart className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`} />
+          )}
         </Button>
       </div>
     </div>

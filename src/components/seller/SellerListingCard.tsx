@@ -1,6 +1,6 @@
 import { withdrawOwnListingAction } from "@/actions/seller";
+import SubmitButton from "@/components/auth/SubmitButton";
 import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import {
   formatCompactCurrency,
@@ -99,9 +99,9 @@ export default function SellerListingCard({
           <form action={withdrawOwnListingAction}>
             <input type="hidden" name="listingId" value={listing.id} />
             <input type="hidden" name="returnTo" value={returnTo} />
-            <Button type="submit" variant="danger" size="sm">
+            <SubmitButton pendingLabel="Withdrawing..." variant="danger" size="sm">
               Withdraw Listing
-            </Button>
+            </SubmitButton>
           </form>
         ) : null}
       </CardContent>

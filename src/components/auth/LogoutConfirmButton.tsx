@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { LogOut } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
+import SubmitButton from "@/components/auth/SubmitButton";
 import Button, { type ButtonProps } from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
@@ -57,9 +58,9 @@ export default function LogoutConfirmButton({
               Stay logged in
             </Button>
             <form action={logoutAction}>
-              <Button type="submit" variant="danger" className="w-full sm:w-auto">
+              <SubmitButton pendingLabel="Logging out..." variant="danger" className="w-full sm:w-auto">
                 Yes, log out
-              </Button>
+              </SubmitButton>
             </form>
           </div>
         </div>

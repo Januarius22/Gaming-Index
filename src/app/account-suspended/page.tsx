@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { logoutAction } from "@/actions/auth";
+import SubmitButton from "@/components/auth/SubmitButton";
 import Badge from "@/components/ui/Badge";
-import Button, { buttonClassName } from "@/components/ui/Button";
+import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { getCurrentProfile, getDashboardRoute } from "@/lib/auth";
 import { formatDate } from "@/lib/utils";
@@ -64,9 +65,9 @@ export default async function AccountSuspendedPage() {
                 Submit appeal
               </Link>
               <form action={logoutAction}>
-                <Button type="submit" variant="secondary" className="w-full rounded-2xl">
+                <SubmitButton pendingLabel="Logging out..." variant="secondary" className="w-full rounded-2xl">
                   Log out
-                </Button>
+                </SubmitButton>
               </form>
             </div>
           </div>

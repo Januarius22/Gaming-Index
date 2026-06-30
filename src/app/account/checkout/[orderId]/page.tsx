@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, CreditCard } from "lucide-react";
 import { completeCheckoutAction } from "@/actions/account";
 import FormMessage from "@/components/auth/FormMessage";
+import SubmitButton from "@/components/auth/SubmitButton";
 import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
 import Badge from "@/components/ui/Badge";
-import Button, { buttonClassName } from "@/components/ui/Button";
+import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import { requireAccountProfile } from "@/lib/auth";
@@ -307,9 +308,9 @@ export default async function AccountCheckoutPage({
                     </div>
                   </div>
 
-                  <Button type="submit" size="lg" className="w-full rounded-2xl">
+                  <SubmitButton pendingLabel="Processing..." size="lg" className="w-full rounded-2xl">
                     Pay securely with Paystack
-                  </Button>
+                  </SubmitButton>
                 </form>
               </CardContent>
             </Card>
