@@ -132,13 +132,15 @@ export default async function AdminDisputeCasePage({
           </Card>
 
           <DisputeInstructions />
-          <DisputeThread messages={caseData.messages} />
-          <DisputeMessageForm
-            disputeId={caseData.dispute.id}
-            orderId={caseData.dispute.order_id}
-            returnTo={`/admin/disputes/${caseData.dispute.id}`}
-            disabled={closed}
-          />
+          <DisputeThread messages={caseData.messages} currentUserId={profile.id} />
+          <div className="sticky bottom-4 z-20">
+            <DisputeMessageForm
+              disputeId={caseData.dispute.id}
+              orderId={caseData.dispute.order_id}
+              returnTo={`/admin/disputes/${caseData.dispute.id}`}
+              disabled={closed}
+            />
+          </div>
         </div>
 
         <div className="space-y-6">
