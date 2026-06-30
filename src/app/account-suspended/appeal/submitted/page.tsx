@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
+import LogoutConfirmButton from "@/components/auth/LogoutConfirmButton";
 import Badge from "@/components/ui/Badge";
-import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { getCurrentProfile, getDashboardRoute } from "@/lib/auth";
 
@@ -36,16 +35,10 @@ export default async function SuspensionAppealSubmittedPage() {
             </CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="flex flex-col justify-center gap-3 sm:flex-row">
-          <Link
-            href="/account-suspended"
-            className={buttonClassName({ variant: "secondary", className: "rounded-2xl" })}
-          >
-            Back to suspension notice
-          </Link>
-          <Link href="/auth/login" className={buttonClassName({ className: "rounded-2xl" })}>
-            Return to sign in
-          </Link>
+        <CardContent className="flex justify-center">
+          <LogoutConfirmButton variant="primary" className="rounded-2xl">
+            Logout
+          </LogoutConfirmButton>
         </CardContent>
       </Card>
     </main>
