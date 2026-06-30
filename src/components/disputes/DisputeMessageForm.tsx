@@ -176,7 +176,7 @@ export default function DisputeMessageForm({
       onSubmit={(event) => {
         void submitMessage(event);
       }}
-      className="space-y-4 rounded-3xl border border-border bg-white p-4 shadow-sm"
+      className="space-y-3 rounded-3xl border border-border bg-white p-3 shadow-lg shadow-slate-200/70 sm:p-4"
     >
       <input type="hidden" name="disputeId" value={disputeId} />
       <input type="hidden" name="orderId" value={orderId ?? ""} />
@@ -186,14 +186,14 @@ export default function DisputeMessageForm({
       ))}
       <Textarea
         name="message"
-        rows={4}
-        placeholder="Add a clear update for this case."
-        className="min-h-28"
+        rows={2}
+        placeholder="Message"
+        className="min-h-16 resize-none"
       />
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between gap-3">
         <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-primary-soft">
           <Paperclip className="h-4 w-4" />
-          Add evidence
+          Evidence
           <input
             ref={fileInputRef}
             className="sr-only"
@@ -208,7 +208,7 @@ export default function DisputeMessageForm({
         </label>
         <Button type="submit" disabled={Boolean(fileError) || pending}>
           <Send className="mr-2 h-4 w-4" />
-          {pending ? "Sending..." : "Send message"}
+          {pending ? "Sending..." : "Send"}
         </Button>
       </div>
       {selectedEvidence.length > 0 ? (

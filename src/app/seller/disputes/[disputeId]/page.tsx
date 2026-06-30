@@ -82,7 +82,7 @@ export default async function SellerDisputeCasePage({
 
       <DisputeInstructions />
       <DisputeThread messages={caseData.messages} currentUserId={profile.id} />
-      <div className="sticky bottom-4 z-20">
+      <div className="sticky bottom-0 z-20 -mx-4 bg-gradient-to-t from-[#061c3f] via-[#061c3f] to-transparent px-4 pb-3 pt-5 sm:mx-0 sm:px-0">
         <DisputeMessageForm
           disputeId={caseData.dispute.id}
           orderId={caseData.dispute.order_id}
