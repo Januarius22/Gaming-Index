@@ -195,6 +195,8 @@ export interface DisputeMessage {
   created_at: string;
   sender_name?: string;
   attachments?: DisputeAttachment[];
+  read_count?: number;
+  delivery_status?: "sending" | "sent" | "failed";
 }
 
 export interface SellerEnforcement {
@@ -205,6 +207,7 @@ export interface SellerEnforcement {
   reason: string;
   strike_count: number;
   restricted_until?: string | null;
+  acknowledged_at?: string | null;
   created_by?: string | null;
   created_at: string;
 }

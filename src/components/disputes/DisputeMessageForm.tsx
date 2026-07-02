@@ -21,11 +21,15 @@ export default function DisputeMessageForm({
   disputeId,
   orderId,
   returnTo,
+  currentUserId,
+  senderRole,
   disabled = false
 }: {
   disputeId: string;
   orderId?: string;
   returnTo: string;
+  currentUserId: string;
+  senderRole: "buyer" | "seller" | "admin";
   disabled?: boolean;
 }) {
   const router = useRouter();
@@ -139,7 +143,34 @@ export default function DisputeMessageForm({
     }
 
     const formData = new FormData(event.currentTarget);
+    const optimisticId = `pending-${crypto.randomUUID()}`;
+    const messageBody = String(formData.get("message") ?? "").trim();
     setPending(true);
+    window.dispatchEvent(
+      new CustomEvent("dispute-message:pending", {
+        detail: {
+          id: optimisticId,
+          dispute_id: disputeId,
+          sender_id: currentUserId,
+          sender_role: senderRole,
+          sender_name: "You",
+          message: messageBody,
+          created_at: new Date().toISOString(),
+          delivery_status: "sending",
+          attachments: selectedEvidence.map((file, index) => ({
+            id: `${optimisticId}-file-${index}`,
+            dispute_id: disputeId,
+            message_id: optimisticId,
+            uploader_id: currentUserId,
+            file_name: file.name,
+            file_path: "",
+            file_type: file.kind,
+            duration_seconds: file.duration,
+            created_at: new Date().toISOString()
+          }))
+        }
+      })
+    );
 
     try {
       const response = await fetch("/api/disputes/messages", {
@@ -149,6 +180,11 @@ export default function DisputeMessageForm({
       const result = (await response.json()) as { status: "success" | "error"; message?: string };
 
       if (!response.ok || result.status === "error") {
+        window.dispatchEvent(
+          new CustomEvent("dispute-message:failed", {
+            detail: { id: optimisticId }
+          })
+        );
         setFeedback({
           message: result.message ?? "Message could not be sent.",
           tone: "error"
@@ -156,11 +192,20 @@ export default function DisputeMessageForm({
         return;
       }
 
+      window.dispatchEvent(
+        new CustomEvent("dispute-message:sent", {
+          detail: { id: optimisticId }
+        })
+      );
       formRef.current?.reset();
       clearFiles();
-      setFeedback({ message: "Message sent.", tone: "success" });
       router.refresh();
     } catch {
+      window.dispatchEvent(
+        new CustomEvent("dispute-message:failed", {
+          detail: { id: optimisticId }
+        })
+      );
       setFeedback({
         message: "Message could not be sent. Please try again.",
         tone: "error"
@@ -176,7 +221,7 @@ export default function DisputeMessageForm({
       onSubmit={(event) => {
         void submitMessage(event);
       }}
-      className="space-y-3 rounded-3xl border border-border bg-white p-3 shadow-lg shadow-slate-200/70 sm:p-4"
+      className="w-full space-y-3 rounded-none border-y border-border bg-white p-4 shadow-[0_-18px_42px_rgba(15,23,42,0.16)] sm:rounded-3xl sm:border sm:p-4 sm:shadow-lg sm:shadow-slate-200/70"
     >
       <input type="hidden" name="disputeId" value={disputeId} />
       <input type="hidden" name="orderId" value={orderId ?? ""} />
@@ -188,9 +233,9 @@ export default function DisputeMessageForm({
         name="message"
         rows={2}
         placeholder="Message"
-        className="min-h-16 resize-none"
+        className="min-h-16 w-full resize-none"
       />
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex w-full items-center justify-between gap-3">
         <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-primary-soft">
           <Paperclip className="h-4 w-4" />
           Evidence
@@ -206,7 +251,7 @@ export default function DisputeMessageForm({
             }}
           />
         </label>
-        <Button type="submit" disabled={Boolean(fileError) || pending}>
+        <Button type="submit" disabled={Boolean(fileError) || pending} className="shrink-0">
           <Send className="mr-2 h-4 w-4" />
           {pending ? "Sending..." : "Send"}
         </Button>

@@ -143,11 +143,13 @@ export default async function AdminDisputeCasePage({
 
         <DisputeInstructions />
         <DisputeThread messages={caseData.messages} currentUserId={profile.id} />
-        <div className="sticky bottom-0 z-20 -mx-4 bg-gradient-to-t from-background via-background to-transparent px-4 pb-3 pt-5 sm:mx-0 sm:px-0">
+        <div className="sticky bottom-0 z-30 -mx-4 bg-gradient-to-t from-background via-background to-transparent pb-[env(safe-area-inset-bottom)] pt-4 sm:mx-0 sm:px-0 sm:pb-3">
           <DisputeMessageForm
             disputeId={caseData.dispute.id}
             orderId={caseData.dispute.order_id}
             returnTo={`/admin/disputes/${caseData.dispute.id}`}
+            currentUserId={profile.id}
+            senderRole="admin"
             disabled={closed}
           />
         </div>

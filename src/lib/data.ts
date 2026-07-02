@@ -993,6 +993,7 @@ export async function getLatestSellerEnforcement(sellerId: string) {
       .from("seller_enforcements")
       .select("*")
       .eq("seller_id", sellerId)
+      .is("acknowledged_at", null)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -1046,6 +1047,10 @@ export async function getDisputeCase(
       return null;
     }
 
+    await supabase.rpc("mark_dispute_messages_read", {
+      target_dispute_id: dispute.id
+    });
+
     const [{ data: orderData }, { data: profilesData }, { data: messagesData }, { data: attachmentsData }] =
       await Promise.all([
         supabase.from("orders").select("*").eq("id", dispute.order_id).maybeSingle(),
@@ -1072,6 +1077,19 @@ export async function getDisputeCase(
       )
     );
     const attachments = (attachmentsData as DisputeAttachment[] | null) ?? [];
+    const messagesList = (messagesData as DisputeMessage[] | null) ?? [];
+    const messageIds = messagesList.map((message) => message.id);
+    const { data: readsData } = messageIds.length > 0
+      ? await supabase
+          .from("dispute_message_reads")
+          .select("message_id, profile_id")
+          .in("message_id", messageIds)
+      : { data: [] as Array<{ message_id: string; profile_id: string }> };
+    const readCountMap = new Map<string, number>();
+
+    ((readsData as Array<{ message_id: string; profile_id: string }> | null) ?? []).forEach((receipt) => {
+      readCountMap.set(receipt.message_id, (readCountMap.get(receipt.message_id) ?? 0) + 1);
+    });
     const signedAttachments = await Promise.all(
       attachments.map(async (attachment) => {
         const { data } = await supabase.storage
@@ -1095,13 +1113,15 @@ export async function getDisputeCase(
       attachmentMap.set(key, [...(attachmentMap.get(key) ?? []), attachment]);
     });
 
-    const messages = ((messagesData as DisputeMessage[] | null) ?? []).map((message) => ({
+    const messages = messagesList.map((message) => ({
       ...message,
       sender_name:
         message.sender_role === "admin"
           ? "Gaming Index"
           : profileMap.get(message.sender_id)?.full_name ?? message.sender_role,
-      attachments: attachmentMap.get(message.id) ?? []
+      attachments: attachmentMap.get(message.id) ?? [],
+      read_count: readCountMap.get(message.id) ?? 0,
+      delivery_status: "sent" as const
     }));
 
     return {

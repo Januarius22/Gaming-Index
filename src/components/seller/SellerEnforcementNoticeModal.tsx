@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { acknowledgeSellerEnforcementAction } from "@/actions/seller";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { formatDate } from "@/lib/utils";
@@ -26,6 +27,7 @@ export default function SellerEnforcementNoticeModal({
     return `gi-seller-enforcement:${enforcement.id}:${enforcement.created_at}`;
   }, [enforcement]);
   const [open, setOpen] = useState(false);
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
     if (!storageKey) {
@@ -38,17 +40,24 @@ export default function SellerEnforcementNoticeModal({
     }
   }, [storageKey]);
 
-  if (!enforcement) {
-    return null;
-  }
+  const dismiss = useCallback(() => {
+    if (!enforcement) {
+      return;
+    }
 
-  const dismiss = () => {
     if (storageKey) {
       window.localStorage.setItem(storageKey, "dismissed");
     }
 
     setOpen(false);
-  };
+    startTransition(() => {
+      void acknowledgeSellerEnforcementAction(enforcement.id);
+    });
+  }, [enforcement, storageKey]);
+
+  if (!enforcement) {
+    return null;
+  }
 
   return (
     <Modal

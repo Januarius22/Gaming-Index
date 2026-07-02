@@ -307,6 +307,13 @@ alter table public.dispute_messages drop constraint if exists dispute_messages_s
 alter table public.dispute_messages add constraint dispute_messages_sender_role_check
   check (sender_role in ('buyer', 'seller', 'admin'));
 
+create table if not exists public.dispute_message_reads (
+  message_id uuid not null references public.dispute_messages(id) on delete cascade,
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  read_at timestamp with time zone not null default now(),
+  primary key (message_id, profile_id)
+);
+
 create table if not exists public.dispute_attachments (
   id uuid primary key default gen_random_uuid(),
   dispute_id uuid not null references public.disputes(id) on delete cascade,
@@ -340,6 +347,7 @@ create table if not exists public.seller_enforcements (
   reason text not null default '',
   strike_count integer not null default 0 check (strike_count >= 0),
   restricted_until timestamp with time zone,
+  acknowledged_at timestamp with time zone,
   created_by uuid references public.profiles(id) on delete set null,
   created_at timestamp with time zone not null default now()
 );
@@ -348,6 +356,7 @@ alter table public.seller_enforcements add column if not exists dispute_id uuid 
 alter table public.seller_enforcements add column if not exists reason text not null default '';
 alter table public.seller_enforcements add column if not exists strike_count integer not null default 0;
 alter table public.seller_enforcements add column if not exists restricted_until timestamp with time zone;
+alter table public.seller_enforcements add column if not exists acknowledged_at timestamp with time zone;
 alter table public.seller_enforcements add column if not exists created_by uuid references public.profiles(id) on delete set null;
 alter table public.seller_enforcements drop constraint if exists seller_enforcements_action_check;
 alter table public.seller_enforcements add constraint seller_enforcements_action_check
@@ -1560,6 +1569,71 @@ begin
 end;
 $$;
 
+create or replace function public.acknowledge_seller_enforcement(target_enforcement_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'You must be signed in to acknowledge this notice.';
+  end if;
+
+  update public.seller_enforcements
+  set acknowledged_at = coalesce(acknowledged_at, now())
+  where id = target_enforcement_id
+    and seller_id = auth.uid();
+
+  if not found then
+    raise exception 'Seller notice not found.';
+  end if;
+end;
+$$;
+
+create or replace function public.mark_dispute_messages_read(target_dispute_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  viewer_id uuid;
+begin
+  viewer_id := auth.uid();
+
+  if viewer_id is null then
+    raise exception 'You must be signed in to read this case.';
+  end if;
+
+  if not exists (
+    select 1
+    from public.disputes as dispute
+    where dispute.id = target_dispute_id
+      and (
+        viewer_id = dispute.buyer_id
+        or viewer_id = dispute.seller_id
+        or exists (
+          select 1
+          from public.profiles as admin_profile
+          where admin_profile.id = viewer_id
+            and admin_profile.role = 'admin'
+        )
+      )
+  ) then
+    raise exception 'Case not found.';
+  end if;
+
+  insert into public.dispute_message_reads (message_id, profile_id)
+  select message.id, viewer_id
+  from public.dispute_messages as message
+  where message.dispute_id = target_dispute_id
+    and message.sender_id <> viewer_id
+  on conflict (message_id, profile_id) do update
+    set read_at = coalesce(public.dispute_message_reads.read_at, excluded.read_at);
+end;
+$$;
+
 create or replace function public.clear_seller_restriction(
   target_seller_id uuid,
   admin_note text default ''
@@ -2387,6 +2461,7 @@ alter table public.listing_delivery_details enable row level security;
 alter table public.orders enable row level security;
 alter table public.disputes enable row level security;
 alter table public.dispute_messages enable row level security;
+alter table public.dispute_message_reads enable row level security;
 alter table public.dispute_attachments enable row level security;
 alter table public.seller_enforcements enable row level security;
 alter table public.wallets enable row level security;
@@ -2797,6 +2872,31 @@ create policy "case participants can insert dispute messages"
               where admin_profile.id = auth.uid()
                 and admin_profile.role = 'admin'
             )
+          )
+        )
+    )
+  );
+
+drop policy if exists "case participants can read dispute message receipts" on public.dispute_message_reads;
+create policy "case participants can read dispute message receipts"
+  on public.dispute_message_reads
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.dispute_messages as message
+      join public.disputes as dispute
+        on dispute.id = message.dispute_id
+      where message.id = public.dispute_message_reads.message_id
+        and (
+          auth.uid() = dispute.buyer_id
+          or auth.uid() = dispute.seller_id
+          or exists (
+            select 1
+            from public.profiles as admin_profile
+            where admin_profile.id = auth.uid()
+              and admin_profile.role = 'admin'
           )
         )
     )

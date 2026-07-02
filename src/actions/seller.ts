@@ -35,6 +35,21 @@ export type WithdrawalActionState = {
   message?: string;
 };
 
+export async function acknowledgeSellerEnforcementAction(enforcementId: string) {
+  await requireSellerProfile();
+
+  if (!enforcementId || !hasSupabaseEnv) {
+    return;
+  }
+
+  const supabase = await getSupabaseServerClient();
+  await supabase?.rpc("acknowledge_seller_enforcement", {
+    target_enforcement_id: enforcementId
+  });
+
+  revalidatePath("/seller/dashboard");
+}
+
 export async function requestWithdrawalAction(
   _previousState: WithdrawalActionState,
   formData: FormData

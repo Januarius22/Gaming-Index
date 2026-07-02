@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ImageIcon, Video } from "lucide-react";
+import { Check, CheckCheck, CircleAlert, ImageIcon, LoaderCircle, Video } from "lucide-react";
 import { BrandMark } from "@/components/branding/BrandLogo";
 import Badge from "@/components/ui/Badge";
 import { cn, formatDate } from "@/lib/utils";
@@ -28,12 +28,55 @@ export default function DisputeThread({
   currentUserId: string;
 }) {
   const endRef = useRef<HTMLDivElement | null>(null);
+  const [visibleMessages, setVisibleMessages] = useState(messages);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length]);
+  }, [visibleMessages.length]);
 
-  if (messages.length === 0) {
+  useEffect(() => {
+    setVisibleMessages(messages);
+  }, [messages]);
+
+  useEffect(() => {
+    const addPendingMessage = (event: Event) => {
+      const message = (event as CustomEvent<DisputeMessage>).detail;
+
+      setVisibleMessages((currentMessages) => [...currentMessages, message]);
+    };
+
+    const markSent = (event: Event) => {
+      const { id } = (event as CustomEvent<{ id: string }>).detail;
+
+      setVisibleMessages((currentMessages) =>
+        currentMessages.map((message) =>
+          message.id === id ? { ...message, delivery_status: "sent" } : message
+        )
+      );
+    };
+
+    const markFailed = (event: Event) => {
+      const { id } = (event as CustomEvent<{ id: string }>).detail;
+
+      setVisibleMessages((currentMessages) =>
+        currentMessages.map((message) =>
+          message.id === id ? { ...message, delivery_status: "failed" } : message
+        )
+      );
+    };
+
+    window.addEventListener("dispute-message:pending", addPendingMessage);
+    window.addEventListener("dispute-message:sent", markSent);
+    window.addEventListener("dispute-message:failed", markFailed);
+
+    return () => {
+      window.removeEventListener("dispute-message:pending", addPendingMessage);
+      window.removeEventListener("dispute-message:sent", markSent);
+      window.removeEventListener("dispute-message:failed", markFailed);
+    };
+  }, []);
+
+  if (visibleMessages.length === 0) {
     return (
       <div className="relative isolate overflow-hidden rounded-3xl border border-border bg-white p-8 text-center text-sm text-muted-foreground">
         <ChatWatermark />
@@ -43,9 +86,9 @@ export default function DisputeThread({
   }
 
   return (
-    <div className="relative isolate min-h-[24rem] space-y-4 overflow-hidden rounded-3xl px-1 py-3 sm:px-3">
+    <div className="relative isolate min-h-[24rem] space-y-4 overflow-x-hidden rounded-3xl px-1 py-3 sm:px-3">
       <ChatWatermark />
-      {messages.map((message) => {
+      {visibleMessages.map((message) => {
         const mine = message.sender_id === currentUserId;
         const admin = message.sender_role === "admin";
 
@@ -59,7 +102,7 @@ export default function DisputeThread({
           >
             <div
               className={cn(
-                "max-w-[min(34rem,92%)] rounded-3xl border p-4 shadow-sm",
+                "min-w-0 max-w-[min(34rem,92%)] overflow-hidden rounded-3xl border p-4 shadow-sm",
                 mine
                   ? "border-primary/20 bg-primary text-white"
                   : admin
@@ -75,9 +118,15 @@ export default function DisputeThread({
                   {roleLabel[message.sender_role]}
                 </Badge>
               </div>
-              <p className={cn("mt-1 text-xs", mine ? "text-white/75" : "text-muted-foreground")}>
-                {formatDate(message.created_at)}
-              </p>
+              <div
+                className={cn(
+                  "mt-1 flex items-center gap-1.5 text-xs",
+                  mine ? "text-white/75" : "text-muted-foreground"
+                )}
+              >
+                <span>{formatDate(message.created_at)}</span>
+                {mine ? <DeliveryReceipt message={message} mine={mine} /> : null}
+              </div>
 
               {message.message ? (
                 <p className={cn("mt-3 whitespace-pre-line leading-7", mine ? "text-white" : "text-muted-foreground")}>
@@ -86,14 +135,14 @@ export default function DisputeThread({
               ) : null}
 
               {message.attachments && message.attachments.length > 0 ? (
-                <div className="mt-4 grid gap-2">
+                <div className="mt-4 grid min-w-0 gap-2 overflow-hidden">
                   {message.attachments.map((attachment) => (
                     <Link
                       key={attachment.id}
                       href={attachment.file_url ?? "#"}
                       target="_blank"
                       className={cn(
-                        "flex items-center gap-3 rounded-2xl border p-3 text-sm font-semibold transition",
+                        "flex min-w-0 max-w-full items-center gap-3 overflow-hidden rounded-2xl border p-3 text-sm font-semibold transition",
                         mine
                           ? "border-white/25 bg-white/10 text-white hover:bg-white/20"
                           : "border-border bg-surface text-foreground hover:bg-primary-soft"
@@ -104,7 +153,7 @@ export default function DisputeThread({
                       ) : (
                         <ImageIcon className={cn("h-5 w-5 shrink-0", mine ? "text-white" : "text-primary")} />
                       )}
-                      <span className="min-w-0 flex-1 truncate">
+                      <span className="block min-w-0 flex-1 truncate">
                         {attachment.file_name || "Evidence"}
                       </span>
                     </Link>
@@ -118,6 +167,31 @@ export default function DisputeThread({
       <div ref={endRef} />
     </div>
   );
+}
+
+function DeliveryReceipt({ message, mine }: { message: DisputeMessage; mine: boolean }) {
+  if (!mine) {
+    return null;
+  }
+
+  if (message.delivery_status === "sending") {
+    return <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-label="Sending" />;
+  }
+
+  if (message.delivery_status === "failed") {
+    return (
+      <span className="inline-flex items-center gap-1 text-white/85" aria-label="Message failed">
+        <CircleAlert className="h-3.5 w-3.5" />
+        Failed
+      </span>
+    );
+  }
+
+  if ((message.read_count ?? 0) > 0) {
+    return <CheckCheck className="h-3.5 w-3.5" aria-label="Seen" />;
+  }
+
+  return <Check className="h-3.5 w-3.5" aria-label="Sent" />;
 }
 
 function ChatWatermark() {
