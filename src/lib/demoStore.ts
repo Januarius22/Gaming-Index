@@ -1,7 +1,12 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { normalizeProfile } from "@/lib/profile";
-import { getNigeriaTimestamp } from "@/lib/utils";
+import {
+  PLATFORM_COMMISSION_RATE,
+  calculatePlatformFee,
+  calculateSellerPayout,
+  getNigeriaTimestamp
+} from "@/lib/utils";
 import type {
   KycSubmission,
   KycStatus,
@@ -401,6 +406,11 @@ export async function addDemoOrder(
     listing_id: order.listing_id,
     listing_title: order.listing_title,
     amount: order.amount,
+    platform_fee_rate: order.platform_fee_rate ?? PLATFORM_COMMISSION_RATE,
+    platform_fee_amount:
+      order.platform_fee_amount ?? calculatePlatformFee(order.amount, order.platform_fee_rate ?? PLATFORM_COMMISSION_RATE),
+    seller_payout_amount:
+      order.seller_payout_amount ?? calculateSellerPayout(order.amount, order.platform_fee_rate ?? PLATFORM_COMMISSION_RATE),
     status: order.status,
     payment_status: order.payment_status ?? "pending",
     payment_provider: order.payment_provider ?? "",

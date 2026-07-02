@@ -92,6 +92,8 @@ export default function AdminOrdersTable({
               <th className="px-4 py-3 font-medium">Buyer</th>
               <th className="px-4 py-3 font-medium">Game Account</th>
               <th className="px-4 py-3 font-medium">Amount</th>
+              <th className="px-4 py-3 font-medium">Platform Fee</th>
+              <th className="px-4 py-3 font-medium">Seller Payout</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Escrow</th>
               <th className="px-4 py-3 font-medium">Date</th>
@@ -101,7 +103,7 @@ export default function AdminOrdersTable({
           <tbody>
             {visibleOrders.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
                   No orders yet.
                 </td>
               </tr>
@@ -123,6 +125,12 @@ export default function AdminOrdersTable({
                     </td>
                     <td className="px-4 py-4">{order.listing_title}</td>
                     <td className="px-4 py-4">{formatCurrency(order.amount)}</td>
+                    <td className="px-4 py-4">
+                      {formatCurrency(order.platform_fee_amount ?? 0)}
+                    </td>
+                    <td className="px-4 py-4">
+                      {formatCurrency(order.seller_payout_amount ?? order.amount)}
+                    </td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap gap-2">
                         <Badge variant={statusVariant(order.status)}>{titleCase(order.status)}</Badge>

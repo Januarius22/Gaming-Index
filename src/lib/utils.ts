@@ -3,6 +3,7 @@ import type { KycStatus, ListingStatus, OrderStatus, PaymentStatus } from "@/typ
 export const APP_TIME_ZONE = "Africa/Lagos";
 export const APP_TIME_LABEL = "WAT";
 export const SOLD_LISTING_PUBLIC_VISIBILITY_HOURS = 24 * 7;
+export const PLATFORM_COMMISSION_RATE = 0.15;
 
 export function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -23,6 +24,14 @@ export function formatCompactCurrency(value: number) {
     notation: "compact",
     maximumFractionDigits: value >= 1000 ? 1 : 0
   }).format(value);
+}
+
+export function calculatePlatformFee(amount: number, rate = PLATFORM_COMMISSION_RATE) {
+  return Math.round(amount * rate * 100) / 100;
+}
+
+export function calculateSellerPayout(amount: number, rate = PLATFORM_COMMISSION_RATE) {
+  return Math.max(amount - calculatePlatformFee(amount, rate), 0);
 }
 
 export function formatDate(value: string) {

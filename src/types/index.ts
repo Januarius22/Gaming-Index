@@ -147,6 +147,9 @@ export interface Order {
   listing_id: string;
   listing_title: string;
   amount: number;
+  platform_fee_rate?: number;
+  platform_fee_amount?: number;
+  seller_payout_amount?: number;
   status: OrderStatus;
   payment_status?: PaymentStatus;
   payment_provider?: string;

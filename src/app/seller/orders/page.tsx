@@ -47,7 +47,7 @@ export default async function SellerOrdersPage({
                 <th className="px-4 py-3 font-medium">Order ID</th>
                 <th className="px-4 py-3 font-medium">Buyer Name</th>
                 <th className="px-4 py-3 font-medium">Game Account</th>
-                <th className="px-4 py-3 font-medium">Amount</th>
+                <th className="px-4 py-3 font-medium">Seller Payout</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Date</th>
               </tr>
@@ -65,7 +65,14 @@ export default async function SellerOrdersPage({
                     <td className="px-4 py-4 font-medium text-foreground">{order.id.slice(0, 8)}</td>
                     <td className="px-4 py-4">{order.buyer_name}</td>
                     <td className="px-4 py-4">{order.listing_title}</td>
-                    <td className="px-4 py-4">{formatCurrency(order.amount)}</td>
+                    <td className="px-4 py-4">
+                      <div className="font-medium text-foreground">
+                        {formatCurrency(order.seller_payout_amount ?? order.amount)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Sale {formatCurrency(order.amount)}
+                      </div>
+                    </td>
                     <td className="px-4 py-4">
                       <Badge variant={statusVariant(order.status)}>{titleCase(order.status)}</Badge>
                     </td>

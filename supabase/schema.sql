@@ -233,6 +233,9 @@ create table if not exists public.orders (
   listing_id uuid not null references public.listings(id) on delete cascade,
   listing_title text not null default '',
   amount numeric not null,
+  platform_fee_rate numeric(5, 4) not null default 0.15,
+  platform_fee_amount numeric(18, 2) not null default 0,
+  seller_payout_amount numeric(18, 2) not null default 0,
   status text not null default 'pending' check (status in ('pending', 'processing', 'completed', 'cancelled')),
   payment_status text not null default 'pending' check (payment_status in ('pending', 'successful', 'failed')),
   payment_provider text not null default '',
@@ -246,6 +249,9 @@ create table if not exists public.orders (
 alter table public.orders add column if not exists buyer_id uuid references public.profiles(id) on delete cascade;
 alter table public.orders add column if not exists buyer_phone text not null default '';
 alter table public.orders add column if not exists listing_title text not null default '';
+alter table public.orders add column if not exists platform_fee_rate numeric(5, 4) not null default 0.15;
+alter table public.orders add column if not exists platform_fee_amount numeric(18, 2) not null default 0;
+alter table public.orders add column if not exists seller_payout_amount numeric(18, 2) not null default 0;
 alter table public.orders add column if not exists payment_status text not null default 'pending';
 alter table public.orders add column if not exists payment_provider text not null default '';
 alter table public.orders add column if not exists payment_reference text not null default '';
@@ -262,6 +268,33 @@ alter table public.orders add constraint orders_payment_status_check
 alter table public.orders drop constraint if exists orders_escrow_status_check;
 alter table public.orders add constraint orders_escrow_status_check
   check (escrow_status in ('not_started', 'holding', 'released', 'refunded', 'disputed'));
+alter table public.orders drop constraint if exists orders_platform_fee_rate_check;
+alter table public.orders add constraint orders_platform_fee_rate_check
+  check (platform_fee_rate >= 0 and platform_fee_rate < 1);
+alter table public.orders drop constraint if exists orders_platform_fee_amount_check;
+alter table public.orders add constraint orders_platform_fee_amount_check
+  check (platform_fee_amount >= 0);
+alter table public.orders drop constraint if exists orders_seller_payout_amount_check;
+alter table public.orders add constraint orders_seller_payout_amount_check
+  check (seller_payout_amount >= 0);
+update public.orders
+set
+  platform_fee_rate = 0,
+  platform_fee_amount = 0,
+  seller_payout_amount = amount
+where payment_status = 'successful'
+  and platform_fee_amount = 0
+  and seller_payout_amount = 0;
+update public.orders
+set
+  platform_fee_rate = coalesce(nullif(platform_fee_rate, 0), 0.15),
+  platform_fee_amount = round(amount * coalesce(nullif(platform_fee_rate, 0), 0.15), 2),
+  seller_payout_amount = amount - round(amount * coalesce(nullif(platform_fee_rate, 0), 0.15), 2)
+where payment_status <> 'successful'
+  and (
+    platform_fee_amount = 0
+    or seller_payout_amount = 0
+  );
 update public.orders as order_row
 set buyer_id = profile.id
 from public.profiles as profile
@@ -1409,6 +1442,7 @@ as $$
 declare
   dispute_row public.disputes%rowtype;
   linked_order public.orders%rowtype;
+  seller_refund_amount numeric;
 begin
   if not exists (
     select 1
@@ -1604,6 +1638,16 @@ begin
     raise exception 'This order is not eligible for refund.';
   end if;
 
+  seller_refund_amount := coalesce(
+    nullif(linked_order.seller_payout_amount, 0),
+    linked_order.amount - coalesce(linked_order.platform_fee_amount, 0),
+    linked_order.amount
+  );
+
+  if seller_refund_amount <= 0 then
+    raise exception 'Seller payout amount is invalid for this refund.';
+  end if;
+
   insert into public.wallets (profile_id)
   values (dispute_row.buyer_id)
   on conflict (profile_id) do nothing;
@@ -1621,10 +1665,10 @@ begin
 
   update public.wallets
   set
-    pending_balance = pending_balance - linked_order.amount,
+    pending_balance = pending_balance - seller_refund_amount,
     updated_at = now()
   where profile_id = dispute_row.seller_id
-    and pending_balance >= linked_order.amount;
+    and pending_balance >= seller_refund_amount;
 
   if not found then
     raise exception 'Seller pending balance is lower than the refund amount.';
@@ -1698,6 +1742,8 @@ begin
     jsonb_build_object(
       'dispute_id', dispute_row.id,
       'note', trim(refund_note),
+      'gross_amount', linked_order.amount,
+      'platform_fee_amount', linked_order.platform_fee_amount,
       'listing_taken_down', take_listing_down
     )
   ),
@@ -1707,7 +1753,7 @@ begin
     'debit',
     'pending',
     'completed',
-    linked_order.amount,
+    seller_refund_amount,
     linked_order.id,
     linked_order.listing_id,
     linked_order.payment_reference,
@@ -1715,6 +1761,8 @@ begin
     jsonb_build_object(
       'dispute_id', dispute_row.id,
       'note', trim(refund_note),
+      'gross_amount', linked_order.amount,
+      'platform_fee_amount', linked_order.platform_fee_amount,
       'listing_taken_down', take_listing_down
     )
   );
@@ -1741,6 +1789,8 @@ begin
       'dispute_id', dispute_row.id,
       'order_id', linked_order.id,
       'amount', linked_order.amount,
+      'platform_fee_amount', linked_order.platform_fee_amount,
+      'seller_payout_amount', seller_refund_amount,
       'note', trim(refund_note),
       'listing_taken_down', take_listing_down
     )
@@ -1759,6 +1809,8 @@ begin
       'order_id', linked_order.id,
       'listing_id', linked_order.listing_id,
       'amount', linked_order.amount,
+      'platform_fee_amount', linked_order.platform_fee_amount,
+      'seller_payout_amount', seller_refund_amount,
       'note', trim(refund_note),
       'listing_taken_down', take_listing_down
     )
@@ -2008,6 +2060,7 @@ as $$
 declare
   paid_order public.orders%rowtype;
   hold_expires_at timestamp with time zone;
+  seller_earning_amount numeric;
 begin
   select *
   into paid_order
@@ -2040,6 +2093,15 @@ begin
   end if;
 
   hold_expires_at := coalesce(paid_order.paid_at, now()) + interval '24 hours';
+  seller_earning_amount := coalesce(
+    nullif(paid_order.seller_payout_amount, 0),
+    paid_order.amount - coalesce(paid_order.platform_fee_amount, 0),
+    paid_order.amount
+  );
+
+  if seller_earning_amount <= 0 then
+    raise exception 'Seller payout amount is invalid for this order.';
+  end if;
 
   insert into public.wallets (profile_id)
   values (paid_order.seller_id)
@@ -2047,7 +2109,7 @@ begin
 
   update public.wallets
   set
-    pending_balance = pending_balance + paid_order.amount,
+    pending_balance = pending_balance + seller_earning_amount,
     updated_at = now()
   where profile_id = paid_order.seller_id;
 
@@ -2070,14 +2132,16 @@ begin
     'credit',
     'pending',
     'completed',
-    paid_order.amount,
+    seller_earning_amount,
     paid_order.id,
     paid_order.listing_id,
     paid_order.payment_reference,
     'Sale funds are pending buyer protection release.',
     jsonb_build_object(
       'hold_expires_at', hold_expires_at,
-      'listing_title', paid_order.listing_title
+      'listing_title', paid_order.listing_title,
+      'gross_amount', paid_order.amount,
+      'platform_fee_amount', paid_order.platform_fee_amount
     )
   );
 
@@ -2100,7 +2164,9 @@ begin
     jsonb_build_object(
       'order_id', paid_order.id,
       'listing_id', paid_order.listing_id,
-      'amount', paid_order.amount,
+      'amount', seller_earning_amount,
+      'gross_amount', paid_order.amount,
+      'platform_fee_amount', paid_order.platform_fee_amount,
       'hold_expires_at', hold_expires_at
     )
   );
@@ -2139,6 +2205,8 @@ begin
       'seller_id', paid_order.seller_id,
       'buyer_id', paid_order.buyer_id,
       'amount', paid_order.amount,
+      'platform_fee_amount', paid_order.platform_fee_amount,
+      'seller_payout_amount', seller_earning_amount,
       'hold_expires_at', hold_expires_at
     )
   );
@@ -2168,6 +2236,9 @@ as $$
 declare
   checkout_order public.orders%rowtype;
   checkout_listing public.listings%rowtype;
+  checkout_platform_fee_rate numeric(5, 4);
+  checkout_platform_fee_amount numeric(18, 2);
+  checkout_seller_payout_amount numeric(18, 2);
 begin
   if auth.uid() is null then
     raise exception 'You must be signed in to complete checkout.';
@@ -2212,6 +2283,14 @@ begin
     raise exception 'You cannot buy your own listing.';
   end if;
 
+  checkout_platform_fee_rate := coalesce(nullif(checkout_order.platform_fee_rate, 0), 0.15);
+  checkout_platform_fee_amount := round(checkout_order.amount * checkout_platform_fee_rate, 2);
+  checkout_seller_payout_amount := checkout_order.amount - checkout_platform_fee_amount;
+
+  if checkout_seller_payout_amount <= 0 then
+    raise exception 'Seller payout amount is invalid for this checkout.';
+  end if;
+
   update public.listings
   set
     status = 'sold',
@@ -2222,6 +2301,9 @@ begin
   update public.orders
   set
     buyer_phone = trim(buyer_phone_number),
+    platform_fee_rate = checkout_platform_fee_rate,
+    platform_fee_amount = checkout_platform_fee_amount,
+    seller_payout_amount = checkout_seller_payout_amount,
     status = 'completed',
     payment_status = 'successful',
     payment_provider = checkout_payment_provider,
@@ -2243,6 +2325,7 @@ set search_path = public
 as $$
 declare
   held_order public.orders%rowtype;
+  seller_release_amount numeric;
 begin
   select *
   into held_order
@@ -2269,18 +2352,28 @@ begin
     raise exception 'Order funds are not ready for release.';
   end if;
 
+  seller_release_amount := coalesce(
+    nullif(held_order.seller_payout_amount, 0),
+    held_order.amount - coalesce(held_order.platform_fee_amount, 0),
+    held_order.amount
+  );
+
+  if seller_release_amount <= 0 then
+    raise exception 'Seller payout amount is invalid for this release.';
+  end if;
+
   insert into public.wallets (profile_id)
   values (held_order.seller_id)
   on conflict (profile_id) do nothing;
 
   update public.wallets
   set
-    pending_balance = pending_balance - held_order.amount,
-    available_balance = available_balance + held_order.amount,
-    total_earned = total_earned + held_order.amount,
+    pending_balance = pending_balance - seller_release_amount,
+    available_balance = available_balance + seller_release_amount,
+    total_earned = total_earned + seller_release_amount,
     updated_at = now()
   where profile_id = held_order.seller_id
-    and pending_balance >= held_order.amount;
+    and pending_balance >= seller_release_amount;
 
   if not found then
     raise exception 'Seller pending balance is lower than the release amount.';
@@ -2305,12 +2398,16 @@ begin
     'credit',
     'available',
     'completed',
-    held_order.amount,
+    seller_release_amount,
     held_order.id,
     held_order.listing_id,
     held_order.payment_reference,
     'Sale funds released to available balance.',
-    jsonb_build_object('listing_title', held_order.listing_title)
+    jsonb_build_object(
+      'listing_title', held_order.listing_title,
+      'gross_amount', held_order.amount,
+      'platform_fee_amount', held_order.platform_fee_amount
+    )
   );
 
   perform public.assert_wallet_reconciled(held_order.seller_id);
@@ -2332,7 +2429,9 @@ begin
     jsonb_build_object(
       'order_id', held_order.id,
       'listing_id', held_order.listing_id,
-      'amount', held_order.amount
+      'amount', seller_release_amount,
+      'gross_amount', held_order.amount,
+      'platform_fee_amount', held_order.platform_fee_amount
     )
   );
 

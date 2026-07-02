@@ -15,6 +15,9 @@ import { normalizeProfile } from "@/lib/profile";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import {
+  PLATFORM_COMMISSION_RATE,
+  calculatePlatformFee,
+  calculateSellerPayout,
   formatCompactCurrency,
   getListingHistoryTimestamp,
   isListingMarketplaceVisible,
@@ -350,8 +353,25 @@ async function getSupabaseOrders() {
 }
 
 function normalizeOrder(order: Order, listingTitle?: string | null): Order {
+  const amount = Number(order.amount ?? 0);
+  const platformFeeRate = Number(order.platform_fee_rate ?? PLATFORM_COMMISSION_RATE);
+  const platformFeeAmount = Number(
+    order.platform_fee_amount && order.platform_fee_amount > 0
+      ? order.platform_fee_amount
+      : calculatePlatformFee(amount, platformFeeRate)
+  );
+  const sellerPayoutAmount = Number(
+    order.seller_payout_amount && order.seller_payout_amount > 0
+      ? order.seller_payout_amount
+      : calculateSellerPayout(amount, platformFeeRate)
+  );
+
   return {
     ...order,
+    amount,
+    platform_fee_rate: platformFeeRate,
+    platform_fee_amount: platformFeeAmount,
+    seller_payout_amount: sellerPayoutAmount,
     buyer_id: order.buyer_id ?? null,
     buyer_phone: order.buyer_phone ?? "",
     payment_status: order.payment_status ?? "pending",
