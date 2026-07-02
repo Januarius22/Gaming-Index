@@ -597,6 +597,7 @@ export async function saveKycSubmission({
   }
 
   revalidatePath("/seller/kyc");
+  revalidatePath("/seller/notifications");
   revalidatePath("/seller/dashboard");
   revalidatePath("/admin/kyc");
   revalidatePath("/admin/notifications");
@@ -836,6 +837,7 @@ export async function saveListingSubmission({
     }
 
     revalidatePath("/seller/listings");
+    revalidatePath("/seller/notifications");
     revalidatePath("/seller/dashboard");
     revalidatePath("/admin/listings");
     revalidatePath("/admin/notifications");
@@ -874,6 +876,7 @@ export async function saveListingSubmission({
   });
 
   revalidatePath("/seller/listings");
+  revalidatePath("/seller/notifications");
   revalidatePath("/seller/dashboard");
   revalidatePath("/admin/listings");
   revalidatePath("/admin/notifications");
@@ -974,6 +977,7 @@ export async function withdrawOwnListingAction(formData: FormData) {
   revalidatePath("/account/cart");
   revalidatePath("/seller/listings");
   revalidatePath("/seller/history");
+  revalidatePath("/seller/notifications");
   revalidatePath("/seller/dashboard");
   revalidatePath("/admin/listings");
   revalidatePath("/admin/listing-history");

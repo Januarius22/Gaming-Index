@@ -352,18 +352,15 @@ export async function unlockSellerAccessAction(
       };
     }
 
-    await supabase!.from("notifications").insert([
-      {
-        profile_id: profile.id,
-        type: "seller_access_enabled",
-        title: "Seller access enabled",
-        message: "Your seller workspace is ready.",
-        link_path: "/seller/kyc",
-        metadata: {
-          profile_id: profile.id
-        }
+    await supabase!.rpc("notify_current_profile", {
+      notification_type: "seller_access_enabled",
+      notification_title: "Seller access enabled",
+      notification_message: "Your seller workspace is ready.",
+      notification_link_path: "/seller/kyc",
+      notification_metadata: {
+        profile_id: profile.id
       }
-    ]);
+    });
 
     revalidatePath("/account/dashboard");
     revalidatePath("/account/seller");

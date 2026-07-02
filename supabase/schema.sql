@@ -658,6 +658,42 @@ begin
 end;
 $$;
 
+create or replace function public.notify_current_profile(
+  notification_type text,
+  notification_title text,
+  notification_message text,
+  notification_link_path text default '',
+  notification_metadata jsonb default '{}'::jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'You must be signed in to create this notice.';
+  end if;
+
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values (
+    auth.uid(),
+    notification_type,
+    notification_title,
+    notification_message,
+    notification_link_path,
+    notification_metadata
+  );
+end;
+$$;
+
 create or replace function public.submit_suspension_appeal(
   appeal_email text,
   appeal_phone_number text,
@@ -763,6 +799,27 @@ security definer
 set search_path = public
 as $$
 begin
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values (
+    new.seller_id,
+    'kyc_submitted',
+    'KYC submitted',
+    'Your KYC submission is now under review.',
+    '/seller/kyc',
+    jsonb_build_object(
+      'kyc_submission_id', new.id,
+      'seller_id', new.seller_id,
+      'document_type', new.document_type
+    )
+  );
+
   perform public.notify_admins(
     'admin_kyc_submission',
     'New KYC submission',
@@ -793,6 +850,29 @@ security definer
 set search_path = public
 as $$
 begin
+  insert into public.notifications (
+    profile_id,
+    type,
+    title,
+    message,
+    link_path,
+    metadata
+  )
+  values (
+    new.seller_id,
+    'listing_published',
+    'Listing published',
+    new.title || ' is now live on the marketplace.',
+    '/seller/listings',
+    jsonb_build_object(
+      'listing_id', new.id,
+      'title', new.title,
+      'game', new.game,
+      'amount', new.price,
+      'status', new.status
+    )
+  );
+
   perform public.notify_admins(
     'admin_listing_created',
     'New listing created',
@@ -818,6 +898,46 @@ drop trigger if exists notify_admins_on_listing_created_after_insert on public.l
 create trigger notify_admins_on_listing_created_after_insert
   after insert on public.listings
   for each row execute procedure public.notify_admins_on_listing_created();
+
+create or replace function public.notify_on_listing_status_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.status = 'withdrawn' and old.status is distinct from new.status then
+    insert into public.notifications (
+      profile_id,
+      type,
+      title,
+      message,
+      link_path,
+      metadata
+    )
+    values (
+      new.seller_id,
+      'listing_withdrawn',
+      'Listing withdrawn',
+      new.title || ' was removed from the marketplace.',
+      '/seller/history',
+      jsonb_build_object(
+        'listing_id', new.id,
+        'title', new.title,
+        'game', new.game,
+        'withdrawn_at', new.withdrawn_at
+      )
+    );
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists notify_on_listing_status_change_after_update on public.listings;
+create trigger notify_on_listing_status_change_after_update
+  after update of status on public.listings
+  for each row execute procedure public.notify_on_listing_status_change();
 
 create or replace function public.submit_order_dispute(
   target_order_id uuid,
