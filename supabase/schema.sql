@@ -29,6 +29,29 @@ update public.profiles set role = 'user' where role = 'seller';
 alter table public.profiles alter column role set default 'user';
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check check (role in ('user', 'admin'));
+
+create table if not exists public.profile_settings (
+  profile_id uuid primary key references public.profiles(id) on delete cascade,
+  phone_number text not null default '',
+  default_bank_name text not null default '',
+  default_account_number text not null default '',
+  default_account_name text not null default '',
+  notification_preferences jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now()
+);
+
+alter table public.profile_settings add column if not exists phone_number text not null default '';
+alter table public.profile_settings add column if not exists default_bank_name text not null default '';
+alter table public.profile_settings add column if not exists default_account_number text not null default '';
+alter table public.profile_settings add column if not exists default_account_name text not null default '';
+alter table public.profile_settings add column if not exists notification_preferences jsonb not null default '{}'::jsonb;
+alter table public.profile_settings add column if not exists created_at timestamp with time zone not null default now();
+alter table public.profile_settings add column if not exists updated_at timestamp with time zone not null default now();
+insert into public.profile_settings (profile_id)
+select profile.id
+from public.profiles as profile
+on conflict (profile_id) do nothing;
 alter table public.profiles drop constraint if exists profiles_seller_strikes_check;
 alter table public.profiles add constraint profiles_seller_strikes_check check (seller_strikes >= 0);
 
@@ -780,6 +803,10 @@ set search_path = public
 as $$
 begin
   insert into public.wallets (profile_id)
+  values (new.id)
+  on conflict (profile_id) do nothing;
+
+  insert into public.profile_settings (profile_id)
   values (new.id)
   on conflict (profile_id) do nothing;
 
@@ -2650,6 +2677,7 @@ create trigger protect_profile_admin_fields_before_update
   for each row execute procedure public.protect_profile_admin_fields();
 
 alter table public.profiles enable row level security;
+alter table public.profile_settings enable row level security;
 alter table public.kyc_submissions enable row level security;
 alter table public.listings enable row level security;
 alter table public.listing_delivery_details enable row level security;
@@ -2705,6 +2733,36 @@ create policy "admins can update any profile"
         and admin_profile.role = 'admin'
     )
   );
+
+drop policy if exists "users can read their own profile settings" on public.profile_settings;
+create policy "users can read their own profile settings"
+  on public.profile_settings
+  for select
+  to authenticated
+  using (
+    auth.uid() = profile_id
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "users can insert their own profile settings" on public.profile_settings;
+create policy "users can insert their own profile settings"
+  on public.profile_settings
+  for insert
+  to authenticated
+  with check (auth.uid() = profile_id);
+
+drop policy if exists "users can update their own profile settings" on public.profile_settings;
+create policy "users can update their own profile settings"
+  on public.profile_settings
+  for update
+  to authenticated
+  using (auth.uid() = profile_id)
+  with check (auth.uid() = profile_id);
 
 drop policy if exists "sellers can insert their own kyc submission" on public.kyc_submissions;
 create policy "sellers can insert their own kyc submission"

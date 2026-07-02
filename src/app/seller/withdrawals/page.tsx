@@ -2,7 +2,7 @@ import Badge from "@/components/ui/Badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import WithdrawalRequestForm from "@/components/seller/WithdrawalRequestForm";
 import { requireSellerProfile } from "@/lib/auth";
-import { getProfileWallet, getSellerWithdrawalRequests } from "@/lib/data";
+import { getProfileSettings, getProfileWallet, getSellerWithdrawalRequests } from "@/lib/data";
 import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
 
 const statusVariant = {
@@ -15,9 +15,10 @@ const statusVariant = {
 
 export default async function SellerWithdrawalsPage() {
   const profile = await requireSellerProfile();
-  const [wallet, withdrawalRequests] = await Promise.all([
+  const [wallet, withdrawalRequests, settings] = await Promise.all([
     getProfileWallet(profile.id),
-    getSellerWithdrawalRequests(profile.id)
+    getSellerWithdrawalRequests(profile.id),
+    getProfileSettings(profile.id)
   ]);
 
   return (
@@ -28,7 +29,7 @@ export default async function SellerWithdrawalsPage() {
           <CardDescription>Send available wallet funds to your bank account.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-5 pt-0 sm:p-6 sm:pt-0">
-          <WithdrawalRequestForm availableBalance={wallet.available_balance} />
+          <WithdrawalRequestForm availableBalance={wallet.available_balance} settings={settings} />
         </CardContent>
       </Card>
 

@@ -33,6 +33,19 @@ export interface Profile {
   created_at: string;
 }
 
+export type NotificationPreferences = Record<string, boolean>;
+
+export interface ProfileSettings {
+  profile_id: string;
+  phone_number: string;
+  default_bank_name: string;
+  default_account_number: string;
+  default_account_name: string;
+  notification_preferences: NotificationPreferences;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface KycSubmission {
   id: string;
   seller_id: string;

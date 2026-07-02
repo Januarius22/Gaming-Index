@@ -1,31 +1,18 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { updateSellerSettingsAction } from "@/actions/settings";
+import WorkspaceSettingsForm from "@/components/settings/WorkspaceSettingsForm";
 import { requireSellerProfile } from "@/lib/auth";
+import { getProfileSettings } from "@/lib/data";
 
 export default async function SellerSettingsPage() {
   const profile = await requireSellerProfile();
+  const settings = await getProfileSettings(profile.id);
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1fr_0.8fr]">
-      <Card>
-        <CardHeader>
-          <CardTitle>Account settings</CardTitle>
-          <CardDescription>Keep your seller identity details organized and ready for future settings flows.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="rounded-2xl bg-surface px-4 py-3">
-            <p className="text-sm text-muted-foreground">Full Name</p>
-            <p className="mt-1 font-semibold text-foreground">{profile.full_name}</p>
-          </div>
-          <div className="rounded-2xl bg-surface px-4 py-3">
-            <p className="text-sm text-muted-foreground">Username</p>
-            <p className="mt-1 font-semibold text-foreground">@{profile.username}</p>
-          </div>
-          <div className="rounded-2xl bg-surface px-4 py-3">
-            <p className="text-sm text-muted-foreground">Email</p>
-            <p className="mt-1 font-semibold text-foreground">{profile.email}</p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <WorkspaceSettingsForm
+      action={updateSellerSettingsAction}
+      profile={profile}
+      settings={settings}
+      workspace="seller"
+    />
   );
 }

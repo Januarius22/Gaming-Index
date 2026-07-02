@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import BuyerWithdrawalRequestForm from "@/components/account/BuyerWithdrawalRequestForm";
 import PaginationControls from "@/components/ui/PaginationControls";
 import { requireAccountProfile } from "@/lib/auth";
-import { getProfileWallet, getProfileWithdrawalRequests } from "@/lib/data";
+import { getProfileSettings, getProfileWallet, getProfileWithdrawalRequests } from "@/lib/data";
 import { formatCurrency, formatDate, paginateItems, parsePageParam, titleCase } from "@/lib/utils";
 
 const statusVariant = {
@@ -20,9 +20,10 @@ export default async function AccountWithdrawalsPage({
   searchParams?: Promise<{ page?: string }>;
 }) {
   const profile = await requireAccountProfile();
-  const [wallet, withdrawalRequests] = await Promise.all([
+  const [wallet, withdrawalRequests, settings] = await Promise.all([
     getProfileWallet(profile.id),
-    getProfileWithdrawalRequests(profile.id)
+    getProfileWithdrawalRequests(profile.id),
+    getProfileSettings(profile.id)
   ]);
   const params = (await searchParams) ?? {};
   const requestedPage = parsePageParam(params.page);
@@ -43,7 +44,7 @@ export default async function AccountWithdrawalsPage({
           <CardDescription>Send available refund credit to your bank account.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-5 pt-0 sm:p-6 sm:pt-0">
-          <BuyerWithdrawalRequestForm availableBalance={wallet.available_balance} />
+          <BuyerWithdrawalRequestForm availableBalance={wallet.available_balance} settings={settings} />
         </CardContent>
       </Card>
 

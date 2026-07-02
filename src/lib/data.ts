@@ -32,6 +32,7 @@ import type {
   Order,
   Notification,
   Profile,
+  ProfileSettings,
   SellerRating,
   SellerEnforcement,
   SidebarCounts,
@@ -47,6 +48,17 @@ import type {
 const KYC_STORAGE_BUCKET = "kyc-documents";
 const LISTING_STORAGE_BUCKET = "listing-media";
 const DISPUTE_EVIDENCE_BUCKET = "dispute-evidence";
+
+export function getDefaultProfileSettings(profileId: string): ProfileSettings {
+  return {
+    profile_id: profileId,
+    phone_number: "",
+    default_bank_name: "",
+    default_account_number: "",
+    default_account_name: "",
+    notification_preferences: {}
+  };
+}
 
 const seededMarketplaceListings: Listing[] = [
   {
@@ -827,6 +839,45 @@ export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCo
     };
   } catch {
     return {};
+  }
+}
+
+export async function getProfileSettings(profileId: string): Promise<ProfileSettings> {
+  const defaults = getDefaultProfileSettings(profileId);
+
+  if (!hasSupabaseEnv) {
+    return defaults;
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return defaults;
+    }
+
+    const { data } = await supabase
+      .from("profile_settings")
+      .select("*")
+      .eq("profile_id", profileId)
+      .maybeSingle();
+
+    if (!data) {
+      return defaults;
+    }
+
+    const settings = data as ProfileSettings;
+
+    return {
+      ...defaults,
+      ...settings,
+      notification_preferences:
+        settings.notification_preferences && typeof settings.notification_preferences === "object"
+          ? settings.notification_preferences
+          : {}
+    };
+  } catch {
+    return defaults;
   }
 }
 
