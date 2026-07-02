@@ -290,6 +290,41 @@ export interface SiteFeedback {
   profile_username?: string;
 }
 
+export type SupportTicketStatus = "open" | "in_review" | "resolved" | "closed";
+export type SupportTicketCategory =
+  | "account"
+  | "payment"
+  | "withdrawal"
+  | "listing"
+  | "kyc"
+  | "technical"
+  | "other";
+
+export interface SupportTicket {
+  id: string;
+  profile_id: string;
+  workspace: "account" | "seller";
+  category: SupportTicketCategory;
+  subject: string;
+  status: SupportTicketStatus;
+  last_message_at: string;
+  closed_at?: string | null;
+  created_at: string;
+  profile_name?: string;
+  profile_email?: string;
+  profile_username?: string;
+}
+
+export interface SupportTicketMessage {
+  id: string;
+  ticket_id: string;
+  sender_id: string;
+  sender_role: "user" | "admin";
+  message: string;
+  created_at: string;
+  sender_name?: string;
+}
+
 export interface WalletTransaction {
   id: string;
   wallet_profile_id: string;

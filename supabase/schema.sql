@@ -558,6 +558,56 @@ alter table public.site_feedback drop constraint if exists site_feedback_message
 alter table public.site_feedback add constraint site_feedback_message_check
   check (length(trim(message)) >= 10);
 
+create table if not exists public.support_tickets (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  workspace text not null default 'account' check (workspace in ('account', 'seller')),
+  category text not null default 'other' check (category in ('account', 'payment', 'withdrawal', 'listing', 'kyc', 'technical', 'other')),
+  subject text not null,
+  status text not null default 'open' check (status in ('open', 'in_review', 'resolved', 'closed')),
+  last_message_at timestamp with time zone not null default now(),
+  closed_at timestamp with time zone,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.support_tickets add column if not exists profile_id uuid references public.profiles(id) on delete cascade;
+alter table public.support_tickets add column if not exists workspace text not null default 'account';
+alter table public.support_tickets add column if not exists category text not null default 'other';
+alter table public.support_tickets add column if not exists subject text not null default '';
+alter table public.support_tickets add column if not exists status text not null default 'open';
+alter table public.support_tickets add column if not exists last_message_at timestamp with time zone not null default now();
+alter table public.support_tickets add column if not exists closed_at timestamp with time zone;
+alter table public.support_tickets drop constraint if exists support_tickets_workspace_check;
+alter table public.support_tickets add constraint support_tickets_workspace_check
+  check (workspace in ('account', 'seller'));
+alter table public.support_tickets drop constraint if exists support_tickets_category_check;
+alter table public.support_tickets add constraint support_tickets_category_check
+  check (category in ('account', 'payment', 'withdrawal', 'listing', 'kyc', 'technical', 'other'));
+alter table public.support_tickets drop constraint if exists support_tickets_status_check;
+alter table public.support_tickets add constraint support_tickets_status_check
+  check (status in ('open', 'in_review', 'resolved', 'closed'));
+alter table public.support_tickets drop constraint if exists support_tickets_subject_check;
+alter table public.support_tickets add constraint support_tickets_subject_check
+  check (length(trim(subject)) >= 4);
+
+create table if not exists public.support_ticket_messages (
+  id uuid primary key default gen_random_uuid(),
+  ticket_id uuid not null references public.support_tickets(id) on delete cascade,
+  sender_id uuid not null references public.profiles(id) on delete cascade,
+  sender_role text not null default 'user' check (sender_role in ('user', 'admin')),
+  message text not null,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.support_ticket_messages add column if not exists sender_role text not null default 'user';
+alter table public.support_ticket_messages add column if not exists message text not null default '';
+alter table public.support_ticket_messages drop constraint if exists support_ticket_messages_sender_role_check;
+alter table public.support_ticket_messages add constraint support_ticket_messages_sender_role_check
+  check (sender_role in ('user', 'admin'));
+alter table public.support_ticket_messages drop constraint if exists support_ticket_messages_message_check;
+alter table public.support_ticket_messages add constraint support_ticket_messages_message_check
+  check (length(trim(message)) >= 2);
+
 create table if not exists public.notifications (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.profiles(id) on delete cascade,
@@ -2469,6 +2519,8 @@ alter table public.wallet_transactions enable row level security;
 alter table public.withdrawal_requests enable row level security;
 alter table public.suspension_appeals enable row level security;
 alter table public.site_feedback enable row level security;
+alter table public.support_tickets enable row level security;
+alter table public.support_ticket_messages enable row level security;
 alter table public.notifications enable row level security;
 alter table public.seller_ratings enable row level security;
 
@@ -3212,6 +3264,98 @@ create policy "admins can update site feedback"
       from public.profiles as admin_profile
       where admin_profile.id = auth.uid()
         and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "users and admins can read support tickets" on public.support_tickets;
+create policy "users and admins can read support tickets"
+  on public.support_tickets
+  for select
+  to authenticated
+  using (
+    auth.uid() = profile_id
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "users can create their own support tickets" on public.support_tickets;
+create policy "users can create their own support tickets"
+  on public.support_tickets
+  for insert
+  to authenticated
+  with check (auth.uid() = profile_id);
+
+drop policy if exists "admins can update support tickets" on public.support_tickets;
+create policy "admins can update support tickets"
+  on public.support_tickets
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "users and admins can read support messages" on public.support_ticket_messages;
+create policy "users and admins can read support messages"
+  on public.support_ticket_messages
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.support_tickets as ticket
+      where ticket.id = public.support_ticket_messages.ticket_id
+        and (
+          auth.uid() = ticket.profile_id
+          or exists (
+            select 1
+            from public.profiles as admin_profile
+            where admin_profile.id = auth.uid()
+              and admin_profile.role = 'admin'
+          )
+        )
+    )
+  );
+
+drop policy if exists "users and admins can insert support messages" on public.support_ticket_messages;
+create policy "users and admins can insert support messages"
+  on public.support_ticket_messages
+  for insert
+  to authenticated
+  with check (
+    auth.uid() = sender_id
+    and exists (
+      select 1
+      from public.support_tickets as ticket
+      where ticket.id = public.support_ticket_messages.ticket_id
+        and (
+          (sender_role = 'user' and auth.uid() = ticket.profile_id)
+          or (
+            sender_role = 'admin'
+            and exists (
+              select 1
+              from public.profiles as admin_profile
+              where admin_profile.id = auth.uid()
+                and admin_profile.role = 'admin'
+            )
+          )
+        )
     )
   );
 

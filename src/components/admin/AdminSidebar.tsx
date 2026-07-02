@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Bell,
   FileCheck2,
+  Headset,
   History,
   LifeBuoy,
   LayoutDashboard,
@@ -46,6 +47,7 @@ const navGroups = [
         { href: "/admin/kyc", label: "KYC Reviews", icon: FileCheck2 },
         { href: "/admin/appeals", label: "Appeals", icon: LifeBuoy },
         { href: "/admin/disputes", label: "Disputes", icon: ShieldAlert },
+        { href: "/admin/support", label: "Support", icon: Headset },
         { href: "/admin/feedback", label: "Feedback", icon: MessageSquareText }
       ]
   },

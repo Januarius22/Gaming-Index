@@ -36,6 +36,8 @@ import type {
   SellerEnforcement,
   SidebarCounts,
   SiteFeedback,
+  SupportTicket,
+  SupportTicketMessage,
   SuspensionAppeal,
   Wallet,
   WalletTransaction,
@@ -664,7 +666,8 @@ export async function getAccountSidebarCounts(profile: Profile): Promise<Sidebar
       { count: unreadNotifications },
       unreadDisputes,
       { count: pendingOrders },
-      { count: activeWithdrawals }
+      { count: activeWithdrawals },
+      { count: activeSupport }
     ] = await Promise.all([
       supabase
         .from("notifications")
@@ -681,14 +684,20 @@ export async function getAccountSidebarCounts(profile: Profile): Promise<Sidebar
         .from("withdrawal_requests")
         .select("id", { count: "exact", head: true })
         .eq("profile_id", profile.id)
-        .in("status", ["pending", "approved"])
+        .in("status", ["pending", "approved"]),
+      supabase
+        .from("support_tickets")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profile.id)
+        .in("status", ["open", "in_review"])
     ]);
 
     return {
       "/account/notifications": unreadNotifications ?? 0,
       "/account/disputes": unreadDisputes,
       "/account/orders": pendingOrders ?? 0,
-      "/account/withdrawals": activeWithdrawals ?? 0
+      "/account/withdrawals": activeWithdrawals ?? 0,
+      "/account/support": activeSupport ?? 0
     };
   } catch {
     return {};
@@ -711,7 +720,8 @@ export async function getSellerSidebarCounts(profile: Profile): Promise<SidebarC
       { count: unreadNotifications },
       unreadDisputes,
       { count: activeOrders },
-      { count: activeWithdrawals }
+      { count: activeWithdrawals },
+      { count: activeSupport }
     ] = await Promise.all([
       supabase
         .from("notifications")
@@ -729,7 +739,12 @@ export async function getSellerSidebarCounts(profile: Profile): Promise<SidebarC
         .from("withdrawal_requests")
         .select("id", { count: "exact", head: true })
         .eq("profile_id", profile.id)
-        .in("status", ["pending", "approved"])
+        .in("status", ["pending", "approved"]),
+      supabase
+        .from("support_tickets")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profile.id)
+        .in("status", ["open", "in_review"])
     ]);
 
     return {
@@ -737,6 +752,7 @@ export async function getSellerSidebarCounts(profile: Profile): Promise<SidebarC
       "/seller/disputes": unreadDisputes,
       "/seller/orders": activeOrders ?? 0,
       "/seller/withdrawals": activeWithdrawals ?? 0,
+      "/seller/support": activeSupport ?? 0,
       "/seller/kyc": profile.kyc_status === "pending" || profile.kyc_status === "rejected" ? 1 : 0
     };
   } catch {
@@ -763,7 +779,8 @@ export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCo
       { count: pendingAppeals },
       { count: pendingWithdrawals },
       { count: pendingListings },
-      { count: releasableOrders }
+      { count: releasableOrders },
+      { count: openSupport }
     ] = await Promise.all([
       supabase
         .from("notifications")
@@ -791,7 +808,11 @@ export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCo
         .from("orders")
         .select("id", { count: "exact", head: true })
         .eq("payment_status", "successful")
-        .eq("escrow_status", "holding")
+        .eq("escrow_status", "holding"),
+      supabase
+        .from("support_tickets")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["open", "in_review"])
     ]);
 
     return {
@@ -801,7 +822,8 @@ export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCo
       "/admin/appeals": pendingAppeals ?? 0,
       "/admin/withdrawals": pendingWithdrawals ?? 0,
       "/admin/listings": pendingListings ?? 0,
-      "/admin/orders": releasableOrders ?? 0
+      "/admin/orders": releasableOrders ?? 0,
+      "/admin/support": openSupport ?? 0
     };
   } catch {
     return {};
@@ -995,6 +1017,153 @@ export async function getAdminFeedback() {
     );
   } catch {
     return [] as SiteFeedback[];
+  }
+}
+
+function normalizeSupportTicket(
+  ticket: SupportTicket,
+  profile?: Pick<Profile, "full_name" | "email" | "username">
+): SupportTicket {
+  return {
+    ...ticket,
+    workspace: ticket.workspace ?? "account",
+    category: ticket.category ?? "other",
+    status: ticket.status ?? "open",
+    subject: ticket.subject ?? "Support request",
+    last_message_at: ticket.last_message_at ?? ticket.created_at,
+    profile_name: profile?.full_name ?? ticket.profile_name,
+    profile_email: profile?.email ?? ticket.profile_email,
+    profile_username: profile?.username ?? ticket.profile_username
+  };
+}
+
+export async function getProfileSupportTickets(profileId: string) {
+  if (!hasSupabaseEnv) {
+    return [] as SupportTicket[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("support_tickets")
+      .select("*")
+      .eq("profile_id", profileId)
+      .order("last_message_at", { ascending: false });
+
+    return ((data as SupportTicket[] | null) ?? []).map((ticket) =>
+      normalizeSupportTicket(ticket)
+    );
+  } catch {
+    return [] as SupportTicket[];
+  }
+}
+
+export async function getAdminSupportTickets() {
+  if (!hasSupabaseEnv) {
+    return [] as SupportTicket[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("support_tickets")
+      .select("*")
+      .order("last_message_at", { ascending: false });
+    const tickets = (data as SupportTicket[] | null) ?? [];
+    const profileIds = Array.from(new Set(tickets.map((ticket) => ticket.profile_id)));
+    const { data: profiles } =
+      profileIds.length > 0
+        ? await supabase
+            .from("profiles")
+            .select("id, full_name, email, username")
+            .in("id", profileIds)
+        : { data: [] as Array<Pick<Profile, "id" | "full_name" | "email" | "username">> };
+    const profileMap = new Map(
+      ((profiles as Array<Pick<Profile, "id" | "full_name" | "email" | "username">> | null) ?? []).map(
+        (profile) => [profile.id, profile]
+      )
+    );
+
+    return tickets.map((ticket) => normalizeSupportTicket(ticket, profileMap.get(ticket.profile_id)));
+  } catch {
+    return [] as SupportTicket[];
+  }
+}
+
+export async function getSupportTicketDetail(
+  profile: Profile,
+  ticketId: string,
+  scope: "user" | "admin"
+) {
+  if (!hasSupabaseEnv) {
+    return null as {
+      ticket: SupportTicket;
+      messages: SupportTicketMessage[];
+    } | null;
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return null;
+    }
+
+    const { data: ticketData } = await supabase
+      .from("support_tickets")
+      .select("*")
+      .eq("id", ticketId)
+      .maybeSingle();
+    const ticket = ticketData as SupportTicket | null;
+
+    if (!ticket) {
+      return null;
+    }
+
+    if (scope !== "admin" && ticket.profile_id !== profile.id) {
+      return null;
+    }
+
+    const [{ data: messagesData }, { data: profilesData }] = await Promise.all([
+      supabase
+        .from("support_ticket_messages")
+        .select("*")
+        .eq("ticket_id", ticket.id)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("profiles")
+        .select("id, full_name, email, username")
+        .in("id", Array.from(new Set([ticket.profile_id, profile.id])))
+    ]);
+    const profileMap = new Map(
+      ((profilesData as Array<Pick<Profile, "id" | "full_name" | "email" | "username">> | null) ?? []).map(
+        (entry) => [entry.id, entry]
+      )
+    );
+    const messages = ((messagesData as SupportTicketMessage[] | null) ?? []).map((message) => ({
+      ...message,
+      sender_name:
+        message.sender_role === "admin"
+          ? "Gaming Index Support"
+          : profileMap.get(message.sender_id)?.full_name ?? "User"
+    }));
+
+    return {
+      ticket: normalizeSupportTicket(ticket, profileMap.get(ticket.profile_id)),
+      messages
+    };
+  } catch {
+    return null;
   }
 }
 

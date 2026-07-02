@@ -8,6 +8,7 @@ import {
   CreditCard,
   Landmark,
   LayoutDashboard,
+  LifeBuoy,
   MessageSquareText,
   PackageCheck,
   ReceiptText,
@@ -69,6 +70,7 @@ export default function AccountSidebar({
       label: "Account",
       items: [
         { href: "/account/notifications", label: "Notifications", icon: Bell },
+        { href: "/account/support", label: "Support", icon: LifeBuoy },
         { href: "/account/feedback", label: "Feedback", icon: MessageSquareText },
         {
           href: "/account/seller",

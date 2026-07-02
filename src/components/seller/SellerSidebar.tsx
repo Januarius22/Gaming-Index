@@ -10,6 +10,7 @@ import {
   History,
   Landmark,
   LayoutDashboard,
+  LifeBuoy,
   ListChecks,
   MessageSquareText,
   PackageCheck,
@@ -55,6 +56,7 @@ const navGroups = [
       label: "Account",
       items: [
         { href: "/seller/notifications", label: "Notifications", icon: Bell },
+        { href: "/seller/support", label: "Support", icon: LifeBuoy },
         { href: "/seller/feedback", label: "Feedback", icon: MessageSquareText },
         { href: "/seller/settings", label: "Settings", icon: Settings }
       ]
