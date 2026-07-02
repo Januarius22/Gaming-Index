@@ -23,7 +23,7 @@ import LogoutConfirmButton from "@/components/auth/LogoutConfirmButton";
 import { BrandMark } from "@/components/branding/BrandLogo";
 import Button, { buttonClassName } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-import type { Profile } from "@/types";
+import type { Profile, SidebarCounts } from "@/types";
 
 const dashboardItem = { href: "/seller/dashboard", label: "Dashboard", icon: LayoutDashboard };
 const navGroups = [
@@ -63,11 +63,13 @@ const navGroups = [
 
 export default function SellerSidebar({
   profile,
+  sidebarCounts,
   collapsed = false,
   mobile = false,
   onNavigate
 }: {
   profile: Profile;
+  sidebarCounts: SidebarCounts;
   collapsed?: boolean;
   mobile?: boolean;
   onNavigate?: () => void;
@@ -151,7 +153,7 @@ export default function SellerSidebar({
               onClick={onNavigate}
               title={collapsedDesktop ? item.label : undefined}
               className={cn(
-                "flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
+                "relative flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
                 collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
                 active
                   ? "bg-white !text-primary-dark visited:!text-primary-dark hover:!text-primary-dark shadow-sm"
@@ -167,6 +169,7 @@ export default function SellerSidebar({
               >
                 {item.label}
               </span>
+              <SidebarCountBadge count={sidebarCounts[item.href]} collapsed={collapsedDesktop} />
             </Link>
           );
         })}
@@ -197,7 +200,7 @@ export default function SellerSidebar({
                       key={item.href}
                       title={collapsedDesktop ? label : undefined}
                       className={cn(
-                        "flex cursor-not-allowed items-center rounded-2xl py-3 text-sm font-medium text-blue-100/45 transition-all duration-300 ease-in-out",
+                        "relative flex cursor-not-allowed items-center rounded-2xl py-3 text-sm font-medium text-blue-100/45 transition-all duration-300 ease-in-out",
                         collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
                         "bg-white/5"
                       )}
@@ -216,6 +219,7 @@ export default function SellerSidebar({
                       >
                         {label}
                       </span>
+                      <SidebarCountBadge count={sidebarCounts[item.href]} collapsed={collapsedDesktop} />
                     </div>
                   );
                 }
@@ -227,7 +231,7 @@ export default function SellerSidebar({
                     onClick={onNavigate}
                     title={collapsedDesktop ? item.label : undefined}
                     className={cn(
-                      "flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
+                      "relative flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
                       collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
                       active
                         ? "bg-white !text-primary-dark visited:!text-primary-dark hover:!text-primary-dark shadow-sm"
@@ -243,6 +247,7 @@ export default function SellerSidebar({
                     >
                       {item.label}
                     </span>
+                    <SidebarCountBadge count={sidebarCounts[item.href]} collapsed={collapsedDesktop} />
                   </Link>
                 );
               })}
@@ -305,5 +310,28 @@ export default function SellerSidebar({
         </LogoutConfirmButton>
       </div>
     </aside>
+  );
+}
+
+function SidebarCountBadge({
+  count,
+  collapsed
+}: {
+  count?: number;
+  collapsed: boolean;
+}) {
+  if (!count || count <= 0) {
+    return null;
+  }
+
+  return (
+    <span
+      className={cn(
+        "inline-flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm",
+        collapsed ? "absolute right-1 top-1" : "ml-auto"
+      )}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
   );
 }

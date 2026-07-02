@@ -22,7 +22,7 @@ import LogoutConfirmButton from "@/components/auth/LogoutConfirmButton";
 import { BrandMark } from "@/components/branding/BrandLogo";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-import type { Profile } from "@/types";
+import type { Profile, SidebarCounts } from "@/types";
 
 const dashboardItem = { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard };
 const navGroups = [
@@ -67,11 +67,13 @@ const navGroups = [
 
 export default function AdminSidebar({
   profile,
+  sidebarCounts,
   collapsed = false,
   mobile = false,
   onNavigate
 }: {
   profile: Profile;
+  sidebarCounts: SidebarCounts;
   collapsed?: boolean;
   mobile?: boolean;
   onNavigate?: () => void;
@@ -151,7 +153,7 @@ export default function AdminSidebar({
               onClick={onNavigate}
               title={collapsedDesktop ? item.label : undefined}
               className={cn(
-                "flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
+                "relative flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
                 collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
                 active
                   ? "bg-primary !text-white visited:!text-white hover:!text-white shadow-[0_18px_30px_-20px_rgba(0,87,255,0.8)]"
@@ -167,6 +169,7 @@ export default function AdminSidebar({
               >
                 {item.label}
               </span>
+              <SidebarCountBadge count={sidebarCounts[item.href]} collapsed={collapsedDesktop} />
             </Link>
           );
         })}
@@ -192,7 +195,7 @@ export default function AdminSidebar({
                     onClick={onNavigate}
                     title={collapsedDesktop ? item.label : undefined}
                     className={cn(
-                      "flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
+                      "relative flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
                       collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
                       active
                         ? "bg-primary !text-white visited:!text-white hover:!text-white shadow-[0_18px_30px_-20px_rgba(0,87,255,0.8)]"
@@ -208,6 +211,7 @@ export default function AdminSidebar({
                     >
                       {item.label}
                     </span>
+                    <SidebarCountBadge count={sidebarCounts[item.href]} collapsed={collapsedDesktop} />
                   </Link>
                 );
               })}
@@ -242,5 +246,28 @@ export default function AdminSidebar({
         </LogoutConfirmButton>
       </div>
     </aside>
+  );
+}
+
+function SidebarCountBadge({
+  count,
+  collapsed
+}: {
+  count?: number;
+  collapsed: boolean;
+}) {
+  if (!count || count <= 0) {
+    return null;
+  }
+
+  return (
+    <span
+      className={cn(
+        "inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm",
+        collapsed ? "absolute right-1 top-1" : "ml-auto"
+      )}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
   );
 }

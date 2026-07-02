@@ -34,6 +34,7 @@ import type {
   Profile,
   SellerRating,
   SellerEnforcement,
+  SidebarCounts,
   SiteFeedback,
   SuspensionAppeal,
   Wallet,
@@ -559,6 +560,251 @@ export async function getProfileNotifications(profileId: string, limit = 50) {
     );
   } catch {
     return [] as Notification[];
+  }
+}
+
+export async function markProfileNotificationsRead(profileId: string) {
+  if (!hasSupabaseEnv) {
+    return;
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return;
+    }
+
+    await supabase
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("profile_id", profileId)
+      .is("read_at", null);
+  } catch {
+    // Notification read state should never block page rendering.
+  }
+}
+
+async function getUnreadDisputeCount(profile: Profile, scope: "buyer" | "seller" | "admin") {
+  if (!hasSupabaseEnv) {
+    return 0;
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return 0;
+    }
+
+    let disputeQuery = supabase.from("disputes").select("id");
+
+    if (scope === "buyer") {
+      disputeQuery = disputeQuery.eq("buyer_id", profile.id);
+    } else if (scope === "seller") {
+      disputeQuery = disputeQuery.eq("seller_id", profile.id);
+    } else {
+      disputeQuery = disputeQuery.in("status", ["open", "reviewing"]);
+    }
+
+    const { data: disputeData } = await disputeQuery;
+    const disputeIds = ((disputeData as Array<{ id: string }> | null) ?? []).map(
+      (dispute) => dispute.id
+    );
+
+    if (disputeIds.length === 0) {
+      return 0;
+    }
+
+    const { data: messageData } = await supabase
+      .from("dispute_messages")
+      .select("id, dispute_id")
+      .in("dispute_id", disputeIds)
+      .neq("sender_id", profile.id);
+    const messages = (messageData as Array<{ id: string; dispute_id: string }> | null) ?? [];
+
+    if (messages.length === 0) {
+      return 0;
+    }
+
+    const messageIds = messages.map((message) => message.id);
+    const { data: readData } = await supabase
+      .from("dispute_message_reads")
+      .select("message_id")
+      .eq("profile_id", profile.id)
+      .in("message_id", messageIds);
+    const readIds = new Set(
+      ((readData as Array<{ message_id: string }> | null) ?? []).map((receipt) => receipt.message_id)
+    );
+    const unreadDisputeIds = new Set(
+      messages
+        .filter((message) => !readIds.has(message.id))
+        .map((message) => message.dispute_id)
+    );
+
+    return unreadDisputeIds.size;
+  } catch {
+    return 0;
+  }
+}
+
+export async function getAccountSidebarCounts(profile: Profile): Promise<SidebarCounts> {
+  if (!hasSupabaseEnv) {
+    return {};
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return {};
+    }
+
+    const [
+      { count: unreadNotifications },
+      unreadDisputes,
+      { count: pendingOrders },
+      { count: activeWithdrawals }
+    ] = await Promise.all([
+      supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profile.id)
+        .is("read_at", null),
+      getUnreadDisputeCount(profile, "buyer"),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("buyer_id", profile.id)
+        .eq("status", "pending"),
+      supabase
+        .from("withdrawal_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profile.id)
+        .in("status", ["pending", "approved"])
+    ]);
+
+    return {
+      "/account/notifications": unreadNotifications ?? 0,
+      "/account/disputes": unreadDisputes,
+      "/account/orders": pendingOrders ?? 0,
+      "/account/withdrawals": activeWithdrawals ?? 0
+    };
+  } catch {
+    return {};
+  }
+}
+
+export async function getSellerSidebarCounts(profile: Profile): Promise<SidebarCounts> {
+  if (!hasSupabaseEnv) {
+    return {};
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return {};
+    }
+
+    const [
+      { count: unreadNotifications },
+      unreadDisputes,
+      { count: activeOrders },
+      { count: activeWithdrawals }
+    ] = await Promise.all([
+      supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profile.id)
+        .is("read_at", null),
+      getUnreadDisputeCount(profile, "seller"),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("seller_id", profile.id)
+        .in("status", ["processing", "completed"])
+        .eq("escrow_status", "holding"),
+      supabase
+        .from("withdrawal_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profile.id)
+        .in("status", ["pending", "approved"])
+    ]);
+
+    return {
+      "/seller/notifications": unreadNotifications ?? 0,
+      "/seller/disputes": unreadDisputes,
+      "/seller/orders": activeOrders ?? 0,
+      "/seller/withdrawals": activeWithdrawals ?? 0,
+      "/seller/kyc": profile.kyc_status === "pending" || profile.kyc_status === "rejected" ? 1 : 0
+    };
+  } catch {
+    return {};
+  }
+}
+
+export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCounts> {
+  if (!hasSupabaseEnv) {
+    return {};
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return {};
+    }
+
+    const [
+      { count: unreadNotifications },
+      unreadDisputes,
+      { count: pendingKyc },
+      { count: pendingAppeals },
+      { count: pendingWithdrawals },
+      { count: pendingListings },
+      { count: releasableOrders }
+    ] = await Promise.all([
+      supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profile.id)
+        .is("read_at", null),
+      getUnreadDisputeCount(profile, "admin"),
+      supabase
+        .from("kyc_submissions")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending"),
+      supabase
+        .from("suspension_appeals")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending"),
+      supabase
+        .from("withdrawal_requests")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["pending", "approved"]),
+      supabase
+        .from("listings")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending_review"),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("payment_status", "successful")
+        .eq("escrow_status", "holding")
+    ]);
+
+    return {
+      "/admin/notifications": unreadNotifications ?? 0,
+      "/admin/disputes": unreadDisputes,
+      "/admin/kyc": pendingKyc ?? 0,
+      "/admin/appeals": pendingAppeals ?? 0,
+      "/admin/withdrawals": pendingWithdrawals ?? 0,
+      "/admin/listings": pendingListings ?? 0,
+      "/admin/orders": releasableOrders ?? 0
+    };
+  } catch {
+    return {};
   }
 }
 

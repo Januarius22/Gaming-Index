@@ -8,13 +8,15 @@ import AdminTopbar from "@/components/admin/AdminTopbar";
 import LogoutConfirmButton from "@/components/auth/LogoutConfirmButton";
 import { buttonClassName } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-import type { Profile } from "@/types";
+import type { Profile, SidebarCounts } from "@/types";
 
 export default function AdminShell({
   profile,
+  sidebarCounts,
   children
 }: {
   profile: Profile;
+  sidebarCounts: SidebarCounts;
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -72,7 +74,7 @@ export default function AdminShell({
               collapsed ? "w-24" : "w-80"
             )}
           >
-            <AdminSidebar profile={profile} collapsed={collapsed} />
+            <AdminSidebar profile={profile} sidebarCounts={sidebarCounts} collapsed={collapsed} />
           </div>
         </div>
 

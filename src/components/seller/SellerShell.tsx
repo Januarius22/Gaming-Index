@@ -5,13 +5,15 @@ import { useEffect, useState } from "react";
 import SellerSidebar from "@/components/seller/SellerSidebar";
 import SellerTopbar from "@/components/seller/SellerTopbar";
 import { cn } from "@/lib/utils";
-import type { Profile } from "@/types";
+import type { Profile, SidebarCounts } from "@/types";
 
 export default function SellerShell({
   profile,
+  sidebarCounts,
   children
 }: {
   profile: Profile;
+  sidebarCounts: SidebarCounts;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -45,7 +47,7 @@ export default function SellerShell({
               collapsed ? "w-24" : "w-80"
             )}
           >
-            <SellerSidebar profile={profile} collapsed={collapsed} />
+            <SellerSidebar profile={profile} sidebarCounts={sidebarCounts} collapsed={collapsed} />
           </div>
         </div>
 
@@ -66,7 +68,7 @@ export default function SellerShell({
                 className="h-full w-[84%] max-w-xs overflow-y-auto"
                 onClick={(event) => event.stopPropagation()}
               >
-                <SellerSidebar profile={profile} mobile onNavigate={() => setOpen(false)} />
+                <SellerSidebar profile={profile} sidebarCounts={sidebarCounts} mobile onNavigate={() => setOpen(false)} />
               </motion.div>
             </motion.div>
           ) : null}

@@ -199,6 +199,8 @@ export interface DisputeMessage {
   delivery_status?: "sending" | "sent" | "failed";
 }
 
+export type SidebarCounts = Record<string, number>;
+
 export interface SellerEnforcement {
   id: string;
   seller_id: string;

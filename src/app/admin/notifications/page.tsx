@@ -2,7 +2,7 @@ import NotificationList from "@/components/notifications/NotificationList";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import PaginationControls from "@/components/ui/PaginationControls";
 import { requireAdminProfile } from "@/lib/auth";
-import { getProfileNotifications } from "@/lib/data";
+import { getProfileNotifications, markProfileNotificationsRead } from "@/lib/data";
 import { paginateItems, parsePageParam } from "@/lib/utils";
 
 export default async function AdminNotificationsPage({
@@ -12,6 +12,7 @@ export default async function AdminNotificationsPage({
 }) {
   const profile = await requireAdminProfile();
   const notifications = await getProfileNotifications(profile.id, 100);
+  await markProfileNotificationsRead(profile.id);
   const params = (await searchParams) ?? {};
   const requestedPage = parsePageParam(params.page);
   const {

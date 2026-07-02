@@ -6,13 +6,15 @@ import { AccountShellProvider } from "@/components/account/AccountShellContext";
 import AccountSidebar from "@/components/account/AccountSidebar";
 import AccountTopbar from "@/components/account/AccountTopbar";
 import { cn } from "@/lib/utils";
-import type { Profile } from "@/types";
+import type { Profile, SidebarCounts } from "@/types";
 
 export default function AccountShell({
   profile,
+  sidebarCounts,
   children
 }: {
   profile: Profile;
+  sidebarCounts: SidebarCounts;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -93,7 +95,7 @@ export default function AccountShell({
                 sidebarExpanded ? "w-80" : "w-24"
               )}
             >
-              <AccountSidebar profile={profile} collapsed={!sidebarExpanded} />
+              <AccountSidebar profile={profile} sidebarCounts={sidebarCounts} collapsed={!sidebarExpanded} />
             </div>
           </div>
 
@@ -114,7 +116,7 @@ export default function AccountShell({
                   className="h-full w-[84%] max-w-xs overflow-y-auto"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <AccountSidebar profile={profile} mobile onNavigate={() => setOpen(false)} />
+                  <AccountSidebar profile={profile} sidebarCounts={sidebarCounts} mobile onNavigate={() => setOpen(false)} />
                 </motion.div>
               </motion.div>
             ) : null}
