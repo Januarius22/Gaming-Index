@@ -533,6 +533,7 @@ export async function refundOrderDisputeAction(formData: FormData) {
   const disputeId = String(formData.get("disputeId") ?? "").trim();
   const orderId = String(formData.get("orderId") ?? "").trim();
   const adminNote = String(formData.get("adminNote") ?? "").trim();
+  const takeListingDown = formData.get("takeListingDown") === "on";
 
   if (!disputeId || !orderId) {
     return {
@@ -558,7 +559,8 @@ export async function refundOrderDisputeAction(formData: FormData) {
   const supabase = await getSupabaseServerClient();
   const { error } = await supabase!.rpc("refund_order_dispute", {
     target_dispute_id: disputeId,
-    refund_note: adminNote
+    refund_note: adminNote,
+    take_listing_down: takeListingDown
   });
 
   if (error) {
@@ -585,14 +587,21 @@ export async function refundOrderDisputeAction(formData: FormData) {
   revalidatePath("/seller/wallet");
   revalidatePath("/seller/transactions");
   revalidatePath("/seller/notifications");
+  revalidatePath("/seller/listings");
+  revalidatePath("/seller/history");
+  revalidatePath("/marketplace");
+  revalidatePath("/account/marketplace");
   revalidatePath("/admin/notifications");
+  revalidatePath("/admin/listings");
+  revalidatePath("/admin/listing-history");
 
   return {
     status: "success" as const,
-    message: "Refund issued.",
+    message: takeListingDown ? "Refund issued and listing taken down." : "Refund issued.",
     disputeId,
     nextStatus: "refunded" as const,
-    adminNote
+    adminNote,
+    takeListingDown
   };
 }
 

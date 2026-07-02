@@ -99,6 +99,17 @@ export default function AdminDisputeActionsModal({
                 <input type="hidden" name="disputeId" value={disputeId} />
                 <input type="hidden" name="orderId" value={orderId} />
                 <Textarea name="adminNote" placeholder="Refund note" required />
+                <label className="flex items-start gap-3 rounded-2xl border border-border bg-white p-3 text-sm text-muted-foreground">
+                  <input
+                    className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                    name="takeListingDown"
+                    type="checkbox"
+                  />
+                  <span>
+                    <span className="block font-semibold text-foreground">Take down listing</span>
+                    Remove this listing from the marketplace after the refund.
+                  </span>
+                </label>
                 <SubmitButton className="w-full" variant="secondary" disabled={closed}>
                   Refund buyer
                 </SubmitButton>

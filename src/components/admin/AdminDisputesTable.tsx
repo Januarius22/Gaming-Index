@@ -231,6 +231,19 @@ export default function AdminDisputesTable({ disputes }: { disputes: Dispute[] }
               placeholder="Add the review outcome."
               required
             />
+            {reviewingDispute.status === "refunded" ? (
+              <label className="flex items-start gap-3 rounded-2xl border border-border bg-surface p-3 text-sm text-muted-foreground">
+                <input
+                  className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  name="takeListingDown"
+                  type="checkbox"
+                />
+                <span>
+                  <span className="block font-semibold text-foreground">Take down listing</span>
+                  Remove this listing from the marketplace after the refund.
+                </span>
+              </label>
+            ) : null}
             <div className="flex justify-end gap-3">
               <Button type="button" variant="secondary" onClick={() => setReviewingDispute(null)}>
                 Cancel

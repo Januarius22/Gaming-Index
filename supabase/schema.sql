@@ -1309,9 +1309,11 @@ begin
 end;
 $$;
 
+drop function if exists public.refund_order_dispute(uuid, text);
 create or replace function public.refund_order_dispute(
   target_dispute_id uuid,
-  refund_note text
+  refund_note text,
+  take_listing_down boolean default false
 )
 returns void
 language plpgsql
@@ -1391,6 +1393,16 @@ begin
     escrow_status = 'refunded'
   where id = linked_order.id;
 
+  if take_listing_down then
+    update public.listings
+    set
+      status = 'taken_down',
+      admin_note = trim(refund_note),
+      admin_action_at = now(),
+      admin_action_by = auth.uid()
+    where id = linked_order.listing_id;
+  end if;
+
   update public.disputes
   set
     status = 'refunded',
@@ -1440,7 +1452,11 @@ begin
     linked_order.listing_id,
     linked_order.payment_reference,
     'Order refund issued.',
-    jsonb_build_object('dispute_id', dispute_row.id, 'note', trim(refund_note))
+    jsonb_build_object(
+      'dispute_id', dispute_row.id,
+      'note', trim(refund_note),
+      'listing_taken_down', take_listing_down
+    )
   ),
   (
     dispute_row.seller_id,
@@ -1453,7 +1469,11 @@ begin
     linked_order.listing_id,
     linked_order.payment_reference,
     'Sale funds returned to buyer.',
-    jsonb_build_object('dispute_id', dispute_row.id, 'note', trim(refund_note))
+    jsonb_build_object(
+      'dispute_id', dispute_row.id,
+      'note', trim(refund_note),
+      'listing_taken_down', take_listing_down
+    )
   );
 
   insert into public.notifications (
@@ -1475,21 +1495,26 @@ begin
       'dispute_id', dispute_row.id,
       'order_id', linked_order.id,
       'amount', linked_order.amount,
-      'note', trim(refund_note)
+      'note', trim(refund_note),
+      'listing_taken_down', take_listing_down
     )
   ),
   (
     dispute_row.seller_id,
     'seller_dispute_refunded',
     'Order refunded',
-    'A disputed order was refunded.',
+    case
+      when take_listing_down then 'A disputed order was refunded and the listing was taken down.'
+      else 'A disputed order was refunded.'
+    end,
     '/seller/disputes/' || dispute_row.id,
     jsonb_build_object(
       'dispute_id', dispute_row.id,
       'order_id', linked_order.id,
       'listing_id', linked_order.listing_id,
       'amount', linked_order.amount,
-      'note', trim(refund_note)
+      'note', trim(refund_note),
+      'listing_taken_down', take_listing_down
     )
   );
 end;
