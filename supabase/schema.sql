@@ -486,6 +486,97 @@ alter table public.wallet_transactions add constraint wallet_transactions_status
 alter table public.wallet_transactions drop constraint if exists wallet_transactions_amount_check;
 alter table public.wallet_transactions add constraint wallet_transactions_amount_check check (amount > 0);
 
+create or replace function public.wallet_reconciliation(target_profile_id uuid)
+returns table (
+  profile_id uuid,
+  available_balance numeric,
+  expected_available_balance numeric,
+  available_difference numeric,
+  pending_balance numeric,
+  expected_pending_balance numeric,
+  pending_difference numeric
+)
+language sql
+security definer
+set search_path = public
+as $$
+  with ledger as (
+    select
+      coalesce(
+        sum(
+          case
+            when balance_bucket = 'available'
+              and direction = 'credit'
+              and status = 'completed' then amount
+            when balance_bucket = 'available'
+              and direction = 'debit'
+              and status in ('pending', 'completed') then -amount
+            else 0
+          end
+        ),
+        0
+      ) as expected_available_balance,
+      coalesce(
+        sum(
+          case
+            when balance_bucket = 'pending'
+              and direction = 'credit'
+              and status = 'completed' then amount
+            when balance_bucket = 'pending'
+              and direction = 'debit'
+              and status = 'completed' then -amount
+            when type = 'seller_release'
+              and balance_bucket = 'available'
+              and direction = 'credit'
+              and status = 'completed' then -amount
+            else 0
+          end
+        ),
+        0
+      ) as expected_pending_balance
+    from public.wallet_transactions
+    where wallet_profile_id = target_profile_id
+  )
+  select
+    wallet.profile_id,
+    wallet.available_balance,
+    ledger.expected_available_balance,
+    wallet.available_balance - ledger.expected_available_balance as available_difference,
+    wallet.pending_balance,
+    ledger.expected_pending_balance,
+    wallet.pending_balance - ledger.expected_pending_balance as pending_difference
+  from public.wallets as wallet
+  cross join ledger
+  where wallet.profile_id = target_profile_id;
+$$;
+
+create or replace function public.assert_wallet_reconciled(target_profile_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  reconciliation record;
+begin
+  select *
+  into reconciliation
+  from public.wallet_reconciliation(target_profile_id);
+
+  if not found then
+    raise exception 'Wallet not found.';
+  end if;
+
+  if abs(reconciliation.available_difference) >= 0.01
+    or abs(reconciliation.pending_difference) >= 0.01 then
+    raise exception 'Wallet balance does not match transaction ledger.';
+  end if;
+end;
+$$;
+
+revoke all on function public.wallet_reconciliation(uuid) from public, anon, authenticated;
+revoke all on function public.assert_wallet_reconciled(uuid) from public, anon, authenticated;
+
 create table if not exists public.withdrawal_requests (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.profiles(id) on delete cascade,
@@ -1530,9 +1621,14 @@ begin
 
   update public.wallets
   set
-    pending_balance = greatest(pending_balance - linked_order.amount, 0),
+    pending_balance = pending_balance - linked_order.amount,
     updated_at = now()
-  where profile_id = dispute_row.seller_id;
+  where profile_id = dispute_row.seller_id
+    and pending_balance >= linked_order.amount;
+
+  if not found then
+    raise exception 'Seller pending balance is lower than the refund amount.';
+  end if;
 
   update public.orders
   set
@@ -1622,6 +1718,9 @@ begin
       'listing_taken_down', take_listing_down
     )
   );
+
+  perform public.assert_wallet_reconciled(dispute_row.buyer_id);
+  perform public.assert_wallet_reconciled(dispute_row.seller_id);
 
   insert into public.notifications (
     profile_id,
@@ -1982,6 +2081,8 @@ begin
     )
   );
 
+  perform public.assert_wallet_reconciled(paid_order.seller_id);
+
   insert into public.notifications (
     profile_id,
     type,
@@ -2174,11 +2275,16 @@ begin
 
   update public.wallets
   set
-    pending_balance = greatest(pending_balance - held_order.amount, 0),
+    pending_balance = pending_balance - held_order.amount,
     available_balance = available_balance + held_order.amount,
     total_earned = total_earned + held_order.amount,
     updated_at = now()
-  where profile_id = held_order.seller_id;
+  where profile_id = held_order.seller_id
+    and pending_balance >= held_order.amount;
+
+  if not found then
+    raise exception 'Seller pending balance is lower than the release amount.';
+  end if;
 
   insert into public.wallet_transactions (
     wallet_profile_id,
@@ -2206,6 +2312,8 @@ begin
     'Sale funds released to available balance.',
     jsonb_build_object('listing_title', held_order.listing_title)
   );
+
+  perform public.assert_wallet_reconciled(held_order.seller_id);
 
   insert into public.notifications (
     profile_id,
@@ -2325,6 +2433,8 @@ begin
     'Withdrawal request submitted.',
     jsonb_build_object('withdrawal_request_id', request_id)
   );
+
+  perform public.assert_wallet_reconciled(requester_id);
 
   insert into public.notifications (
     profile_id,
@@ -2447,6 +2557,8 @@ begin
     jsonb_build_object('withdrawal_request_id', withdrawal.id)
   );
 
+  perform public.assert_wallet_reconciled(withdrawal.profile_id);
+
   insert into public.notifications (
     profile_id,
     type,
@@ -2548,6 +2660,8 @@ begin
     'Withdrawal paid by admin.',
     jsonb_build_object('withdrawal_request_id', withdrawal.id)
   );
+
+  perform public.assert_wallet_reconciled(withdrawal.profile_id);
 
   insert into public.notifications (
     profile_id,
@@ -2920,6 +3034,7 @@ create policy "buyers can read paid order delivery details"
       where buyer_profile.id = auth.uid()
         and buyer_order.listing_id = public.listing_delivery_details.listing_id
         and buyer_order.status in ('processing', 'completed')
+        and buyer_order.payment_status = 'successful'
     )
   );
 

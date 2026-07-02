@@ -494,7 +494,9 @@ export async function buyNowAction(formData: FormData) {
   }
 
   const existingPaidOrder = buyerOrders.find(
-    (order) => order.listing_id === listingId && isOrderPaymentConfirmed(order.status)
+    (order) =>
+      order.listing_id === listingId &&
+      isOrderPaymentConfirmed(order.status, order.payment_status)
   );
 
   if (existingPaidOrder) {

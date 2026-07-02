@@ -2058,7 +2058,7 @@ export async function getBuyerOrderDetail(
 
     const listings = (await getDemoListings()).map((listing) => normalizeListing(listing));
     const listing = listings.find((entry) => entry.id === order.listing_id) ?? null;
-    const paymentConfirmed = isOrderPaymentConfirmed(order.status);
+    const paymentConfirmed = isOrderPaymentConfirmed(order.status, order.payment_status);
     const demoDeliveryDetails = paymentConfirmed
       ? (await getDemoListingDeliveryDetails()).find((entry) => entry.listing_id === order.listing_id) ?? null
       : null;
@@ -2087,7 +2087,7 @@ export async function getBuyerOrderDetail(
 
     const listings = await getSupabaseListings();
     const listing = listings.find((entry) => entry.id === order.listing_id) ?? null;
-    const paymentConfirmed = isOrderPaymentConfirmed(order.status);
+    const paymentConfirmed = isOrderPaymentConfirmed(order.status, order.payment_status);
     const deliveryDetails = paymentConfirmed
       ? await getSupabaseListingDeliveryDetailsForListing(order.listing_id)
       : null;

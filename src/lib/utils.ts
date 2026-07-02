@@ -1,4 +1,4 @@
-import type { KycStatus, ListingStatus, OrderStatus } from "@/types";
+import type { KycStatus, ListingStatus, OrderStatus, PaymentStatus } from "@/types";
 
 export const APP_TIME_ZONE = "Africa/Lagos";
 export const APP_TIME_LABEL = "WAT";
@@ -196,8 +196,8 @@ export function statusVariant(
   }
 }
 
-export function isOrderPaymentConfirmed(status: OrderStatus) {
-  return status === "processing" || status === "completed";
+export function isOrderPaymentConfirmed(status: OrderStatus, paymentStatus?: PaymentStatus) {
+  return (status === "processing" || status === "completed") && paymentStatus === "successful";
 }
 
 export function getListingMarketplaceVisibilityEndsAt(listing: {
