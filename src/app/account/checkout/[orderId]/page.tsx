@@ -11,7 +11,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Input from "@/components/ui/Input";
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrderDetail } from "@/lib/data";
-import { formatCurrency, formatDate, statusVariant, titleCase } from "@/lib/utils";
+import {
+  formatCurrency,
+  formatDate,
+  isPendingCheckoutActive,
+  statusVariant,
+  titleCase
+} from "@/lib/utils";
 
 function getNoticeMessage(notice?: string) {
   switch (notice) {
@@ -85,8 +91,12 @@ export default async function AccountCheckoutPage({
   }
 
   const { order, listing, paymentConfirmed } = orderDetail;
+  const checkoutActive = isPendingCheckoutActive(order);
   const checkoutBlocked =
-    order.status === "cancelled" || !listing || (!paymentConfirmed && listing.status !== "approved");
+    order.status === "cancelled" ||
+    !checkoutActive ||
+    !listing ||
+    (!paymentConfirmed && listing.status !== "approved");
 
   if (paymentConfirmed) {
     redirect(`/account/checkout/${order.id}/success`);

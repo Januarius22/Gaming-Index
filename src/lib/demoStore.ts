@@ -5,6 +5,7 @@ import {
   PLATFORM_COMMISSION_RATE,
   calculatePlatformFee,
   calculateSellerPayout,
+  getPendingCheckoutExpiresAt,
   getNigeriaTimestamp
 } from "@/lib/utils";
 import type {
@@ -417,7 +418,8 @@ export async function addDemoOrder(
     payment_reference: order.payment_reference ?? "",
     payment_channel: order.payment_channel ?? "",
     payment_last4: order.payment_last4 ?? "",
-    paid_at: order.paid_at ?? null
+    paid_at: order.paid_at ?? null,
+    checkout_expires_at: order.checkout_expires_at ?? getPendingCheckoutExpiresAt()
   };
 
   await saveDemoOrders([nextOrder, ...orders]);

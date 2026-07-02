@@ -10,7 +10,13 @@ import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrderDetail } from "@/lib/data";
-import { formatCurrency, formatDate, statusVariant, titleCase } from "@/lib/utils";
+import {
+  formatCurrency,
+  formatDate,
+  isPendingCheckoutActive,
+  statusVariant,
+  titleCase
+} from "@/lib/utils";
 
 function getNoticeMessage(notice?: string) {
   switch (notice) {
@@ -103,6 +109,7 @@ export default async function AccountOrderDetailPage({
   }
 
   const { order, listing, paymentConfirmed, deliveryAvailable, deliveryDetails } = orderDetail;
+  const checkoutActive = isPendingCheckoutActive(order);
   const deliveryVisible = Boolean(showDelivery && deliveryDetails && paymentConfirmed);
   const revealedDeliveryDetails = deliveryVisible ? deliveryDetails : null;
   const canOpenDispute =
@@ -237,7 +244,7 @@ export default async function AccountOrderDetailPage({
                     View Listing
                   </Link>
                 ) : null}
-                {!paymentConfirmed ? (
+                {!paymentConfirmed && checkoutActive ? (
                   <Link
                     href={`/account/checkout/${order.id}`}
                     className={buttonClassName({
@@ -261,7 +268,7 @@ export default async function AccountOrderDetailPage({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!paymentConfirmed ? (
+              {!paymentConfirmed && checkoutActive ? (
                 <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
                   <div className="flex items-start gap-3">
                     <div className="rounded-2xl bg-white p-3 text-amber-700 shadow-sm">

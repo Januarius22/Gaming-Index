@@ -149,11 +149,23 @@ export async function releaseSellerFundsAction(formData: FormData) {
 export async function markWithdrawalPaidAction(formData: FormData) {
   await requireAdminProfile();
   const withdrawalId = String(formData.get("withdrawalId") ?? "").trim();
+  const payoutProvider = String(formData.get("payoutProvider") ?? "").trim();
+  const payoutReference = String(formData.get("payoutReference") ?? "").trim();
+  const payoutProofName = String(formData.get("payoutProofName") ?? "").trim();
+  const payoutProofPath = String(formData.get("payoutProofPath") ?? "").trim();
+  const paidNote = String(formData.get("paidNote") ?? "").trim();
 
   if (!withdrawalId) {
     return {
       status: "error" as const,
       message: "Withdrawal request not found."
+    };
+  }
+
+  if (!payoutProvider || !payoutReference) {
+    return {
+      status: "error" as const,
+      message: "Add the payout provider and transaction reference before marking this paid."
     };
   }
 
@@ -166,7 +178,12 @@ export async function markWithdrawalPaidAction(formData: FormData) {
 
   const supabase = await getSupabaseServerClient();
   const { error } = await supabase!.rpc("mark_withdrawal_paid", {
-    target_withdrawal_id: withdrawalId
+    target_withdrawal_id: withdrawalId,
+    payout_provider_name: payoutProvider,
+    payout_transaction_reference: payoutReference,
+    payout_proof_file_name: payoutProofName,
+    payout_proof_file_path: payoutProofPath,
+    payout_admin_note: paidNote
   });
 
   if (error) {

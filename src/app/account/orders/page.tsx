@@ -6,7 +6,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import PaginationControls from "@/components/ui/PaginationControls";
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrders } from "@/lib/data";
-import { formatCurrency, formatDate, paginateItems, parsePageParam, statusVariant, titleCase } from "@/lib/utils";
+import {
+  formatCurrency,
+  formatDate,
+  isPendingCheckoutActive,
+  paginateItems,
+  parsePageParam,
+  statusVariant,
+  titleCase
+} from "@/lib/utils";
 
 export default async function AccountOrdersPage({
   searchParams
@@ -74,33 +82,37 @@ export default async function AccountOrdersPage({
                 </tr>
               </thead>
               <tbody>
-                {paginatedOrders.map((order) => (
-                  <tr key={order.id} className="border-b border-border/60">
-                    <td className="px-4 py-4 font-medium text-foreground">{order.id.slice(0, 8)}</td>
-                    <td className="px-4 py-4">{order.listing_title}</td>
-                    <td className="px-4 py-4">{formatCurrency(order.amount)}</td>
-                    <td className="px-4 py-4">
-                      <Badge variant={statusVariant(order.status)}>{titleCase(order.status)}</Badge>
-                    </td>
-                    <td className="px-4 py-4">{formatDate(order.created_at)}</td>
-                    <td className="px-4 py-4">
-                      <Link
-                        href={
-                          order.status === "pending"
-                            ? `/account/checkout/${order.id}`
-                            : `/account/orders/${order.id}?fromPage=${currentPage}`
-                        }
-                        className={buttonClassName({
-                          variant: "secondary",
-                          size: "sm",
-                          className: "rounded-2xl"
-                        })}
-                      >
-                        {order.status === "pending" ? "Continue Checkout" : "Open Order"}
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                {paginatedOrders.map((order) => {
+                  const canContinueCheckout = isPendingCheckoutActive(order);
+
+                  return (
+                    <tr key={order.id} className="border-b border-border/60">
+                      <td className="px-4 py-4 font-medium text-foreground">{order.id.slice(0, 8)}</td>
+                      <td className="px-4 py-4">{order.listing_title}</td>
+                      <td className="px-4 py-4">{formatCurrency(order.amount)}</td>
+                      <td className="px-4 py-4">
+                        <Badge variant={statusVariant(order.status)}>{titleCase(order.status)}</Badge>
+                      </td>
+                      <td className="px-4 py-4">{formatDate(order.created_at)}</td>
+                      <td className="px-4 py-4">
+                        <Link
+                          href={
+                            canContinueCheckout
+                              ? `/account/checkout/${order.id}`
+                              : `/account/orders/${order.id}?fromPage=${currentPage}`
+                          }
+                          className={buttonClassName({
+                            variant: "secondary",
+                            size: "sm",
+                            className: "rounded-2xl"
+                          })}
+                        >
+                          {canContinueCheckout ? "Continue Checkout" : "Open Order"}
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

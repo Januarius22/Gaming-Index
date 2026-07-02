@@ -19,6 +19,7 @@ export default function AdminWithdrawalsTable({
   const [, startTransition] = useTransition();
   const [visibleRequests, setVisibleRequests] = useState(requests);
   const [rejectingRequest, setRejectingRequest] = useState<WithdrawalRequest | null>(null);
+  const [payingRequest, setPayingRequest] = useState<WithdrawalRequest | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
     message: string;
@@ -39,13 +40,29 @@ export default function AdminWithdrawalsTable({
         const result = await markWithdrawalPaidAction(formData);
 
         if (result.status === "success" && result.withdrawalId) {
+          const payoutProvider = String(formData.get("payoutProvider") ?? "");
+          const payoutReference = String(formData.get("payoutReference") ?? "");
+          const payoutProofName = String(formData.get("payoutProofName") ?? "");
+          const payoutProofPath = String(formData.get("payoutProofPath") ?? "");
+          const paidNote = String(formData.get("paidNote") ?? "");
+
           setVisibleRequests((current) =>
             current.map((request) =>
               request.id === result.withdrawalId
-                ? { ...request, status: "paid", paid_at: new Date().toISOString() }
+                ? {
+                    ...request,
+                    status: "paid",
+                    payout_provider: payoutProvider,
+                    payout_reference: payoutReference,
+                    payout_proof_name: payoutProofName,
+                    payout_proof_path: payoutProofPath,
+                    paid_note: paidNote,
+                    paid_at: new Date().toISOString()
+                  }
                 : request
             )
           );
+          setPayingRequest(null);
         }
 
         setFeedback({
@@ -148,21 +165,23 @@ export default function AdminWithdrawalsTable({
                           Reason: {request.admin_note}
                         </p>
                       ) : null}
+                      {request.payout_reference ? (
+                        <p className="mt-2 max-w-xs text-xs text-muted-foreground">
+                          Ref: {request.payout_reference}
+                        </p>
+                      ) : null}
                     </td>
                     <td className="px-4 py-4">{formatDate(request.created_at)}</td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap gap-2">
-                        <form
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            submitPaid(new FormData(event.currentTarget));
-                          }}
+                        <Button
+                          size="sm"
+                          type="button"
+                          disabled={!pending || isSubmitting}
+                          onClick={() => setPayingRequest(request)}
                         >
-                          <input type="hidden" name="withdrawalId" value={request.id} />
-                          <Button size="sm" type="submit" disabled={!pending || isSubmitting}>
-                            {isSubmitting ? "Marking..." : "Mark paid"}
-                          </Button>
-                        </form>
+                          Mark paid
+                        </Button>
                         <Button
                           size="sm"
                           type="button"
@@ -181,6 +200,88 @@ export default function AdminWithdrawalsTable({
           </tbody>
         </table>
       </div>
+
+      <Modal
+        open={Boolean(payingRequest)}
+        onClose={() => setPayingRequest(null)}
+        title="Mark withdrawal paid"
+        description="Record the payout details before closing this withdrawal."
+      >
+        {payingRequest ? (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitPaid(new FormData(event.currentTarget));
+            }}
+            className="space-y-4"
+          >
+            <input type="hidden" name="withdrawalId" value={payingRequest.id} />
+            <Input value={formatCurrency(payingRequest.amount)} readOnly />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-foreground" htmlFor="payoutProvider">
+                  Payout provider
+                </label>
+                <Input
+                  id="payoutProvider"
+                  name="payoutProvider"
+                  placeholder="Bank transfer"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-foreground" htmlFor="payoutReference">
+                  Transaction reference
+                </label>
+                <Input
+                  id="payoutReference"
+                  name="payoutReference"
+                  placeholder="Transfer reference"
+                  required
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-foreground" htmlFor="payoutProofName">
+                  Proof label
+                </label>
+                <Input
+                  id="payoutProofName"
+                  name="payoutProofName"
+                  placeholder="Receipt screenshot"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-foreground" htmlFor="payoutProofPath">
+                  Proof link or path
+                </label>
+                <Input
+                  id="payoutProofPath"
+                  name="payoutProofPath"
+                  placeholder="Receipt URL or internal file path"
+                />
+              </div>
+            </div>
+            <label className="block text-sm font-semibold text-foreground" htmlFor="paidNote">
+              Admin note
+            </label>
+            <Textarea
+              id="paidNote"
+              name="paidNote"
+              placeholder="Optional payout note."
+            />
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="secondary" onClick={() => setPayingRequest(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pendingId === payingRequest.id}>
+                {pendingId === payingRequest.id ? "Saving..." : "Mark paid"}
+              </Button>
+            </div>
+          </form>
+        ) : null}
+      </Modal>
 
       <Modal
         open={Boolean(rejectingRequest)}

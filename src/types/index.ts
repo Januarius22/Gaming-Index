@@ -157,6 +157,7 @@ export interface Order {
   payment_channel?: string;
   payment_last4?: string;
   paid_at?: string | null;
+  checkout_expires_at?: string | null;
   escrow_status?: "not_started" | "holding" | "released" | "refunded" | "disputed";
   seller_hold_expires_at?: string | null;
   seller_released_at?: string | null;
@@ -252,6 +253,11 @@ export interface WithdrawalRequest {
   account_name: string;
   status: WithdrawalStatus;
   admin_note: string;
+  payout_provider?: string;
+  payout_reference?: string;
+  payout_proof_name?: string;
+  payout_proof_path?: string;
+  paid_note?: string;
   reviewed_by?: string | null;
   reviewed_at?: string | null;
   paid_at?: string | null;

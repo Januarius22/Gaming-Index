@@ -243,6 +243,7 @@ create table if not exists public.orders (
   payment_channel text not null default '',
   payment_last4 text not null default '',
   paid_at timestamp with time zone,
+  checkout_expires_at timestamp with time zone,
   created_at timestamp with time zone not null default now()
 );
 
@@ -258,6 +259,7 @@ alter table public.orders add column if not exists payment_reference text not nu
 alter table public.orders add column if not exists payment_channel text not null default '';
 alter table public.orders add column if not exists payment_last4 text not null default '';
 alter table public.orders add column if not exists paid_at timestamp with time zone;
+alter table public.orders add column if not exists checkout_expires_at timestamp with time zone;
 alter table public.orders add column if not exists escrow_status text not null default 'not_started';
 alter table public.orders add column if not exists seller_hold_expires_at timestamp with time zone;
 alter table public.orders add column if not exists seller_released_at timestamp with time zone;
@@ -305,6 +307,37 @@ set listing_title = coalesce(listing.title, order_row.listing_title, '')
 from public.listings as listing
 where order_row.listing_id = listing.id
   and order_row.listing_title = '';
+update public.orders
+set checkout_expires_at = created_at + interval '30 minutes'
+where status = 'pending'
+  and checkout_expires_at is null;
+update public.orders
+set status = 'cancelled'
+where status = 'pending'
+  and payment_status = 'pending'
+  and checkout_expires_at is not null
+  and checkout_expires_at <= now();
+
+create or replace function public.cancel_expired_pending_orders()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  cancelled_count integer;
+begin
+  update public.orders
+  set status = 'cancelled'
+  where status = 'pending'
+    and payment_status = 'pending'
+    and checkout_expires_at is not null
+    and checkout_expires_at <= now();
+
+  get diagnostics cancelled_count = row_count;
+  return cancelled_count;
+end;
+$$;
 
 create table if not exists public.disputes (
   id uuid primary key default gen_random_uuid(),
@@ -619,6 +652,11 @@ create table if not exists public.withdrawal_requests (
   account_name text not null default '',
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'paid', 'cancelled')),
   admin_note text not null default '',
+  payout_provider text not null default '',
+  payout_reference text not null default '',
+  payout_proof_name text not null default '',
+  payout_proof_path text not null default '',
+  paid_note text not null default '',
   reviewed_by uuid references public.profiles(id) on delete set null,
   reviewed_at timestamp with time zone,
   paid_at timestamp with time zone,
@@ -629,6 +667,11 @@ alter table public.withdrawal_requests add column if not exists bank_name text n
 alter table public.withdrawal_requests add column if not exists account_number text not null default '';
 alter table public.withdrawal_requests add column if not exists account_name text not null default '';
 alter table public.withdrawal_requests add column if not exists admin_note text not null default '';
+alter table public.withdrawal_requests add column if not exists payout_provider text not null default '';
+alter table public.withdrawal_requests add column if not exists payout_reference text not null default '';
+alter table public.withdrawal_requests add column if not exists payout_proof_name text not null default '';
+alter table public.withdrawal_requests add column if not exists payout_proof_path text not null default '';
+alter table public.withdrawal_requests add column if not exists paid_note text not null default '';
 alter table public.withdrawal_requests add column if not exists reviewed_by uuid references public.profiles(id) on delete set null;
 alter table public.withdrawal_requests add column if not exists reviewed_at timestamp with time zone;
 alter table public.withdrawal_requests add column if not exists paid_at timestamp with time zone;
@@ -2269,6 +2312,15 @@ begin
     raise exception 'This checkout is no longer pending.';
   end if;
 
+  if checkout_order.checkout_expires_at is not null
+    and checkout_order.checkout_expires_at <= now() then
+    update public.orders
+    set status = 'cancelled'
+    where id = checkout_order.id;
+
+    raise exception 'This checkout has expired.';
+  end if;
+
   select *
   into checkout_listing
   from public.listings
@@ -2687,7 +2739,14 @@ begin
 end;
 $$;
 
-create or replace function public.mark_withdrawal_paid(target_withdrawal_id uuid)
+create or replace function public.mark_withdrawal_paid(
+  target_withdrawal_id uuid,
+  payout_provider_name text,
+  payout_transaction_reference text,
+  payout_proof_file_name text default '',
+  payout_proof_file_path text default '',
+  payout_admin_note text default ''
+)
 returns void
 language plpgsql
 security definer
@@ -2720,6 +2779,11 @@ begin
     raise exception 'This withdrawal cannot be marked paid.';
   end if;
 
+  if trim(payout_provider_name) = ''
+    or trim(payout_transaction_reference) = '' then
+    raise exception 'Payout provider and transaction reference are required.';
+  end if;
+
   select *
   into withdrawal_profile
   from public.profiles
@@ -2734,6 +2798,11 @@ begin
   update public.withdrawal_requests
   set
     status = 'paid',
+    payout_provider = trim(payout_provider_name),
+    payout_reference = trim(payout_transaction_reference),
+    payout_proof_name = trim(payout_proof_file_name),
+    payout_proof_path = trim(payout_proof_file_path),
+    paid_note = trim(payout_admin_note),
     reviewed_by = auth.uid(),
     reviewed_at = coalesce(reviewed_at, now()),
     paid_at = now()
@@ -2757,7 +2826,14 @@ begin
     'completed',
     withdrawal.amount,
     'Withdrawal paid by admin.',
-    jsonb_build_object('withdrawal_request_id', withdrawal.id)
+    jsonb_build_object(
+      'withdrawal_request_id', withdrawal.id,
+      'payout_provider', trim(payout_provider_name),
+      'payout_reference', trim(payout_transaction_reference),
+      'payout_proof_name', trim(payout_proof_file_name),
+      'payout_proof_path', trim(payout_proof_file_path),
+      'paid_note', trim(payout_admin_note)
+    )
   );
 
   perform public.assert_wallet_reconciled(withdrawal.profile_id);
@@ -2779,7 +2855,13 @@ begin
       when withdrawal_profile.seller_enabled then '/seller/withdrawals'
       else '/account/withdrawals'
     end,
-    jsonb_build_object('withdrawal_request_id', withdrawal.id, 'amount', withdrawal.amount)
+    jsonb_build_object(
+      'withdrawal_request_id', withdrawal.id,
+      'amount', withdrawal.amount,
+      'payout_provider', trim(payout_provider_name),
+      'payout_reference', trim(payout_transaction_reference),
+      'paid_note', trim(payout_admin_note)
+    )
   );
 end;
 $$;

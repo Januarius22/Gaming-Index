@@ -23,8 +23,10 @@ import {
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import {
+  getPendingCheckoutExpiresAt,
   getNigeriaTimestamp,
   isOrderPaymentConfirmed,
+  isPendingCheckoutActive,
   isValidPhoneNumber
 } from "@/lib/utils";
 import type { ActionState } from "@/types";
@@ -203,7 +205,8 @@ async function createPendingOrderForListing({
       payment_reference: "",
       payment_channel: "card",
       payment_last4: "",
-      paid_at: null
+      paid_at: null,
+      checkout_expires_at: getPendingCheckoutExpiresAt()
     });
   }
 
@@ -230,7 +233,8 @@ async function createPendingOrderForListing({
       payment_reference: "",
       payment_channel: "card",
       payment_last4: "",
-      paid_at: null
+      paid_at: null,
+      checkout_expires_at: getPendingCheckoutExpiresAt()
     })
     .select("*")
     .single();
@@ -486,7 +490,7 @@ export async function buyNowAction(formData: FormData) {
 
   const buyerOrders = await getBuyerOrders(profile);
   const existingPendingOrder = buyerOrders.find(
-    (order) => order.listing_id === listingId && order.status === "pending"
+    (order) => order.listing_id === listingId && isPendingCheckoutActive(order)
   );
 
   if (existingPendingOrder) {

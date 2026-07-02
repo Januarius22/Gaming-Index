@@ -4,6 +4,7 @@ export const APP_TIME_ZONE = "Africa/Lagos";
 export const APP_TIME_LABEL = "WAT";
 export const SOLD_LISTING_PUBLIC_VISIBILITY_HOURS = 24 * 7;
 export const PLATFORM_COMMISSION_RATE = 0.15;
+export const PENDING_CHECKOUT_EXPIRY_MINUTES = 30;
 
 export function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -32,6 +33,25 @@ export function calculatePlatformFee(amount: number, rate = PLATFORM_COMMISSION_
 
 export function calculateSellerPayout(amount: number, rate = PLATFORM_COMMISSION_RATE) {
   return Math.max(amount - calculatePlatformFee(amount, rate), 0);
+}
+
+export function getPendingCheckoutExpiresAt(from = new Date()) {
+  return new Date(from.getTime() + PENDING_CHECKOUT_EXPIRY_MINUTES * 60 * 1000).toISOString();
+}
+
+export function isPendingCheckoutActive(order: {
+  status: OrderStatus;
+  checkout_expires_at?: string | null;
+}) {
+  if (order.status !== "pending") {
+    return false;
+  }
+
+  if (!order.checkout_expires_at) {
+    return true;
+  }
+
+  return new Date(order.checkout_expires_at).getTime() > Date.now();
 }
 
 export function formatDate(value: string) {

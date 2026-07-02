@@ -185,6 +185,8 @@ async function getSupabaseProfiles() {
     return [];
   }
 
+  await supabase.rpc("cancel_expired_pending_orders");
+
   const { data } = await supabase
     .from("profiles")
     .select("*")
@@ -380,6 +382,7 @@ function normalizeOrder(order: Order, listingTitle?: string | null): Order {
     payment_channel: order.payment_channel ?? "",
     payment_last4: order.payment_last4 ?? "",
     paid_at: order.paid_at ?? null,
+    checkout_expires_at: order.checkout_expires_at ?? null,
     escrow_status: order.escrow_status ?? "not_started",
     seller_hold_expires_at: order.seller_hold_expires_at ?? null,
     seller_released_at: order.seller_released_at ?? null,
@@ -487,6 +490,11 @@ function normalizeWithdrawalRequest(
     account_name: request.account_name ?? "",
     status: request.status ?? "pending",
     admin_note: request.admin_note ?? "",
+    payout_provider: request.payout_provider ?? "",
+    payout_reference: request.payout_reference ?? "",
+    payout_proof_name: request.payout_proof_name ?? "",
+    payout_proof_path: request.payout_proof_path ?? "",
+    paid_note: request.paid_note ?? "",
     reviewed_by: request.reviewed_by ?? null,
     reviewed_at: request.reviewed_at ?? null,
     paid_at: request.paid_at ?? null,
