@@ -10,7 +10,7 @@ import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrderDetail } from "@/lib/data";
-import { formatCurrency, formatDate, statusVariant } from "@/lib/utils";
+import { formatCurrency, formatDate, statusVariant, titleCase } from "@/lib/utils";
 
 function getNoticeMessage(notice?: string) {
   switch (notice) {
@@ -140,7 +140,7 @@ export default async function AccountOrderDetailPage({
           <div className="rounded-3xl bg-surface p-5">
             <p className="text-sm text-muted-foreground">Status</p>
             <div className="mt-2">
-              <Badge variant={statusVariant(order.status)}>{order.status}</Badge>
+              <Badge variant={statusVariant(order.status)}>{titleCase(order.status)}</Badge>
             </div>
           </div>
           <div className="rounded-3xl bg-surface p-5">
@@ -398,7 +398,7 @@ export default async function AccountOrderDetailPage({
                 <div className="rounded-3xl bg-surface p-5">
                   <p className="text-sm text-muted-foreground">Payment status</p>
                   <p className="mt-2 font-semibold capitalize text-foreground">
-                    {order.payment_status || "successful"}
+                    {titleCase(order.payment_status || "successful")}
                   </p>
                 </div>
                 <div className="rounded-3xl bg-surface p-5">

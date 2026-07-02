@@ -3,13 +3,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import PaginationControls from "@/components/ui/PaginationControls";
 import { requireSellerProfile } from "@/lib/auth";
 import { getProfileWalletTransactions } from "@/lib/data";
-import { formatCurrency, formatDate, paginateItems, parsePageParam } from "@/lib/utils";
+import { formatCurrency, formatDate, paginateItems, parsePageParam, titleCase } from "@/lib/utils";
 
 const bucketVariant = {
   available: "success",
   pending: "warning",
   external: "neutral"
 } as const;
+
+function formatTransactionType(value: string) {
+  return titleCase(value);
+}
 
 export default async function SellerTransactionsPage({
   searchParams
@@ -59,13 +63,15 @@ export default async function SellerTransactionsPage({
             >
               <div className="min-w-0">
                 <p className="break-words font-semibold text-foreground">
-                  {transaction.description || transaction.type}
+                  {transaction.description || formatTransactionType(transaction.type)}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                  <span>{transaction.type}</span>
+                  <span>{formatTransactionType(transaction.type)}</span>
                   <span aria-hidden="true">/</span>
                   <span>{formatDate(transaction.created_at)}</span>
-                  <Badge variant={bucketVariant[transaction.balance_bucket]}>{transaction.balance_bucket}</Badge>
+                  <Badge variant={bucketVariant[transaction.balance_bucket]}>
+                    {formatTransactionType(transaction.balance_bucket)}
+                  </Badge>
                 </div>
               </div>
               <p

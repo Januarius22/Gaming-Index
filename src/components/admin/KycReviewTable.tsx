@@ -9,7 +9,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Textarea from "@/components/ui/Textarea";
-import { formatDate, statusVariant } from "@/lib/utils";
+import { formatDate, statusVariant, titleCase } from "@/lib/utils";
 import type { KycSubmission } from "@/types";
 
 function isImageAsset(fileName?: string, assetUrl?: string) {
@@ -190,7 +190,7 @@ export default function KycReviewTable({
                     <td className="px-4 py-4">@{submission.username}</td>
                     <td className="px-4 py-4">{submission.email}</td>
                     <td className="px-4 py-4">
-                      <Badge variant={statusVariant(submission.status)}>{submission.status}</Badge>
+                      <Badge variant={statusVariant(submission.status)}>{titleCase(submission.status)}</Badge>
                     </td>
                     <td className="px-4 py-4">{formatDate(submission.created_at)}</td>
                     <td className="px-4 py-4">
@@ -301,7 +301,7 @@ export default function KycReviewTable({
               </p>
               <div className="mt-4 space-y-2 text-sm text-muted-foreground">
                 <p>Submitted: {formatDate(selectedSubmission.created_at)}</p>
-                <p>Status: {selectedSubmission.status}</p>
+                <p>Status: {titleCase(selectedSubmission.status)}</p>
                 <p>Address provided: {selectedSubmission.residential_address ? "Yes" : "No"}</p>
                 {selectedSubmission.rejection_reason ? (
                   <p>Admin note: {selectedSubmission.rejection_reason}</p>

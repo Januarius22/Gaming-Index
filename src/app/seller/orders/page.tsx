@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import PaginationControls from "@/components/ui/PaginationControls";
 import { getSellerOrders } from "@/lib/data";
 import { requireSellerProfile } from "@/lib/auth";
-import { formatCurrency, formatDate, paginateItems, parsePageParam, statusVariant } from "@/lib/utils";
+import { formatCurrency, formatDate, paginateItems, parsePageParam, statusVariant, titleCase } from "@/lib/utils";
 import Badge from "@/components/ui/Badge";
 
 export default async function SellerOrdersPage({
@@ -67,7 +67,7 @@ export default async function SellerOrdersPage({
                     <td className="px-4 py-4">{order.listing_title}</td>
                     <td className="px-4 py-4">{formatCurrency(order.amount)}</td>
                     <td className="px-4 py-4">
-                      <Badge variant={statusVariant(order.status)}>{order.status}</Badge>
+                      <Badge variant={statusVariant(order.status)}>{titleCase(order.status)}</Badge>
                     </td>
                     <td className="px-4 py-4">{formatDate(order.created_at)}</td>
                   </tr>

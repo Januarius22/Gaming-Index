@@ -4,7 +4,7 @@ import Button from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { requireSellerProfile } from "@/lib/auth";
 import { getSellerDisputes } from "@/lib/data";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
 
 const statusVariant = {
   open: "danger",
@@ -41,7 +41,7 @@ export default async function SellerDisputesPage() {
                   {formatCurrency(dispute.amount ?? 0)} - {formatDate(dispute.created_at)}
                 </p>
                 <div className="mt-3">
-                  <Badge variant={statusVariant[dispute.status]}>{dispute.status}</Badge>
+                  <Badge variant={statusVariant[dispute.status]}>{titleCase(dispute.status)}</Badge>
                 </div>
               </div>
               <Link href={`/seller/disputes/${dispute.id}`}>

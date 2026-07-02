@@ -10,7 +10,7 @@ import Button from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { requireAccountProfile } from "@/lib/auth";
 import { getDisputeCase } from "@/lib/data";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
 
 const statusVariant = {
   open: "danger",
@@ -67,7 +67,7 @@ export default async function AccountDisputeCasePage({
               {caseData.order ? `${formatCurrency(caseData.order.amount)} - ${formatDate(caseData.order.created_at)}` : "Order case"}
             </CardDescription>
           </div>
-          <Badge variant={statusVariant[caseData.dispute.status]}>{caseData.dispute.status}</Badge>
+          <Badge variant={statusVariant[caseData.dispute.status]}>{titleCase(caseData.dispute.status)}</Badge>
         </CardHeader>
         <CardContent className="space-y-3 text-sm leading-7 text-muted-foreground">
           <p>{caseData.dispute.details}</p>

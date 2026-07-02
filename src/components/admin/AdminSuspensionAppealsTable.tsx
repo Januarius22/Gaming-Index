@@ -10,7 +10,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Textarea from "@/components/ui/Textarea";
-import { formatDate } from "@/lib/utils";
+import { formatDate, titleCase } from "@/lib/utils";
 import type { SuspensionAppeal } from "@/types";
 
 const statusVariant = {
@@ -131,7 +131,7 @@ export default function AdminSuspensionAppealsTable({
                     <td className="px-4 py-4">
                       <div className="font-medium text-foreground">{appeal.profile_name ?? "User"}</div>
                       <div className="text-xs text-muted-foreground">
-                        @{appeal.profile_username ?? "user"} · {appeal.email || appeal.profile_email}
+                        @{appeal.profile_username ?? "user"} - {appeal.email || appeal.profile_email}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">{appeal.phone_number}</div>
                     </td>
@@ -149,7 +149,7 @@ export default function AdminSuspensionAppealsTable({
                       ) : null}
                     </td>
                     <td className="px-4 py-4">
-                      <Badge variant={statusVariant[appeal.status]}>{appeal.status}</Badge>
+                      <Badge variant={statusVariant[appeal.status]}>{titleCase(appeal.status)}</Badge>
                       {appeal.admin_note ? (
                         <p className="mt-2 max-w-xs text-xs text-muted-foreground">
                           Note: {appeal.admin_note}

@@ -8,7 +8,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import Textarea from "@/components/ui/Textarea";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
 import type { WithdrawalRequest } from "@/types";
 
 export default function AdminWithdrawalsTable({
@@ -119,7 +119,7 @@ export default function AdminWithdrawalsTable({
                     <td className="px-4 py-4">
                       <div className="font-medium text-foreground">{request.profile_name ?? "Seller"}</div>
                       <div className="text-xs text-muted-foreground">
-                        @{request.profile_username ?? "seller"} · {request.profile_email ?? ""}
+                        @{request.profile_username ?? "seller"} - {request.profile_email ?? ""}
                       </div>
                     </td>
                     <td className="px-4 py-4 font-semibold text-foreground">
@@ -128,7 +128,7 @@ export default function AdminWithdrawalsTable({
                     <td className="px-4 py-4">
                       <div>{request.bank_name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {request.account_name} · {request.account_number}
+                        {request.account_name} - {request.account_number}
                       </div>
                     </td>
                     <td className="px-4 py-4">
@@ -141,7 +141,7 @@ export default function AdminWithdrawalsTable({
                               : "warning"
                         }
                       >
-                        {request.status}
+                        {titleCase(request.status)}
                       </Badge>
                       {request.admin_note ? (
                         <p className="mt-2 max-w-xs text-xs text-muted-foreground">

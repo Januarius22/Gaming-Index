@@ -7,7 +7,7 @@ import { releaseSellerFundsInlineAction } from "@/actions/admin";
 import FormMessage from "@/components/auth/FormMessage";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
-import { formatCurrency, formatDate, statusVariant } from "@/lib/utils";
+import { formatCurrency, formatDate, statusVariant, titleCase } from "@/lib/utils";
 import type { Order } from "@/types";
 
 type BadgeVariant = ComponentProps<typeof Badge>["variant"];
@@ -125,15 +125,15 @@ export default function AdminOrdersTable({
                     <td className="px-4 py-4">{formatCurrency(order.amount)}</td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap gap-2">
-                        <Badge variant={statusVariant(order.status)}>{order.status}</Badge>
+                        <Badge variant={statusVariant(order.status)}>{titleCase(order.status)}</Badge>
                         <Badge variant={order.payment_status === "successful" ? "success" : "neutral"}>
-                          {order.payment_status ?? "pending"}
+                          {titleCase(order.payment_status ?? "pending")}
                         </Badge>
                       </div>
                     </td>
                     <td className="px-4 py-4">
                       <div className="space-y-1">
-                        <Badge variant={getEscrowVariant(escrowStatus)}>{escrowStatus}</Badge>
+                        <Badge variant={getEscrowVariant(escrowStatus)}>{titleCase(escrowStatus)}</Badge>
                         {order.seller_hold_expires_at && escrowStatus === "holding" ? (
                           <div className="text-xs text-muted-foreground">
                             Hold ends {formatDate(order.seller_hold_expires_at)}

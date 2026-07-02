@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Input from "@/components/ui/Input";
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrderDetail } from "@/lib/data";
-import { formatCurrency, formatDate, statusVariant } from "@/lib/utils";
+import { formatCurrency, formatDate, statusVariant, titleCase } from "@/lib/utils";
 
 function getNoticeMessage(notice?: string) {
   switch (notice) {
@@ -135,7 +135,7 @@ export default async function AccountCheckoutPage({
                     {listing.game}
                   </span>
                 ) : null}
-                <Badge variant={statusVariant(order.status)}>{order.status}</Badge>
+                <Badge variant={statusVariant(order.status)}>{titleCase(order.status)}</Badge>
                 <Badge variant="warning">Awaiting payment</Badge>
               </div>
 
@@ -240,7 +240,7 @@ export default async function AccountCheckoutPage({
               <CardHeader>
                 <CardTitle>Secure payment</CardTitle>
                 <CardDescription>
-                  Complete this test checkout through the future provider-style flow.
+                  Complete payment securely to continue with this order.
                 </CardDescription>
               </CardHeader>
               <CardContent>

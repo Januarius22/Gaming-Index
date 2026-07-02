@@ -37,14 +37,13 @@ export default async function AccountSettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Workspace preferences</CardTitle>
+          <CardTitle>Workspace status</CardTitle>
           <CardDescription>
-            Reserved for saved carts, buyer notifications, dispute settings, and profile
-            edits later.
+            Your account tools are separated so buyer activity and seller activity stay organized.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm leading-7 text-muted-foreground">
-          <p>Buyer-facing alerts and order tracking controls can live here later.</p>
+          <p>Notifications, wallet activity, orders, and disputes are available from the dashboard menu.</p>
           <p>Seller tools remain separate so your buying workflow stays clean and focused.</p>
         </CardContent>
       </Card>

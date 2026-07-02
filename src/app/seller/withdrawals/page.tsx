@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import WithdrawalRequestForm from "@/components/seller/WithdrawalRequestForm";
 import { requireSellerProfile } from "@/lib/auth";
 import { getProfileWallet, getSellerWithdrawalRequests } from "@/lib/data";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
 
 const statusVariant = {
   paid: "success",
@@ -85,7 +85,7 @@ export default async function SellerWithdrawalsPage() {
                   ) : null}
                 </div>
                 <Badge variant={statusVariant[request.status]} className="self-start sm:self-center">
-                  {request.status}
+                  {titleCase(request.status)}
                 </Badge>
               </div>
             ))

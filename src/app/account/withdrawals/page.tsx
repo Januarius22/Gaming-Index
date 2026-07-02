@@ -4,7 +4,7 @@ import BuyerWithdrawalRequestForm from "@/components/account/BuyerWithdrawalRequ
 import PaginationControls from "@/components/ui/PaginationControls";
 import { requireAccountProfile } from "@/lib/auth";
 import { getProfileWallet, getProfileWithdrawalRequests } from "@/lib/data";
-import { formatCurrency, formatDate, paginateItems, parsePageParam } from "@/lib/utils";
+import { formatCurrency, formatDate, paginateItems, parsePageParam, titleCase } from "@/lib/utils";
 
 const statusVariant = {
   paid: "success",
@@ -111,7 +111,7 @@ export default async function AccountWithdrawalsPage({
                   ) : null}
                 </div>
                 <Badge variant={statusVariant[request.status]} className="self-start sm:self-center">
-                  {request.status}
+                  {titleCase(request.status)}
                 </Badge>
               </div>
             ))

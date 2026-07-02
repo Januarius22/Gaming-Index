@@ -2,7 +2,7 @@ import Badge from "@/components/ui/Badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import PaginationControls from "@/components/ui/PaginationControls";
 import { getAdminSellers } from "@/lib/data";
-import { formatDate, paginateItems, parsePageParam, statusVariant } from "@/lib/utils";
+import { formatDate, paginateItems, parsePageParam, statusVariant, titleCase } from "@/lib/utils";
 
 export default async function AdminSellersPage({
   searchParams
@@ -65,7 +65,7 @@ export default async function AdminSellersPage({
                     <td className="px-4 py-4">@{seller.username}</td>
                     <td className="px-4 py-4">{seller.email}</td>
                     <td className="px-4 py-4">
-                      <Badge variant={statusVariant(seller.kyc_status)}>{seller.kyc_status}</Badge>
+                      <Badge variant={statusVariant(seller.kyc_status)}>{titleCase(seller.kyc_status)}</Badge>
                     </td>
                     <td className="px-4 py-4">{formatDate(seller.created_at)}</td>
                   </tr>

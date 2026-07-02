@@ -13,7 +13,7 @@ import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { requireSellerProfile } from "@/lib/auth";
 import { getProfileWallet, getSellerWithdrawalRequests } from "@/lib/data";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { cn, formatCurrency, formatDate, titleCase } from "@/lib/utils";
 
 const statusVariant = {
   paid: "success",
@@ -188,7 +188,7 @@ export default async function SellerWalletPage() {
                 </p>
               </div>
               <Badge variant={statusVariant[latestWithdrawal.status]}>
-                {latestWithdrawal.status}
+                {titleCase(latestWithdrawal.status)}
               </Badge>
             </div>
           </CardContent>

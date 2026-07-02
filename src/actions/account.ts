@@ -295,78 +295,32 @@ async function markOrderPaid({
     return { ok: false as const, reason: "payment-failed" };
   }
 
-  const { data: soldListing, error: listingError } = await supabase
-    .from("listings")
-    .update({ status: "sold", sold_at: paidAt })
-    .eq("id", listingId)
-    .eq("status", "approved")
-    .select("id")
-    .maybeSingle();
-
-  if (listingError || !soldListing) {
-    return { ok: false as const, reason: "listing-unavailable" };
-  }
-
-  const { error: orderError } = await supabase
-    .from("orders")
-    .update({
-      buyer_phone: buyerPhone,
-      status: "completed",
-      payment_status: "successful",
-      payment_provider: paymentProvider,
-      payment_reference: paymentReference,
-      payment_channel: paymentChannel,
-      payment_last4: paymentLast4,
-      paid_at: paidAt
-    })
-    .eq("id", orderId);
-
-  if (orderError) {
-    await supabase
-      .from("listings")
-      .update({ status: "approved" })
-      .eq("id", listingId)
-      .eq("status", "sold");
-
-    return { ok: false as const, reason: "payment-failed" };
-  }
-
-  const { error: escrowError } = await supabase.rpc("record_seller_pending_earning", {
-    target_order_id: orderId
+  const { error: checkoutError } = await supabase.rpc("complete_checkout_payment", {
+    target_order_id: orderId,
+    buyer_phone_number: buyerPhone,
+    checkout_payment_reference: paymentReference,
+    checkout_payment_last4: paymentLast4,
+    checkout_payment_provider: paymentProvider,
+    checkout_payment_channel: paymentChannel,
+    checkout_paid_at: paidAt
   });
 
-  if (escrowError) {
-    console.error("Seller pending escrow failed", {
+  if (checkoutError) {
+    console.error("Checkout completion failed", {
       orderId,
       listingId,
-      message: escrowError.message,
-      details: escrowError.details,
-      hint: escrowError.hint,
-      code: escrowError.code
+      message: checkoutError.message,
+      details: checkoutError.details,
+      hint: checkoutError.hint,
+      code: checkoutError.code
     });
 
-    await supabase
-      .from("orders")
-      .update({
-        status: "pending",
-        payment_status: "pending",
-        payment_provider: "",
-        payment_reference: "",
-        payment_channel: paymentChannel,
-        payment_last4: "",
-        paid_at: null,
-        escrow_status: "not_started",
-        seller_hold_expires_at: null
-      })
-      .eq("id", orderId);
-
-    await supabase
-      .from("listings")
-      .update({ status: "approved", sold_at: null })
-      .eq("id", listingId)
-      .eq("status", "sold");
-
-    return { ok: false as const, reason: "payment-failed" };
+    return {
+      ok: false as const,
+      reason: checkoutError.message.toLowerCase().includes("listing")
+        ? "listing-unavailable"
+        : "payment-failed"
+    };
   }
 
   return { ok: true as const };

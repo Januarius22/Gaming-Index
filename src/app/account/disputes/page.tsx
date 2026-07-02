@@ -6,7 +6,7 @@ import Button from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerDisputeCandidates, getBuyerDisputes } from "@/lib/data";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
 
 const statusVariant = {
   open: "danger",
@@ -48,7 +48,7 @@ export default async function AccountDisputesPage() {
                   </p>
                   {dispute ? (
                     <div className="mt-3">
-                      <Badge variant={statusVariant[dispute.status]}>{dispute.status}</Badge>
+                      <Badge variant={statusVariant[dispute.status]}>{titleCase(dispute.status)}</Badge>
                     </div>
                   ) : null}
                 </div>
@@ -89,7 +89,7 @@ export default async function AccountDisputesPage() {
                   <p className="font-semibold text-foreground">{dispute.listing_title || "Order case"}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{dispute.reason}</p>
                 </div>
-                <Badge variant={statusVariant[dispute.status]}>{dispute.status}</Badge>
+                <Badge variant={statusVariant[dispute.status]}>{titleCase(dispute.status)}</Badge>
               </Link>
             ))
           )}

@@ -8,7 +8,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Textarea from "@/components/ui/Textarea";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
 import type { Dispute, DisputeStatus } from "@/types";
 
 const statusVariant = {
@@ -130,7 +130,7 @@ export default function AdminDisputesTable({ disputes }: { disputes: Dispute[] }
                       </p>
                     </td>
                     <td className="px-4 py-4">
-                      <Badge variant={statusVariant[dispute.status]}>{dispute.status}</Badge>
+                      <Badge variant={statusVariant[dispute.status]}>{titleCase(dispute.status)}</Badge>
                       {dispute.admin_note ? (
                         <p className="mt-2 max-w-xs text-xs text-muted-foreground">
                           Note: {dispute.admin_note}

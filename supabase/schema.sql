@@ -1754,6 +1754,90 @@ begin
 end;
 $$;
 
+create or replace function public.complete_checkout_payment(
+  target_order_id uuid,
+  buyer_phone_number text,
+  checkout_payment_reference text,
+  checkout_payment_last4 text,
+  checkout_payment_provider text,
+  checkout_payment_channel text,
+  checkout_paid_at timestamp with time zone default now()
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  checkout_order public.orders%rowtype;
+  checkout_listing public.listings%rowtype;
+begin
+  if auth.uid() is null then
+    raise exception 'You must be signed in to complete checkout.';
+  end if;
+
+  select *
+  into checkout_order
+  from public.orders
+  where id = target_order_id
+  for update;
+
+  if not found then
+    raise exception 'Order not found.';
+  end if;
+
+  if checkout_order.buyer_id is distinct from auth.uid()
+    and not exists (
+      select 1
+      from public.profiles as buyer_profile
+      where buyer_profile.id = auth.uid()
+        and lower(buyer_profile.email) = lower(checkout_order.buyer_email)
+    ) then
+    raise exception 'This checkout does not belong to your account.';
+  end if;
+
+  if checkout_order.status <> 'pending'
+    or checkout_order.payment_status <> 'pending' then
+    raise exception 'This checkout is no longer pending.';
+  end if;
+
+  select *
+  into checkout_listing
+  from public.listings
+  where id = checkout_order.listing_id
+  for update;
+
+  if not found or checkout_listing.status <> 'approved' then
+    raise exception 'This listing is no longer available.';
+  end if;
+
+  if checkout_listing.seller_id = auth.uid() then
+    raise exception 'You cannot buy your own listing.';
+  end if;
+
+  update public.listings
+  set
+    status = 'sold',
+    sold_at = checkout_paid_at
+  where id = checkout_listing.id
+    and status = 'approved';
+
+  update public.orders
+  set
+    buyer_phone = trim(buyer_phone_number),
+    status = 'completed',
+    payment_status = 'successful',
+    payment_provider = checkout_payment_provider,
+    payment_reference = checkout_payment_reference,
+    payment_channel = checkout_payment_channel,
+    payment_last4 = checkout_payment_last4,
+    paid_at = checkout_paid_at
+  where id = checkout_order.id;
+
+  perform public.record_seller_pending_earning(checkout_order.id);
+end;
+$$;
+
 create or replace function public.release_seller_earning(target_order_id uuid)
 returns void
 language plpgsql
@@ -2358,19 +2442,43 @@ create policy "sellers can insert their own kyc submission"
   with check (auth.uid() = seller_id);
 
 drop policy if exists "authenticated users can read kyc submissions" on public.kyc_submissions;
-create policy "authenticated users can read kyc submissions"
+drop policy if exists "sellers and admins can read kyc submissions" on public.kyc_submissions;
+create policy "sellers and admins can read kyc submissions"
   on public.kyc_submissions
   for select
   to authenticated
-  using (true);
+  using (
+    auth.uid() = seller_id
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
 
 drop policy if exists "authenticated users can update kyc submissions" on public.kyc_submissions;
-create policy "authenticated users can update kyc submissions"
+drop policy if exists "admins can update kyc submissions" on public.kyc_submissions;
+create policy "admins can update kyc submissions"
   on public.kyc_submissions
   for update
   to authenticated
-  using (true)
-  with check (true);
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
 
 drop policy if exists "sellers can insert their own listings" on public.listings;
 create policy "sellers can insert their own listings"
@@ -2384,22 +2492,54 @@ create policy "authenticated users can read listings"
   on public.listings
   for select
   to authenticated
-  using (true);
+  using (
+    status in ('approved', 'sold')
+    or auth.uid() = seller_id
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
 
 drop policy if exists "public can read live marketplace listings" on public.listings;
 create policy "public can read live marketplace listings"
   on public.listings
   for select
   to anon
-  using (status in ('approved', 'sold', 'pending_review'));
+  using (status in ('approved', 'sold'));
 
 drop policy if exists "authenticated users can update listings" on public.listings;
-create policy "authenticated users can update listings"
+drop policy if exists "sellers can update their own listings" on public.listings;
+create policy "sellers can update their own listings"
   on public.listings
   for update
   to authenticated
-  using (true)
-  with check (true);
+  using (auth.uid() = seller_id)
+  with check (auth.uid() = seller_id);
+
+drop policy if exists "admins can update any listing" on public.listings;
+create policy "admins can update any listing"
+  on public.listings
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
 
 drop policy if exists "sellers can delete their own listings" on public.listings;
 create policy "sellers can delete their own listings"
@@ -2515,26 +2655,33 @@ create policy "buyers can insert their own orders"
   );
 
 drop policy if exists "buyers can update their own orders" on public.orders;
-create policy "buyers can update their own orders"
+drop policy if exists "buyers can cancel their own pending orders" on public.orders;
+create policy "buyers can cancel their own pending orders"
   on public.orders
   for update
   to authenticated
   using (
-    auth.uid() = buyer_id
-    or exists (
-      select 1
-      from public.profiles as buyer_profile
-      where buyer_profile.id = auth.uid()
-        and lower(buyer_profile.email) = lower(public.orders.buyer_email)
+    status = 'pending'
+    and (
+      auth.uid() = buyer_id
+      or exists (
+        select 1
+        from public.profiles as buyer_profile
+        where buyer_profile.id = auth.uid()
+          and lower(buyer_profile.email) = lower(public.orders.buyer_email)
+      )
     )
   )
   with check (
-    auth.uid() = buyer_id
-    or exists (
-      select 1
-      from public.profiles as buyer_profile
-      where buyer_profile.id = auth.uid()
-        and lower(buyer_profile.email) = lower(public.orders.buyer_email)
+    status = 'cancelled'
+    and (
+      auth.uid() = buyer_id
+      or exists (
+        select 1
+        from public.profiles as buyer_profile
+        where buyer_profile.id = auth.uid()
+          and lower(buyer_profile.email) = lower(public.orders.buyer_email)
+      )
     )
   );
 
@@ -3038,11 +3185,23 @@ create policy "authenticated users can upload their own kyc files"
   );
 
 drop policy if exists "authenticated users can read kyc files" on storage.objects;
-create policy "authenticated users can read kyc files"
+drop policy if exists "owners and admins can read kyc files" on storage.objects;
+create policy "owners and admins can read kyc files"
   on storage.objects
   for select
   to authenticated
-  using (bucket_id = 'kyc-documents');
+  using (
+    bucket_id = 'kyc-documents'
+    and (
+      auth.uid()::text = (storage.foldername(name))[1]
+      or exists (
+        select 1
+        from public.profiles as admin_profile
+        where admin_profile.id = auth.uid()
+          and admin_profile.role = 'admin'
+      )
+    )
+  );
 
 drop policy if exists "authenticated users can delete their own kyc files" on storage.objects;
 create policy "authenticated users can delete their own kyc files"
@@ -3107,11 +3266,29 @@ create policy "case participants can upload dispute evidence"
   );
 
 drop policy if exists "authenticated users can read dispute evidence" on storage.objects;
-create policy "authenticated users can read dispute evidence"
+drop policy if exists "case participants and admins can read dispute evidence" on storage.objects;
+create policy "case participants and admins can read dispute evidence"
   on storage.objects
   for select
   to authenticated
-  using (bucket_id = 'dispute-evidence');
+  using (
+    bucket_id = 'dispute-evidence'
+    and (
+      auth.uid()::text = (storage.foldername(name))[1]
+      or exists (
+        select 1
+        from public.disputes as dispute
+        where dispute.id::text = (storage.foldername(name))[2]
+          and (dispute.buyer_id = auth.uid() or dispute.seller_id = auth.uid())
+      )
+      or exists (
+        select 1
+        from public.profiles as admin_profile
+        where admin_profile.id = auth.uid()
+          and admin_profile.role = 'admin'
+      )
+    )
+  );
 
 drop policy if exists "users can delete their own dispute evidence" on storage.objects;
 create policy "users can delete their own dispute evidence"

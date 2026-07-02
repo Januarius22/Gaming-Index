@@ -26,17 +26,6 @@ export default async function SellerSettingsPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* <Card>
-        <CardHeader>
-          <CardTitle>Workspace preferences</CardTitle>
-          <CardDescription>Reserved for notification settings, payout preferences, and profile edits.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm leading-7 text-muted-foreground">
-          <p>Email notifications for order updates will live here later.</p>
-          <p>Password management and payout preferences can be added without disturbing layout boundaries.</p>
-        </CardContent>
-      </Card> */}
     </div>
   );
 }

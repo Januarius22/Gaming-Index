@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import PaginationControls from "@/components/ui/PaginationControls";
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrders } from "@/lib/data";
-import { formatCurrency, formatDate, paginateItems, parsePageParam, statusVariant } from "@/lib/utils";
+import { formatCurrency, formatDate, paginateItems, parsePageParam, statusVariant, titleCase } from "@/lib/utils";
 
 export default async function AccountOrdersPage({
   searchParams
@@ -80,7 +80,7 @@ export default async function AccountOrdersPage({
                     <td className="px-4 py-4">{order.listing_title}</td>
                     <td className="px-4 py-4">{formatCurrency(order.amount)}</td>
                     <td className="px-4 py-4">
-                      <Badge variant={statusVariant(order.status)}>{order.status}</Badge>
+                      <Badge variant={statusVariant(order.status)}>{titleCase(order.status)}</Badge>
                     </td>
                     <td className="px-4 py-4">{formatDate(order.created_at)}</td>
                     <td className="px-4 py-4">
