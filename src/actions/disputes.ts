@@ -123,6 +123,22 @@ export async function submitDisputeMessage(formData: FormData): Promise<ActionSt
     .getAll("durationSeconds")
     .map((value) => Number(String(value)))
     .filter((value) => Number.isFinite(value));
+  const uploadedFileNames = formData
+    .getAll("uploadedFileNames")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  const uploadedFilePaths = formData
+    .getAll("uploadedFilePaths")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  const uploadedFileTypes = formData
+    .getAll("uploadedFileTypes")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  const uploadedDurations = formData
+    .getAll("uploadedDurationSeconds")
+    .map((value) => Number(String(value)))
+    .filter((value) => Number.isFinite(value));
   const files = formData
     .getAll("evidenceFiles")
     .filter((value): value is File => value instanceof File && value.size > 0);
@@ -141,14 +157,18 @@ export async function submitDisputeMessage(formData: FormData): Promise<ActionSt
     };
   }
 
-  if (!message && files.length === 0) {
+  if (!message && files.length === 0 && uploadedFilePaths.length === 0) {
     return {
       status: "error",
       message: "Add a message or evidence."
     };
   }
 
-  if (files.length > MAX_EVIDENCE_FILES) {
+  if (
+    files.length > MAX_EVIDENCE_FILES ||
+    uploadedFilePaths.length > MAX_EVIDENCE_FILES ||
+    files.length + uploadedFilePaths.length > MAX_EVIDENCE_FILES
+  ) {
     return {
       status: "error",
       message: "Upload up to five evidence files at once."
@@ -170,6 +190,62 @@ export async function submitDisputeMessage(formData: FormData): Promise<ActionSt
 
   let imageCount = 0;
   let videoCount = 0;
+
+  if (uploadedFilePaths.length > 0) {
+    if (
+      uploadedFilePaths.length !== uploadedFileNames.length ||
+      uploadedFilePaths.length !== uploadedFileTypes.length
+    ) {
+      return {
+        status: "error",
+        message: "Evidence details are incomplete."
+      };
+    }
+
+    for (const [index, filePath] of uploadedFilePaths.entries()) {
+      const fileType = uploadedFileTypes[index];
+      const duration = uploadedDurations[index] ?? 0;
+
+      if (fileType !== "image" && fileType !== "video") {
+        return {
+          status: "error",
+          message: "Evidence must be an image or video."
+        };
+      }
+
+      if (!filePath.startsWith(`${profile.id}/${disputeId}/`)) {
+        return {
+          status: "error",
+          message: "Evidence path is invalid."
+        };
+      }
+
+      if (fileType === "image") {
+        imageCount += 1;
+      } else {
+        videoCount += 1;
+      }
+
+      if (imageCount > MAX_EVIDENCE_IMAGES || videoCount > MAX_EVIDENCE_VIDEOS) {
+        return {
+          status: "error",
+          message: "Upload up to four images and one video."
+        };
+      }
+
+      if (fileType === "video" && duration > MAX_VIDEO_SECONDS) {
+        return {
+          status: "error",
+          message: "Video evidence must be 15 seconds or less."
+        };
+      }
+
+      fileNames.push(safeFileName(uploadedFileNames[index] || `evidence-${index + 1}`));
+      filePaths.push(filePath);
+      fileTypes.push(fileType);
+      fileDurations.push(fileType === "video" ? duration : 0);
+    }
+  }
 
   for (const [index, file] of files.entries()) {
     const isImage = file.type.startsWith("image/");

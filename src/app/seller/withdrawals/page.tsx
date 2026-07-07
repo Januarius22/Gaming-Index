@@ -84,6 +84,22 @@ export default async function SellerWithdrawalsPage() {
                       <p className="mt-1 break-words text-muted-foreground">{request.admin_note}</p>
                     </div>
                   ) : null}
+                  {request.payout_reference ? (
+                    <div className="mt-2 rounded-2xl bg-white p-3 text-sm">
+                      <p className="font-semibold text-foreground">Payout reference</p>
+                      <p className="mt-1 break-words text-muted-foreground">{request.payout_reference}</p>
+                      {request.payout_proof_url ? (
+                        <a
+                          href={request.payout_proof_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-2 inline-flex font-semibold text-primary hover:text-primary-dark"
+                        >
+                          View payout proof
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
                 <Badge variant={statusVariant[request.status]} className="self-start sm:self-center">
                   {titleCase(request.status)}

@@ -185,8 +185,6 @@ async function getSupabaseProfiles() {
     return [];
   }
 
-  await supabase.rpc("clear_expired_pending_orders");
-
   const { data } = await supabase
     .from("profiles")
     .select("*")
@@ -346,6 +344,8 @@ async function getSupabaseOrders() {
     return [];
   }
 
+  await supabase.rpc("clear_expired_pending_orders");
+
   const { data } = await supabase
     .from("orders")
     .select("*")
@@ -494,6 +494,7 @@ function normalizeWithdrawalRequest(
     payout_reference: request.payout_reference ?? "",
     payout_proof_name: request.payout_proof_name ?? "",
     payout_proof_path: request.payout_proof_path ?? "",
+    payout_proof_url: request.payout_proof_url ?? "",
     paid_note: request.paid_note ?? "",
     reviewed_by: request.reviewed_by ?? null,
     reviewed_at: request.reviewed_at ?? null,
@@ -502,6 +503,35 @@ function normalizeWithdrawalRequest(
     profile_email: profile?.email,
     profile_username: profile?.username
   };
+}
+
+async function attachWithdrawalProofUrls(requests: WithdrawalRequest[]) {
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    return requests;
+  }
+
+  return Promise.all(
+    requests.map(async (request) => {
+      if (!request.payout_proof_path) {
+        return request;
+      }
+
+      const { data, error } = await supabase.storage
+        .from("withdrawal-proofs")
+        .createSignedUrl(request.payout_proof_path, 60 * 15);
+
+      if (error || !data?.signedUrl) {
+        return request;
+      }
+
+      return {
+        ...request,
+        payout_proof_url: data.signedUrl
+      };
+    })
+  );
 }
 
 export async function getSellerWithdrawalRequests(profileId: string) {
@@ -522,8 +552,10 @@ export async function getSellerWithdrawalRequests(profileId: string) {
       .eq("profile_id", profileId)
       .order("created_at", { ascending: false });
 
-    return ((data as WithdrawalRequest[] | null) ?? []).map((request) =>
-      normalizeWithdrawalRequest(request)
+    return attachWithdrawalProofUrls(
+      ((data as WithdrawalRequest[] | null) ?? []).map((request) =>
+        normalizeWithdrawalRequest(request)
+      )
     );
   } catch {
     return [] as WithdrawalRequest[];
@@ -942,8 +974,10 @@ export async function getAdminWithdrawalRequests() {
       ])
     );
 
-    return requests.map((request) =>
-      normalizeWithdrawalRequest(request, profileMap.get(request.profile_id))
+    return attachWithdrawalProofUrls(
+      requests.map((request) =>
+        normalizeWithdrawalRequest(request, profileMap.get(request.profile_id))
+      )
     );
   } catch {
     return [] as WithdrawalRequest[];

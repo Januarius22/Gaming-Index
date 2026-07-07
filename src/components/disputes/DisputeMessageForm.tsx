@@ -6,16 +6,28 @@ import { FileImage, Paperclip, Send, Video, X } from "lucide-react";
 import FormMessage from "@/components/auth/FormMessage";
 import Button from "@/components/ui/Button";
 import Textarea from "@/components/ui/Textarea";
+import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabaseClient";
 const MAX_FILES = 5;
 const MAX_IMAGES = 4;
 const MAX_VIDEOS = 1;
 const MAX_VIDEO_SECONDS = 15;
+const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
+const MAX_VIDEO_SIZE = 25 * 1024 * 1024;
+const DISPUTE_EVIDENCE_BUCKET = "dispute-evidence";
 
 type SelectedEvidence = {
   name: string;
   kind: "image" | "video";
   duration: number;
+  file: File;
 };
+
+function safeEvidenceFileName(fileName: string) {
+  return fileName
+    .replace(/[^a-zA-Z0-9._-]/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 90);
+}
 
 export default function DisputeMessageForm({
   disputeId,
@@ -93,6 +105,22 @@ export default function DisputeMessageForm({
         return;
       }
 
+      if (isImage && file.size > MAX_IMAGE_SIZE) {
+        setFileError("Images must be 8MB or less.");
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
+
+      if (isVideo && file.size > MAX_VIDEO_SIZE) {
+        setFileError("Videos must be 25MB or less.");
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
+
       if (file.type.startsWith("video/")) {
         const duration = await getVideoDuration(file);
 
@@ -105,10 +133,10 @@ export default function DisputeMessageForm({
         }
 
         nextDurations.push(duration);
-        nextEvidence.push({ name: file.name || "Video evidence", kind: "video", duration });
+        nextEvidence.push({ name: file.name || "Video evidence", kind: "video", duration, file });
       } else {
         nextDurations.push(0);
-        nextEvidence.push({ name: file.name || "Image evidence", kind: "image", duration: 0 });
+        nextEvidence.push({ name: file.name || "Image evidence", kind: "image", duration: 0, file });
       }
     }
 
@@ -142,9 +170,9 @@ export default function DisputeMessageForm({
       return;
     }
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData();
     const optimisticId = `pending-${crypto.randomUUID()}`;
-    const messageBody = String(formData.get("message") ?? "").trim();
+    const messageBody = String(new FormData(event.currentTarget).get("message") ?? "").trim();
     setPending(true);
     window.dispatchEvent(
       new CustomEvent("dispute-message:pending", {
@@ -172,7 +200,43 @@ export default function DisputeMessageForm({
       })
     );
 
+    const uploadedPaths: string[] = [];
+
     try {
+      formData.set("disputeId", disputeId);
+      formData.set("orderId", orderId ?? "");
+      formData.set("returnTo", returnTo);
+      formData.set("message", messageBody);
+
+      if (selectedEvidence.length > 0) {
+        if (!hasSupabaseEnv) {
+          throw new Error("Connect Supabase to upload evidence.");
+        }
+
+        const supabase = getSupabaseBrowserClient();
+
+        for (const evidence of selectedEvidence) {
+          const fileName = safeEvidenceFileName(evidence.name || "evidence");
+          const filePath = `${currentUserId}/${disputeId}/${crypto.randomUUID()}-${fileName}`;
+          const { error } = await supabase!.storage
+            .from(DISPUTE_EVIDENCE_BUCKET)
+            .upload(filePath, evidence.file, {
+              contentType: evidence.file.type || "application/octet-stream",
+              upsert: false
+            });
+
+          if (error) {
+            throw new Error(error.message);
+          }
+
+          uploadedPaths.push(filePath);
+          formData.append("uploadedFileNames", fileName);
+          formData.append("uploadedFilePaths", filePath);
+          formData.append("uploadedFileTypes", evidence.kind);
+          formData.append("uploadedDurationSeconds", String(evidence.duration));
+        }
+      }
+
       const response = await fetch("/api/disputes/messages", {
         method: "POST",
         body: formData
@@ -180,6 +244,10 @@ export default function DisputeMessageForm({
       const result = (await response.json()) as { status: "success" | "error"; message?: string };
 
       if (!response.ok || result.status === "error") {
+        if (uploadedPaths.length > 0) {
+          await getSupabaseBrowserClient()?.storage.from(DISPUTE_EVIDENCE_BUCKET).remove(uploadedPaths);
+        }
+
         window.dispatchEvent(
           new CustomEvent("dispute-message:failed", {
             detail: { id: optimisticId }
@@ -200,14 +268,18 @@ export default function DisputeMessageForm({
       formRef.current?.reset();
       clearFiles();
       router.refresh();
-    } catch {
+    } catch (error) {
+      if (uploadedPaths.length > 0) {
+        await getSupabaseBrowserClient()?.storage.from(DISPUTE_EVIDENCE_BUCKET).remove(uploadedPaths);
+      }
+
       window.dispatchEvent(
         new CustomEvent("dispute-message:failed", {
           detail: { id: optimisticId }
         })
       );
       setFeedback({
-        message: "Message could not be sent. Please try again.",
+        message: error instanceof Error ? error.message : "Message could not be sent. Please try again.",
         tone: "error"
       });
     } finally {

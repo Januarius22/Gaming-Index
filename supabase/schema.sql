@@ -128,6 +128,10 @@ insert into storage.buckets (id, name, public)
 values ('dispute-evidence', 'dispute-evidence', false)
 on conflict (id) do nothing;
 
+insert into storage.buckets (id, name, public)
+values ('withdrawal-proofs', 'withdrawal-proofs', false)
+on conflict (id) do nothing;
+
 create table if not exists public.listings (
   id uuid primary key default gen_random_uuid(),
   seller_id uuid not null references public.profiles(id) on delete cascade,
@@ -2791,6 +2795,11 @@ begin
     raise exception 'Payout provider and transaction reference are required.';
   end if;
 
+  if trim(payout_proof_file_path) <> ''
+    and split_part(trim(payout_proof_file_path), '/', 1) <> target_withdrawal_id::text then
+    raise exception 'Payout proof path is invalid.';
+  end if;
+
   select *
   into withdrawal_profile
   from public.profiles
@@ -2978,6 +2987,24 @@ create trigger protect_profile_admin_fields_before_update
   before update on public.profiles
   for each row execute procedure public.protect_profile_admin_fields();
 
+create or replace function public.current_profile_is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.profiles as admin_profile
+    where admin_profile.id = auth.uid()
+      and admin_profile.role = 'admin'
+  );
+$$;
+
+revoke all on function public.current_profile_is_admin() from public, anon;
+grant execute on function public.current_profile_is_admin() to authenticated;
+
 alter table public.profiles enable row level security;
 alter table public.profile_settings enable row level security;
 alter table public.kyc_submissions enable row level security;
@@ -3000,11 +3027,12 @@ alter table public.notifications enable row level security;
 alter table public.seller_ratings enable row level security;
 
 drop policy if exists "profiles readable by authenticated users" on public.profiles;
-create policy "profiles readable by authenticated users"
+drop policy if exists "users and admins can read profiles" on public.profiles;
+create policy "users and admins can read profiles"
   on public.profiles
   for select
   to authenticated
-  using (true);
+  using (auth.uid() = id or public.current_profile_is_admin());
 
 drop policy if exists "users can update their own profile" on public.profiles;
 create policy "users can update their own profile"
@@ -3019,22 +3047,8 @@ create policy "admins can update any profile"
   on public.profiles
   for update
   to authenticated
-  using (
-    exists (
-      select 1
-      from public.profiles as admin_profile
-      where admin_profile.id = auth.uid()
-        and admin_profile.role = 'admin'
-    )
-  )
-  with check (
-    exists (
-      select 1
-      from public.profiles as admin_profile
-      where admin_profile.id = auth.uid()
-        and admin_profile.role = 'admin'
-    )
-  );
+  using (public.current_profile_is_admin())
+  with check (public.current_profile_is_admin());
 
 drop policy if exists "users can read their own profile settings" on public.profile_settings;
 create policy "users can read their own profile settings"
@@ -4057,6 +4071,59 @@ create policy "admins can delete any dispute evidence"
   to authenticated
   using (
     bucket_id = 'dispute-evidence'
+    and exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "admins can upload withdrawal proofs" on storage.objects;
+create policy "admins can upload withdrawal proofs"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (
+    bucket_id = 'withdrawal-proofs'
+    and exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "withdrawal owners and admins can read withdrawal proofs" on storage.objects;
+create policy "withdrawal owners and admins can read withdrawal proofs"
+  on storage.objects
+  for select
+  to authenticated
+  using (
+    bucket_id = 'withdrawal-proofs'
+    and (
+      exists (
+        select 1
+        from public.withdrawal_requests as withdrawal
+        where withdrawal.id::text = (storage.foldername(name))[1]
+          and withdrawal.profile_id = auth.uid()
+      )
+      or exists (
+        select 1
+        from public.profiles as admin_profile
+        where admin_profile.id = auth.uid()
+          and admin_profile.role = 'admin'
+      )
+    )
+  );
+
+drop policy if exists "admins can delete withdrawal proofs" on storage.objects;
+create policy "admins can delete withdrawal proofs"
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'withdrawal-proofs'
     and exists (
       select 1
       from public.profiles as admin_profile

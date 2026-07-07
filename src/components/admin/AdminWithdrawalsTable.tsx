@@ -8,8 +8,19 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import Textarea from "@/components/ui/Textarea";
+import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabaseClient";
 import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
 import type { WithdrawalRequest } from "@/types";
+
+const WITHDRAWAL_PROOFS_BUCKET = "withdrawal-proofs";
+const MAX_PAYOUT_PROOF_SIZE = 8 * 1024 * 1024;
+
+function safeProofFileName(fileName: string) {
+  return fileName
+    .replace(/[^a-zA-Z0-9._-]/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 90);
+}
 
 export default function AdminWithdrawalsTable({
   requests
@@ -37,6 +48,52 @@ export default function AdminWithdrawalsTable({
 
     startTransition(() => {
       void (async () => {
+        const proofFile = formData.get("payoutProofFile");
+
+        if (proofFile instanceof File && proofFile.size > 0) {
+          if (proofFile.size > MAX_PAYOUT_PROOF_SIZE) {
+            setFeedback({
+              message: "Payout proof must be 8MB or less.",
+              tone: "error"
+            });
+            setPendingId(null);
+            return;
+          }
+
+          if (!hasSupabaseEnv) {
+            setFeedback({
+              message: "Connect Supabase to upload payout proof.",
+              tone: "error"
+            });
+            setPendingId(null);
+            return;
+          }
+
+          const supabase = getSupabaseBrowserClient();
+          const fileName = safeProofFileName(proofFile.name || "payout-proof");
+          const filePath = `${withdrawalId}/${crypto.randomUUID()}-${fileName}`;
+          const { error } = await supabase!.storage
+            .from(WITHDRAWAL_PROOFS_BUCKET)
+            .upload(filePath, proofFile, {
+              contentType: proofFile.type || "application/octet-stream",
+              upsert: false
+            });
+
+          if (error) {
+            setFeedback({
+              message: error.message,
+              tone: "error"
+            });
+            setPendingId(null);
+            return;
+          }
+
+          formData.set("payoutProofName", fileName);
+          formData.set("payoutProofPath", filePath);
+        }
+
+        formData.delete("payoutProofFile");
+
         const result = await markWithdrawalPaidAction(formData);
 
         if (result.status === "success" && result.withdrawalId) {
@@ -170,6 +227,16 @@ export default function AdminWithdrawalsTable({
                           Ref: {request.payout_reference}
                         </p>
                       ) : null}
+                      {request.payout_proof_url ? (
+                        <a
+                          href={request.payout_proof_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-2 block max-w-xs text-xs font-semibold text-primary hover:text-primary-dark"
+                        >
+                          View payout proof
+                        </a>
+                      ) : null}
                     </td>
                     <td className="px-4 py-4">{formatDate(request.created_at)}</td>
                     <td className="px-4 py-4">
@@ -241,27 +308,18 @@ export default function AdminWithdrawalsTable({
                 />
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-foreground" htmlFor="payoutProofName">
-                  Proof label
-                </label>
-                <Input
-                  id="payoutProofName"
-                  name="payoutProofName"
-                  placeholder="Receipt screenshot"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-foreground" htmlFor="payoutProofPath">
-                  Proof link or path
-                </label>
-                <Input
-                  id="payoutProofPath"
-                  name="payoutProofPath"
-                  placeholder="Receipt URL or internal file path"
-                />
-              </div>
+            <input type="hidden" name="payoutProofName" value="" />
+            <input type="hidden" name="payoutProofPath" value="" />
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-foreground" htmlFor="payoutProofFile">
+                Payout proof
+              </label>
+              <Input
+                id="payoutProofFile"
+                name="payoutProofFile"
+                type="file"
+                accept="image/*,.pdf"
+              />
             </div>
             <label className="block text-sm font-semibold text-foreground" htmlFor="paidNote">
               Admin note

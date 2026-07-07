@@ -257,6 +257,7 @@ export interface WithdrawalRequest {
   payout_reference?: string;
   payout_proof_name?: string;
   payout_proof_path?: string;
+  payout_proof_url?: string;
   paid_note?: string;
   reviewed_by?: string | null;
   reviewed_at?: string | null;
