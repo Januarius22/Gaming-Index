@@ -248,7 +248,8 @@ create table if not exists public.orders (
   payment_last4 text not null default '',
   paid_at timestamp with time zone,
   checkout_expires_at timestamp with time zone,
-  created_at timestamp with time zone not null default now()
+  created_at timestamp with time zone not null default now(),
+  constraint orders_buyer_not_seller_check check (buyer_id is null or buyer_id <> seller_id)
 );
 
 alter table public.orders add column if not exists buyer_id uuid references public.profiles(id) on delete cascade;
@@ -283,6 +284,9 @@ alter table public.orders add constraint orders_platform_fee_amount_check
 alter table public.orders drop constraint if exists orders_seller_payout_amount_check;
 alter table public.orders add constraint orders_seller_payout_amount_check
   check (seller_payout_amount >= 0);
+alter table public.orders drop constraint if exists orders_buyer_not_seller_check;
+alter table public.orders add constraint orders_buyer_not_seller_check
+  check (buyer_id is null or buyer_id <> seller_id) not valid;
 update public.orders
 set
   platform_fee_rate = 0,
@@ -1640,6 +1644,7 @@ end;
 $$;
 
 drop function if exists public.refund_order_dispute(uuid, text);
+drop function if exists public.refund_order_dispute(uuid, text, boolean);
 create or replace function public.refund_order_dispute(
   target_dispute_id uuid,
   refund_note text,
@@ -1653,6 +1658,7 @@ as $$
 declare
   dispute_row public.disputes%rowtype;
   linked_order public.orders%rowtype;
+  seller_refund_amount numeric;
 begin
   if not exists (
     select 1
@@ -2342,7 +2348,9 @@ begin
     raise exception 'This listing is no longer available.';
   end if;
 
-  if checkout_listing.seller_id = auth.uid() then
+  if checkout_order.buyer_id = checkout_order.seller_id
+    or checkout_listing.seller_id = auth.uid()
+    or checkout_listing.seller_id = checkout_order.buyer_id then
     raise exception 'You cannot buy your own listing.';
   end if;
 
@@ -3292,12 +3300,22 @@ create policy "buyers can insert their own orders"
   for insert
   to authenticated
   with check (
-    auth.uid() = buyer_id
-    or exists (
+    auth.uid() <> seller_id
+    and exists (
       select 1
-      from public.profiles as buyer_profile
-      where buyer_profile.id = auth.uid()
-        and lower(buyer_profile.email) = lower(public.orders.buyer_email)
+      from public.listings as order_listing
+      where order_listing.id = public.orders.listing_id
+        and order_listing.seller_id = public.orders.seller_id
+        and order_listing.seller_id <> auth.uid()
+    )
+    and (
+      auth.uid() = buyer_id
+      or exists (
+        select 1
+        from public.profiles as buyer_profile
+        where buyer_profile.id = auth.uid()
+          and lower(buyer_profile.email) = lower(public.orders.buyer_email)
+      )
     )
   );
 

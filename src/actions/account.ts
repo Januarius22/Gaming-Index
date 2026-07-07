@@ -189,6 +189,10 @@ async function createPendingOrderForListing({
   listingTitle: string;
   amount: number;
 }) {
+  if (buyerId === sellerId) {
+    return null;
+  }
+
   if (!hasSupabaseEnv) {
     return addDemoOrder({
       buyer_id: buyerId,
@@ -433,11 +437,12 @@ export async function toggleSavedListingInlineAction(listingId: string) {
 }
 
 export async function addToCartAction(formData: FormData) {
-  await requireAccountProfile();
+  const profile = await requireAccountProfile();
   const listingId = String(formData.get("listingId") ?? "").trim();
   const returnTo = getSafeReturnPath(String(formData.get("returnTo") ?? ""));
+  const listing = listingId ? await getMarketplaceListingById(listingId) : null;
 
-  if (!listingId || !(await getMarketplaceListingById(listingId))) {
+  if (!listingId || !listing || listing.seller_id === profile.id) {
     redirect(getRedirectWithNotice(returnTo, "cart-add-failed"));
   }
 
@@ -451,14 +456,18 @@ export async function addToCartAction(formData: FormData) {
 }
 
 export async function toggleCartListingInlineAction(listingId: string) {
-  await requireAccountProfile();
+  const profile = await requireAccountProfile();
   const safeListingId = String(listingId).trim();
+  const listing = safeListingId ? await getMarketplaceListingById(safeListingId) : null;
 
-  if (!safeListingId || !(await getMarketplaceListingById(safeListingId))) {
+  if (!safeListingId || !listing || listing.seller_id === profile.id) {
     return {
       ok: false,
       inCart: false,
-      message: "We could not update your cart right now."
+      message:
+        listing?.seller_id === profile.id
+          ? "You cannot add your own listing to cart."
+          : "We could not update your cart right now."
     };
   }
 
