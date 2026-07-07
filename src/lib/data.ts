@@ -185,7 +185,7 @@ async function getSupabaseProfiles() {
     return [];
   }
 
-  await supabase.rpc("cancel_expired_pending_orders");
+  await supabase.rpc("clear_expired_pending_orders");
 
   const { data } = await supabase
     .from("profiles")

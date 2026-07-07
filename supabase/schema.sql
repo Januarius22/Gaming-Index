@@ -311,12 +311,33 @@ update public.orders
 set checkout_expires_at = created_at + interval '30 minutes'
 where status = 'pending'
   and checkout_expires_at is null;
-update public.orders
-set status = 'cancelled'
-where status = 'pending'
+delete from public.orders
+where status in ('pending', 'cancelled')
   and payment_status = 'pending'
+  and paid_at is null
   and checkout_expires_at is not null
   and checkout_expires_at <= now();
+
+create or replace function public.clear_expired_pending_orders()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  cleared_count integer;
+begin
+  delete from public.orders
+  where status in ('pending', 'cancelled')
+    and payment_status = 'pending'
+    and paid_at is null
+    and checkout_expires_at is not null
+    and checkout_expires_at <= now();
+
+  get diagnostics cleared_count = row_count;
+  return cleared_count;
+end;
+$$;
 
 create or replace function public.cancel_expired_pending_orders()
 returns integer
@@ -324,18 +345,8 @@ language plpgsql
 security definer
 set search_path = public
 as $$
-declare
-  cancelled_count integer;
 begin
-  update public.orders
-  set status = 'cancelled'
-  where status = 'pending'
-    and payment_status = 'pending'
-    and checkout_expires_at is not null
-    and checkout_expires_at <= now();
-
-  get diagnostics cancelled_count = row_count;
-  return cancelled_count;
+  return public.clear_expired_pending_orders();
 end;
 $$;
 
@@ -2314,10 +2325,6 @@ begin
 
   if checkout_order.checkout_expires_at is not null
     and checkout_order.checkout_expires_at <= now() then
-    update public.orders
-    set status = 'cancelled'
-    where id = checkout_order.id;
-
     raise exception 'This checkout has expired.';
   end if;
 
