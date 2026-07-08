@@ -25,6 +25,17 @@ const visualThemes: Record<string, { shell: string; accents: string[] }> = {
       "from-[#2f1959] to-[#7e57c2]"
     ]
   },
+  Roblox: {
+    shell: "from-[#10233f] via-[#1e3f73] to-[#0b1628]",
+    accents: [
+      "from-[#e6eef8] to-[#a9c5e8]",
+      "from-[#183454] to-[#3d6fa8]",
+      "from-[#6f7f95] to-[#c9d4e5]",
+      "from-[#123458] to-[#5a8bc4]",
+      "from-[#0e243b] to-[#49719d]",
+      "from-[#2f4664] to-[#9bb6d6]"
+    ]
+  },
   "PUBG Mobile": {
     shell: "from-[#062b63] via-[#0d4c87] to-[#031b3d]",
     accents: [
@@ -74,6 +85,7 @@ const visualThemes: Record<string, { shell: string; accents: string[] }> = {
 const panelLabels: Record<string, string[]> = {
   CODM: ["Lobby", "Ranked", "Weapons", "Skins", "Loadout", "Vault"],
   "Free Fire": ["Lobby", "Bundles", "Emotes", "Loadout", "Vault", "Rank"],
+  Roblox: ["Avatar", "Items", "Robux", "Gamepasses", "Limiteds", "Stats"],
   "PUBG Mobile": ["Lobby", "Stats", "Loadout", "Crates", "Wardrobe", "Rank"],
   Fortnite: ["Locker", "Skins", "Loadout", "Stats", "Pickaxes", "Emotes"],
   eFootball: ["Squad", "Cards", "Tactics", "Bench", "Boosts", "Stats"],
@@ -105,7 +117,7 @@ export default function ListingPhotoGrid({
       ? Trophy
       : listing.game === "Fortnite"
         ? Sparkles
-        : listing.game === "Free Fire"
+        : listing.game === "Free Fire" || listing.game === "Roblox"
           ? UserRound
           : Sword;
 

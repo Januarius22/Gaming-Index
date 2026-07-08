@@ -157,6 +157,11 @@ export default function SellerUploadForm({
             </div>
           </div>
 
+          <div className="rounded-[26px] border border-border/70 bg-surface p-5 text-sm leading-6 text-muted-foreground">
+            Only list accounts you are authorized to transfer. Listing details, images, and delivery
+            information must match the account being sold.
+          </div>
+
           <div className="space-y-5 rounded-[30px] border border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,250,235,0.95),rgba(255,255,255,0.98))] p-6">
             <div className="space-y-2">
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700">

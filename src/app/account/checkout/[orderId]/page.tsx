@@ -316,6 +316,10 @@ export default async function AccountCheckoutPage({
                         </div>
                       ))}
                     </div>
+                    <p className="text-xs leading-6 text-muted-foreground">
+                      By continuing, you confirm that you reviewed the listing details and understand
+                      that third-party platform rules may affect account transfers.
+                    </p>
                   </div>
 
                   <SubmitButton pendingLabel="Processing..." size="lg" className="w-full rounded-2xl">

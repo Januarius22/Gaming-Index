@@ -182,14 +182,18 @@ export default async function MarketplaceListingDetailPage({
                     <ShieldCheck className="h-5 w-5" />
                   </div>
                   <div className="space-y-2">
-                    <p className="font-semibold text-foreground">Reviewed marketplace listing</p>
+                        <p className="font-semibold text-foreground">Reviewed marketplace listing</p>
                     <p className="text-sm leading-6 text-muted-foreground">
-                      This page keeps the full account specs, seller notes, screenshots, and buyer
-                      rating signals in one place before you move into your buyer dashboard and
-                      secure checkout flow.
+                      Review the account specs, seller notes, screenshots, and buyer rating signals
+                      before checkout.
                     </p>
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-[24px] border border-border/70 bg-white p-4 text-xs leading-6 text-muted-foreground">
+                Gaming Index is independent and does not control third-party game or platform
+                account-transfer rules.
               </div>
 
               <Link

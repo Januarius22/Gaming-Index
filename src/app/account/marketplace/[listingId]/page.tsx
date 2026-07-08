@@ -217,6 +217,11 @@ export default async function AccountMarketplaceListingDetailPage({
                 </div>
               </div>
 
+              <div className="rounded-[24px] border border-border/70 bg-white p-4 text-xs leading-6 text-muted-foreground">
+                Review the listing carefully before checkout. Gaming Index is independent and does
+                not control third-party game or platform account-transfer rules.
+              </div>
+
               <div className="space-y-3">
                 <form action={buyNowAction}>
                   <input type="hidden" name="listingId" value={listing.id} />

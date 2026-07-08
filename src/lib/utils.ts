@@ -294,6 +294,7 @@ export function getListingHistoryTimestamp(listing: {
 export const gameOptions = [
   "CODM",
   "Free Fire",
+  "Roblox",
   "PUBG Mobile",
   "Fortnite",
   "eFootball",

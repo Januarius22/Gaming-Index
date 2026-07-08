@@ -46,6 +46,12 @@ export default function LegalPageShell({
               >
                 Terms &amp; Conditions
               </Link>
+              <Link
+                href="/disclaimer"
+                className="rounded-full border border-border/80 px-3 py-1 transition hover:border-primary/25 hover:bg-primary-soft hover:text-primary"
+              >
+                Disclaimer
+              </Link>
             </div>
           </div>
         </div>

@@ -14,6 +14,10 @@ export default function PublicFooter() {
             Marketplace workflows, seller verification, and buyer account tools built for account
             trading teams that want clearer trust signals.
           </p>
+          <p className="max-w-md text-xs leading-6 text-muted-foreground">
+            Gaming Index is independent and is not affiliated with the game publishers or platforms
+            referenced in marketplace listings.
+          </p>
           <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
             © 2026 Gaming Index
           </p>
@@ -46,6 +50,7 @@ export default function PublicFooter() {
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               <Link href="/privacy-policy">Privacy Policy</Link>
               <Link href="/terms">Terms &amp; Conditions</Link>
+              <Link href="/disclaimer">Disclaimer</Link>
             </div>
           </div>
         </div>
