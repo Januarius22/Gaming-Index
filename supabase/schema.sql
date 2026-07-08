@@ -3,6 +3,9 @@ create table if not exists public.profiles (
   full_name text not null,
   username text unique not null,
   email text unique not null,
+  avatar_name text not null default '',
+  avatar_path text not null default '',
+  avatar_url text not null default '',
   role text not null default 'user' check (role in ('user', 'admin')),
   seller_enabled boolean not null default false,
   kyc_status text not null default 'not_started' check (kyc_status in ('not_started', 'pending', 'approved', 'rejected')),
@@ -17,6 +20,9 @@ create table if not exists public.profiles (
 );
 
 alter table public.profiles add column if not exists seller_enabled boolean not null default false;
+alter table public.profiles add column if not exists avatar_name text not null default '';
+alter table public.profiles add column if not exists avatar_path text not null default '';
+alter table public.profiles add column if not exists avatar_url text not null default '';
 alter table public.profiles add column if not exists is_banned boolean not null default false;
 alter table public.profiles add column if not exists seller_strikes integer not null default 0;
 alter table public.profiles add column if not exists seller_restricted_until timestamp with time zone;
@@ -36,6 +42,10 @@ create table if not exists public.profile_settings (
   default_bank_name text not null default '',
   default_account_number text not null default '',
   default_account_name text not null default '',
+  theme_preference text not null default 'system' check (theme_preference in ('light', 'dark', 'system')),
+  font_size_preference text not null default 'comfortable' check (font_size_preference in ('compact', 'comfortable', 'large')),
+  two_factor_preference_enabled boolean not null default false,
+  two_factor_method text not null default 'authenticator' check (two_factor_method in ('authenticator', 'email')),
   notification_preferences jsonb not null default '{}'::jsonb,
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now()
@@ -45,6 +55,10 @@ alter table public.profile_settings add column if not exists phone_number text n
 alter table public.profile_settings add column if not exists default_bank_name text not null default '';
 alter table public.profile_settings add column if not exists default_account_number text not null default '';
 alter table public.profile_settings add column if not exists default_account_name text not null default '';
+alter table public.profile_settings add column if not exists theme_preference text not null default 'system';
+alter table public.profile_settings add column if not exists font_size_preference text not null default 'comfortable';
+alter table public.profile_settings add column if not exists two_factor_preference_enabled boolean not null default false;
+alter table public.profile_settings add column if not exists two_factor_method text not null default 'authenticator';
 alter table public.profile_settings add column if not exists notification_preferences jsonb not null default '{}'::jsonb;
 alter table public.profile_settings add column if not exists created_at timestamp with time zone not null default now();
 alter table public.profile_settings add column if not exists updated_at timestamp with time zone not null default now();
@@ -54,6 +68,15 @@ from public.profiles as profile
 on conflict (profile_id) do nothing;
 alter table public.profiles drop constraint if exists profiles_seller_strikes_check;
 alter table public.profiles add constraint profiles_seller_strikes_check check (seller_strikes >= 0);
+alter table public.profile_settings drop constraint if exists profile_settings_theme_preference_check;
+alter table public.profile_settings add constraint profile_settings_theme_preference_check
+  check (theme_preference in ('light', 'dark', 'system'));
+alter table public.profile_settings drop constraint if exists profile_settings_font_size_preference_check;
+alter table public.profile_settings add constraint profile_settings_font_size_preference_check
+  check (font_size_preference in ('compact', 'comfortable', 'large'));
+alter table public.profile_settings drop constraint if exists profile_settings_two_factor_method_check;
+alter table public.profile_settings add constraint profile_settings_two_factor_method_check
+  check (two_factor_method in ('authenticator', 'email'));
 
 create table if not exists public.kyc_submissions (
   id uuid primary key default gen_random_uuid(),
@@ -122,6 +145,10 @@ on conflict (id) do nothing;
 
 insert into storage.buckets (id, name, public)
 values ('listing-media', 'listing-media', false)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public)
+values ('profile-avatars', 'profile-avatars', true)
 on conflict (id) do nothing;
 
 insert into storage.buckets (id, name, public)
@@ -4148,4 +4175,31 @@ create policy "admins can delete withdrawal proofs"
       where admin_profile.id = auth.uid()
         and admin_profile.role = 'admin'
     )
+  );
+
+drop policy if exists "anyone can read profile avatars" on storage.objects;
+create policy "anyone can read profile avatars"
+  on storage.objects
+  for select
+  to anon, authenticated
+  using (bucket_id = 'profile-avatars');
+
+drop policy if exists "authenticated users can upload their own profile avatar" on storage.objects;
+create policy "authenticated users can upload their own profile avatar"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (
+    bucket_id = 'profile-avatars'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+drop policy if exists "authenticated users can delete their own profile avatar" on storage.objects;
+create policy "authenticated users can delete their own profile avatar"
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'profile-avatars'
+    and auth.uid()::text = (storage.foldername(name))[1]
   );

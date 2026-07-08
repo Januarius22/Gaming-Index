@@ -5,6 +5,7 @@ import { Bell, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import AnimatedMenuButton from "@/components/ui/AnimatedMenuButton";
 import Button from "@/components/ui/Button";
+import ProfileAvatar from "@/components/ui/ProfileAvatar";
 import type { Profile } from "@/types";
 
 export default function AccountTopbar({
@@ -48,6 +49,7 @@ export default function AccountTopbar({
           </div>
         </div>
         <div className="col-start-2 row-start-1 flex shrink-0 items-center justify-end gap-3 self-start sm:self-auto">
+          <ProfileAvatar profile={profile} className="hidden sm:inline-flex" />
           <Link
             href="/account/notifications"
             aria-label="Open account notifications"

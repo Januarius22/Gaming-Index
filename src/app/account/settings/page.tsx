@@ -1,4 +1,4 @@
-import { updateAccountSettingsAction } from "@/actions/settings";
+import { changePasswordAction, updateAccountSettingsAction } from "@/actions/settings";
 import WorkspaceSettingsForm from "@/components/settings/WorkspaceSettingsForm";
 import { requireAccountProfile } from "@/lib/auth";
 import { getProfileSettings } from "@/lib/data";
@@ -10,6 +10,7 @@ export default async function AccountSettingsPage() {
   return (
     <WorkspaceSettingsForm
       action={updateAccountSettingsAction}
+      passwordAction={changePasswordAction}
       profile={profile}
       settings={settings}
       workspace="account"

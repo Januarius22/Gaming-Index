@@ -20,6 +20,9 @@ export interface Profile {
   full_name: string;
   username: string;
   email: string;
+  avatar_name?: string;
+  avatar_path?: string;
+  avatar_url?: string;
   role: AppRole;
   seller_enabled: boolean;
   kyc_status: KycStatus;
@@ -41,6 +44,10 @@ export interface ProfileSettings {
   default_bank_name: string;
   default_account_number: string;
   default_account_name: string;
+  theme_preference: "light" | "dark" | "system";
+  font_size_preference: "compact" | "comfortable" | "large";
+  two_factor_preference_enabled: boolean;
+  two_factor_method: "authenticator" | "email";
   notification_preferences: NotificationPreferences;
   created_at?: string;
   updated_at?: string;

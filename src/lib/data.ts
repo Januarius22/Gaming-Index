@@ -63,6 +63,10 @@ export function getDefaultProfileSettings(profileId: string): ProfileSettings {
     default_bank_name: "",
     default_account_number: "",
     default_account_name: "",
+    theme_preference: "system",
+    font_size_preference: "comfortable",
+    two_factor_preference_enabled: false,
+    two_factor_method: "authenticator",
     notification_preferences: {}
   };
 }
@@ -935,6 +939,14 @@ export async function getProfileSettings(profileId: string): Promise<ProfileSett
     return {
       ...defaults,
       ...settings,
+      theme_preference: ["light", "dark", "system"].includes(settings.theme_preference)
+        ? settings.theme_preference
+        : defaults.theme_preference,
+      font_size_preference: ["compact", "comfortable", "large"].includes(settings.font_size_preference)
+        ? settings.font_size_preference
+        : defaults.font_size_preference,
+      two_factor_preference_enabled: Boolean(settings.two_factor_preference_enabled),
+      two_factor_method: settings.two_factor_method === "email" ? "email" : "authenticator",
       notification_preferences:
         settings.notification_preferences && typeof settings.notification_preferences === "object"
           ? settings.notification_preferences
