@@ -386,6 +386,69 @@ export interface DashboardStat {
   href?: string;
 }
 
+export interface AnalyticsMetric {
+  label: string;
+  value: string;
+  helper: string;
+  href?: string;
+}
+
+export interface AnalyticsDatum {
+  label: string;
+  value: number;
+  helper?: string;
+}
+
+export interface AnalyticsTrendDatum {
+  label: string;
+  value: number;
+  secondaryValue?: number;
+}
+
+export interface AdminAnalytics {
+  metrics: AnalyticsMetric[];
+  salesTrend: AnalyticsTrendDatum[];
+  listingStatus: AnalyticsDatum[];
+  orderStatus: AnalyticsDatum[];
+  disputeStatus: AnalyticsDatum[];
+  gameBreakdown: AnalyticsDatum[];
+  kycBreakdown: AnalyticsDatum[];
+  financialBreakdown: AnalyticsDatum[];
+  topSellers: Array<{
+    seller_id: string;
+    seller_name: string;
+    seller_username: string;
+    sales: number;
+    revenue: number;
+  }>;
+  recentSignals: Array<{
+    title: string;
+    detail: string;
+    href: string;
+  }>;
+}
+
+export interface SellerAnalytics {
+  metrics: AnalyticsMetric[];
+  earningsTrend: AnalyticsTrendDatum[];
+  listingStatus: AnalyticsDatum[];
+  orderStatus: AnalyticsDatum[];
+  gameBreakdown: AnalyticsDatum[];
+  withdrawalStatus: AnalyticsDatum[];
+  reputation: AnalyticsDatum[];
+  recentSales: Array<{
+    order_id: string;
+    title: string;
+    amount: number;
+    created_at: string;
+  }>;
+  signals: Array<{
+    title: string;
+    detail: string;
+    href: string;
+  }>;
+}
+
 export type SessionProfile = Profile;
 
 export interface ActionState {

@@ -21,10 +21,13 @@ import {
   formatCompactCurrency,
   getListingHistoryTimestamp,
   isListingMarketplaceVisible,
-  isOrderPaymentConfirmed
+  isOrderPaymentConfirmed,
+  titleCase
 } from "@/lib/utils";
 import type {
   ActivityItem,
+  AdminAnalytics,
+  AnalyticsDatum,
   DashboardStat,
   Dispute,
   DisputeAttachment,
@@ -37,6 +40,7 @@ import type {
   Profile,
   ProfileSettings,
   SellerRating,
+  SellerAnalytics,
   SellerEnforcement,
   SidebarCounts,
   SiteFeedback,
@@ -2257,6 +2261,386 @@ export async function getAdminDashboardStats() {
       activity: seededActivity
     };
   }
+}
+
+const analyticsMonthFormatter = new Intl.DateTimeFormat("en", {
+  month: "short"
+});
+
+function getMonthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getRecentMonths(monthCount = 6) {
+  const now = new Date();
+
+  return Array.from({ length: monthCount }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (monthCount - 1 - index), 1);
+
+    return {
+      key: getMonthKey(date),
+      label: analyticsMonthFormatter.format(date)
+    };
+  });
+}
+
+function countBy<T>(
+  items: T[],
+  getLabel: (item: T) => string | undefined | null,
+  options: { prettify?: boolean } = {}
+): AnalyticsDatum[] {
+  const counts = new Map<string, number>();
+  const prettify = options.prettify ?? true;
+
+  items.forEach((item) => {
+    const label = getLabel(item) || "Unknown";
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  });
+
+  return Array.from(counts.entries())
+    .map(([label, value]) => ({ label: prettify ? titleCase(label) : label, value }))
+    .sort((left, right) => right.value - left.value);
+}
+
+function sumBy<T>(items: T[], getValue: (item: T) => number) {
+  return items.reduce((sum, item) => sum + getValue(item), 0);
+}
+
+function isPaidOrder(order: Order) {
+  return isOrderPaymentConfirmed(order.status, order.payment_status);
+}
+
+function buildOrderTrend(orders: Order[]) {
+  const months = getRecentMonths();
+  const paidOrders = orders.filter(isPaidOrder);
+
+  return months.map((month) => {
+    const monthOrders = paidOrders.filter((order) => getMonthKey(new Date(order.created_at)) === month.key);
+
+    return {
+      label: month.label,
+      value: sumBy(monthOrders, (order) => Number(order.amount ?? 0)),
+      secondaryValue: sumBy(monthOrders, (order) => Number(order.platform_fee_amount ?? 0))
+    };
+  });
+}
+
+async function getSupabaseWithdrawalRequests() {
+  if (!hasSupabaseEnv) {
+    return [] as WithdrawalRequest[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("withdrawal_requests")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    return ((data as WithdrawalRequest[] | null) ?? []).map((request) =>
+      normalizeWithdrawalRequest(request)
+    );
+  } catch {
+    return [] as WithdrawalRequest[];
+  }
+}
+
+async function getSupabaseWallets() {
+  if (!hasSupabaseEnv) {
+    return [] as Wallet[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase.from("wallets").select("*");
+
+    return ((data as Wallet[] | null) ?? []).map((wallet) =>
+      normalizeWallet(wallet, wallet.profile_id)
+    );
+  } catch {
+    return [] as Wallet[];
+  }
+}
+
+async function getSellerEnforcements(sellerId: string) {
+  if (!hasSupabaseEnv) {
+    return [] as SellerEnforcement[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("seller_enforcements")
+      .select("*")
+      .eq("seller_id", sellerId)
+      .order("created_at", { ascending: false });
+
+    return (data as SellerEnforcement[] | null) ?? [];
+  } catch {
+    return [] as SellerEnforcement[];
+  }
+}
+
+export async function getAdminAnalytics(): Promise<AdminAnalytics> {
+  const [profiles, listings, orders, kyc, disputes, withdrawals, support, feedback, wallets] =
+    await Promise.all([
+      hasSupabaseEnv ? getSupabaseProfiles() : getDemoProfiles(),
+      hasSupabaseEnv
+        ? getSupabaseListings()
+        : (await getDemoListings()).map((listing) => normalizeListing(listing)),
+      hasSupabaseEnv ? getSupabaseOrders() : getDemoOrders(),
+      hasSupabaseEnv ? getSupabaseKycQueue() : getDemoKycSubmissions(),
+      getAdminDisputes(),
+      getSupabaseWithdrawalRequests(),
+      getAdminSupportTickets(),
+      getAdminFeedback(),
+      getSupabaseWallets()
+    ]);
+
+  const normalizedOrders = orders.map((order) => normalizeOrder(order));
+  const paidOrders = normalizedOrders.filter(isPaidOrder);
+  const salesVolume = sumBy(paidOrders, (order) => Number(order.amount ?? 0));
+  const platformRevenue = sumBy(paidOrders, (order) => Number(order.platform_fee_amount ?? 0));
+  const pendingWithdrawals = withdrawals.filter((request) =>
+    ["pending", "approved"].includes(request.status)
+  );
+  const openDisputes = disputes.filter((dispute) => ["open", "reviewing"].includes(dispute.status));
+  const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
+  const sellerRows = new Map<
+    string,
+    { seller_id: string; seller_name: string; seller_username: string; sales: number; revenue: number }
+  >();
+
+  paidOrders.forEach((order) => {
+    const seller = profileMap.get(order.seller_id);
+    const current =
+      sellerRows.get(order.seller_id) ??
+      {
+        seller_id: order.seller_id,
+        seller_name: seller?.full_name ?? "Seller",
+        seller_username: seller?.username ?? "seller",
+        sales: 0,
+        revenue: 0
+      };
+
+    current.sales += 1;
+    current.revenue += Number(order.amount ?? 0);
+    sellerRows.set(order.seller_id, current);
+  });
+
+  return {
+    metrics: [
+      { label: "Total Users", value: String(profiles.length), helper: "Registered accounts", href: "/admin/users" },
+      {
+        label: "Active Sellers",
+        value: String(profiles.filter((profile) => profile.seller_enabled).length),
+        helper: "Seller-enabled profiles",
+        href: "/admin/sellers"
+      },
+      {
+        label: "Sales Volume",
+        value: formatCompactCurrency(salesVolume),
+        helper: `${paidOrders.length} paid orders`,
+        href: "/admin/orders"
+      },
+      {
+        label: "Platform Revenue",
+        value: formatCompactCurrency(platformRevenue),
+        helper: "Commission earned",
+        href: "/admin/orders"
+      },
+      {
+        label: "Open Disputes",
+        value: String(openDisputes.length),
+        helper: "Needs review",
+        href: "/admin/disputes"
+      },
+      {
+        label: "Pending Withdrawals",
+        value: String(pendingWithdrawals.length),
+        helper: formatCompactCurrency(sumBy(pendingWithdrawals, (request) => request.amount)),
+        href: "/admin/withdrawals"
+      },
+      {
+        label: "Wallet Exposure",
+        value: formatCompactCurrency(
+          sumBy(wallets, (wallet) => wallet.available_balance + wallet.pending_balance)
+        ),
+        helper: "Available and pending balances",
+        href: "/admin/withdrawals"
+      },
+      {
+        label: "Support Queue",
+        value: String(support.filter((ticket) => ["open", "in_review"].includes(ticket.status)).length),
+        helper: "Open support tickets",
+        href: "/admin/support"
+      }
+    ],
+    salesTrend: buildOrderTrend(normalizedOrders),
+    listingStatus: countBy(listings, (listing) => listing.status),
+    orderStatus: countBy(normalizedOrders, (order) => order.status),
+    disputeStatus: countBy(disputes, (dispute) => dispute.status),
+    gameBreakdown: countBy(listings, (listing) => listing.game, { prettify: false }).slice(0, 6),
+    kycBreakdown: countBy(kyc, (submission) => submission.status),
+    financialBreakdown: [
+      { label: "Platform Revenue", value: platformRevenue },
+      { label: "Seller Pending", value: sumBy(wallets, (wallet) => wallet.pending_balance) },
+      { label: "Seller Available", value: sumBy(wallets, (wallet) => wallet.available_balance) },
+      { label: "Withdrawals Paid", value: sumBy(withdrawals.filter((request) => request.status === "paid"), (request) => request.amount) },
+      { label: "Refund Value", value: sumBy(normalizedOrders.filter((order) => order.escrow_status === "refunded"), (order) => order.amount) }
+    ],
+    topSellers: Array.from(sellerRows.values())
+      .sort((left, right) => right.revenue - left.revenue)
+      .slice(0, 5),
+    recentSignals: [
+      {
+        title: "Pending KYC",
+        detail: `${kyc.filter((submission) => submission.status === "pending").length} seller reviews waiting`,
+        href: "/admin/kyc"
+      },
+      {
+        title: "New Feedback",
+        detail: `${feedback.filter((item) => item.status === "new").length} feedback items not reviewed`,
+        href: "/admin/feedback"
+      },
+      {
+        title: "Appeals",
+        detail: `${profiles.filter((profile) => profile.is_banned).length} suspended accounts in the user base`,
+        href: "/admin/appeals"
+      }
+    ]
+  };
+}
+
+export async function getSellerAnalytics(profile: Profile): Promise<SellerAnalytics> {
+  const [listings, orders, wallet, withdrawals, disputes, ratingState, enforcements] =
+    await Promise.all([
+      hasSupabaseEnv
+        ? getSupabaseListings()
+        : (await getDemoListings()).map((listing) => normalizeListing(listing)),
+      hasSupabaseEnv ? getSupabaseOrders() : getDemoOrders(),
+      getProfileWallet(profile.id),
+      getSellerWithdrawalRequests(profile.id),
+      getSellerDisputes(profile),
+      getSellerRatingState(profile.id),
+      getSellerEnforcements(profile.id)
+    ]);
+  const sellerListings = listings.filter((listing) => listing.seller_id === profile.id);
+  const sellerOrders = orders
+    .map((order) => normalizeOrder(order))
+    .filter((order) => order.seller_id === profile.id);
+  const paidOrders = sellerOrders.filter(isPaidOrder);
+  const sellerRevenue = sumBy(paidOrders, (order) =>
+    Number(order.seller_payout_amount && order.seller_payout_amount > 0 ? order.seller_payout_amount : order.amount)
+  );
+  const months = getRecentMonths();
+
+  return {
+    metrics: [
+      {
+        label: "Total Earnings",
+        value: formatCompactCurrency(sellerRevenue),
+        helper: `${paidOrders.length} paid sales`,
+        href: "/seller/orders"
+      },
+      {
+        label: "Available Balance",
+        value: formatCompactCurrency(wallet.available_balance),
+        helper: "Ready for withdrawal",
+        href: "/seller/wallet"
+      },
+      {
+        label: "Pending Balance",
+        value: formatCompactCurrency(wallet.pending_balance),
+        helper: "Buyer protection hold",
+        href: "/seller/wallet"
+      },
+      {
+        label: "Active Listings",
+        value: String(sellerListings.filter((listing) => listing.status === "approved").length),
+        helper: `${sellerListings.length} total listings`,
+        href: "/seller/listings"
+      },
+      {
+        label: "Average Rating",
+        value: ratingState.reviews > 0 ? ratingState.average.toFixed(1) : "New",
+        helper: `${ratingState.reviews} buyer reviews`,
+        href: "/seller/listings"
+      },
+      {
+        label: "Open Disputes",
+        value: String(disputes.filter((dispute) => ["open", "reviewing"].includes(dispute.status)).length),
+        helper: "Needs attention",
+        href: "/seller/disputes"
+      }
+    ],
+    earningsTrend: months.map((month) => {
+      const monthOrders = paidOrders.filter((order) => getMonthKey(new Date(order.created_at)) === month.key);
+
+      return {
+        label: month.label,
+        value: sumBy(monthOrders, (order) => Number(order.seller_payout_amount ?? order.amount)),
+        secondaryValue: monthOrders.length
+      };
+    }),
+    listingStatus: countBy(sellerListings, (listing) => listing.status),
+    orderStatus: countBy(sellerOrders, (order) => order.status),
+    gameBreakdown: countBy(sellerListings, (listing) => listing.game, { prettify: false }).slice(0, 6),
+    withdrawalStatus: countBy(withdrawals, (request) => request.status),
+    reputation: [
+      { label: "Rating", value: ratingState.average },
+      { label: "Reviews", value: ratingState.reviews },
+      { label: "Strikes", value: profile.seller_strikes ?? 0 },
+      { label: "Enforcements", value: enforcements.length }
+    ],
+    recentSales: paidOrders
+      .sort((left, right) => right.created_at.localeCompare(left.created_at))
+      .slice(0, 5)
+      .map((order) => ({
+        order_id: order.id,
+        title: order.listing_title,
+        amount: Number(order.seller_payout_amount ?? order.amount),
+        created_at: order.created_at
+      })),
+    signals: [
+      {
+        title: "Funds Pending",
+        detail:
+          wallet.pending_balance > 0
+            ? `${formatCompactCurrency(wallet.pending_balance)} still in buyer protection`
+            : "No funds are currently held",
+        href: "/seller/wallet"
+      },
+      {
+        title: "Listings to Watch",
+        detail: `${sellerListings.filter((listing) => listing.status === "approved").length} listings are live`,
+        href: "/seller/listings"
+      },
+      {
+        title: "Account Health",
+        detail:
+          (profile.seller_strikes ?? 0) > 0
+            ? `${profile.seller_strikes} strike${profile.seller_strikes === 1 ? "" : "s"} on record`
+            : "No seller strikes on record",
+        href: "/seller/settings"
+      }
+    ]
+  };
 }
 
 export async function getAdminUsers() {

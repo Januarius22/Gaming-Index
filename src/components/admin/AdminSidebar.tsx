@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bell,
+  BarChart3,
   FileCheck2,
   Headset,
   History,
@@ -27,6 +28,10 @@ import type { Profile, SidebarCounts } from "@/types";
 
 const dashboardItem = { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard };
 const navGroups = [
+  {
+    label: "Insights",
+    items: [{ href: "/admin/analytics", label: "Analytics", icon: BarChart3 }]
+  },
   {
     label: "Members",
     items: [

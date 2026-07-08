@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ArrowLeft,
+  BarChart3,
   Bell,
   CreditCard,
   FileCheck2,
@@ -28,6 +29,10 @@ import type { Profile, SidebarCounts } from "@/types";
 
 const dashboardItem = { href: "/seller/dashboard", label: "Dashboard", icon: LayoutDashboard };
 const navGroups = [
+  {
+    label: "Insights",
+    items: [{ href: "/seller/analytics", label: "Analytics", icon: BarChart3 }]
+  },
   {
     label: "Listings",
     items: [
