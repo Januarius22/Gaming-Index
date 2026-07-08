@@ -15,7 +15,7 @@ export default async function AdminAnalyticsPage() {
   const analytics = await getAdminAnalytics();
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-[1540px] space-y-6 px-1 sm:px-2">
       <Card>
         <CardHeader>
           <CardTitle>Analytics</CardTitle>

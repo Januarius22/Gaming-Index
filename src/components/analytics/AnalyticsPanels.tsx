@@ -8,11 +8,11 @@ const chartColors = ["#0057ff", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b
 
 export function AnalyticsMetricGrid({ metrics }: { metrics: AnalyticsMetric[] }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
       {metrics.map((metric) => {
         const content = (
           <Card className="h-full transition hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_22px_70px_-42px_rgba(0,87,255,0.45)]">
-            <CardContent className="p-5">
+            <CardContent className="p-6 sm:p-7">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-sm text-muted-foreground">{metric.label}</p>
