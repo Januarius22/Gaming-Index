@@ -47,6 +47,11 @@ export default function AccountSidebar({
       label: "Explore",
       items: [
         { href: "/account/marketplace", label: "Marketplace", icon: Store },
+        {
+          href: "/account/seller",
+          label: profile.seller_enabled ? "Seller Center" : "Become a Seller",
+          icon: ShieldPlus
+        },
         { href: "/account/saved", label: "Saved Listings", icon: Bookmark }
       ]
     },
@@ -72,11 +77,6 @@ export default function AccountSidebar({
         { href: "/account/notifications", label: "Notifications", icon: Bell },
         { href: "/account/support", label: "Support", icon: LifeBuoy },
         { href: "/account/feedback", label: "Feedback", icon: MessageSquareText },
-        {
-          href: "/account/seller",
-          label: profile.seller_enabled ? "Seller Center" : "Become a Seller",
-          icon: ShieldPlus
-        },
         { href: "/account/settings", label: "Settings", icon: Settings }
       ]
     }
