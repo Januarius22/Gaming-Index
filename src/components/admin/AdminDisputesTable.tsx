@@ -166,14 +166,6 @@ export default function AdminDisputesTable({ disputes }: { disputes: Dispute[] }
                         <Button
                           size="sm"
                           type="button"
-                          disabled={closed || isSubmitting}
-                          onClick={() => setReviewingDispute({ dispute, status: "resolved" })}
-                        >
-                          Resolve
-                        </Button>
-                        <Button
-                          size="sm"
-                          type="button"
                           variant="secondary"
                           disabled={closed || isSubmitting}
                           onClick={() => setReviewingDispute({ dispute, status: "refunded" })}

@@ -26,6 +26,7 @@ import Select from "@/components/ui/Select";
 import type { ActionState, Profile, ProfileSettings } from "@/types";
 
 type Workspace = "account" | "seller" | "admin";
+export type SettingsSection = "profile" | "appearance" | "security" | "notifications" | "payout";
 
 type Preference = {
   key: string;
@@ -145,12 +146,14 @@ export default function WorkspaceSettingsForm({
   profile,
   settings,
   workspace,
+  section,
   action,
   passwordAction
 }: {
   profile: Profile;
   settings: ProfileSettings;
   workspace: Workspace;
+  section?: SettingsSection;
   action: (previousState: ActionState, formData: FormData) => Promise<ActionState>;
   passwordAction: (previousState: ActionState, formData: FormData) => Promise<ActionState>;
 }) {
@@ -170,6 +173,13 @@ export default function WorkspaceSettingsForm({
     [selectedAvatar]
   );
   const profileInitial = profile.full_name.trim().charAt(0).toUpperCase() || "G";
+  const activeSection = section ?? "profile";
+  const showProfile = activeSection === "profile";
+  const showAppearance = activeSection === "appearance";
+  const showSecurity = activeSection === "security";
+  const showNotifications = activeSection === "notifications";
+  const showPayout = activeSection === "payout" && workspace !== "admin";
+  const showStatusPanel = activeSection === "profile";
 
   useEffect(() => {
     return () => {
@@ -183,10 +193,69 @@ export default function WorkspaceSettingsForm({
     <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
       <div className="space-y-6">
         <form id={settingsFormId} action={formAction} className="space-y-6">
+          {!showProfile ? (
+            <>
+              <input type="hidden" name="fullName" value={profile.full_name} />
+              <input type="hidden" name="username" value={profile.username} />
+              <input type="hidden" name="phoneNumber" value={settings.phone_number} />
+            </>
+          ) : null}
+          {!showAppearance ? (
+            <>
+              <input type="hidden" name="themePreference" value={settings.theme_preference} />
+              <input type="hidden" name="fontSizePreference" value={settings.font_size_preference} />
+            </>
+          ) : null}
+          {!showSecurity ? (
+            <>
+              {settings.two_factor_preference_enabled ? (
+                <input type="hidden" name="twoFactorPreferenceEnabled" value="on" />
+              ) : null}
+              <input type="hidden" name="twoFactorMethod" value={settings.two_factor_method} />
+            </>
+          ) : null}
+          {!showPayout && workspace !== "admin" ? (
+            <>
+              <input type="hidden" name="defaultBankName" value={settings.default_bank_name} />
+              <input
+                type="hidden"
+                name="defaultAccountNumber"
+                value={settings.default_account_number}
+              />
+              <input type="hidden" name="defaultAccountName" value={settings.default_account_name} />
+            </>
+          ) : null}
+          {!showNotifications
+            ? shownPreferences.map((preference) =>
+                settings.notification_preferences[preference.key] ?? true ? (
+                  <input key={preference.key} type="hidden" name={preference.key} value="on" />
+                ) : null
+              )
+            : null}
           <Card>
             <CardHeader>
-              <CardTitle>{copy.title}</CardTitle>
-              <CardDescription>{copy.description}</CardDescription>
+              <CardTitle>
+                {activeSection === "profile"
+                  ? copy.title
+                  : activeSection === "appearance"
+                    ? "Appearance"
+                    : activeSection === "security"
+                      ? "Security"
+                      : activeSection === "notifications"
+                        ? "Notifications"
+                        : "Payout details"}
+              </CardTitle>
+              <CardDescription>
+                {activeSection === "profile"
+                  ? copy.description
+                  : activeSection === "appearance"
+                    ? "Theme and reading preferences for this workspace."
+                    : activeSection === "security"
+                      ? "Password and account protection preferences."
+                      : activeSection === "notifications"
+                        ? "Choose the alerts that deserve your attention."
+                        : "Saved bank details for withdrawal requests."}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <FormMessage
@@ -194,7 +263,9 @@ export default function WorkspaceSettingsForm({
                 tone={state.status === "success" ? "success" : "error"}
               />
 
-              <section className="rounded-[24px] border border-border bg-surface p-4">
+              {showProfile ? (
+              <>
+              <section className="rounded-[24px] border border-border bg-surface p-5 sm:p-6">
                 <div className="mb-4 flex items-center gap-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-soft text-primary">
                     <UserRound className="h-5 w-5" />
@@ -207,9 +278,9 @@ export default function WorkspaceSettingsForm({
                   </div>
                 </div>
 
-                <div className="grid gap-5 lg:grid-cols-[190px_1fr]">
+                <div className="grid gap-5 lg:grid-cols-[9rem_minmax(0,1fr)] lg:items-start">
                   <div className="space-y-3">
-                    <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-[28px] border border-border bg-white text-primary shadow-sm">
+                    <div className="relative mx-auto flex h-32 w-32 items-center justify-center overflow-hidden rounded-[26px] border border-border bg-white text-primary shadow-sm lg:mx-0">
                       {avatarPreviewUrl || profile.avatar_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -221,7 +292,7 @@ export default function WorkspaceSettingsForm({
                         <span className="font-heading text-5xl font-semibold">{profileInitial}</span>
                       )}
                     </div>
-                    <label className="block cursor-pointer rounded-2xl border border-border bg-white px-4 py-3 text-center text-sm font-semibold text-foreground shadow-sm transition hover:border-primary/30 hover:bg-primary-soft hover:text-primary">
+                    <label className="mx-auto flex h-11 w-full max-w-36 cursor-pointer items-center justify-center rounded-2xl border border-border bg-white px-3 text-center text-sm font-semibold text-foreground shadow-sm transition hover:border-primary/30 hover:bg-primary-soft hover:text-primary lg:mx-0">
                       <Camera className="mr-2 inline h-4 w-4" />
                       Change photo
                       <input
@@ -234,8 +305,8 @@ export default function WorkspaceSettingsForm({
                         }
                       />
                     </label>
-                    <p className="text-xs leading-5 text-muted-foreground">
-                      JPG, PNG, or WEBP. Maximum 2MB.
+                    <p className="mx-auto max-w-36 text-center text-xs leading-5 text-muted-foreground lg:mx-0 lg:text-left">
+                      JPG, PNG, WEBP. Max 2MB.
                     </p>
                   </div>
 
@@ -258,7 +329,10 @@ export default function WorkspaceSettingsForm({
                   </div>
                 </div>
               </section>
+              </>
+              ) : null}
 
+              {showProfile ? (
               <section className="rounded-[24px] border border-border bg-surface p-4">
                 <div className="mb-4 flex items-center gap-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
@@ -277,7 +351,9 @@ export default function WorkspaceSettingsForm({
                   placeholder="+234 801 234 5678"
                 />
               </section>
+              ) : null}
 
+              {showAppearance ? (
               <section className="rounded-[24px] border border-border bg-surface p-4">
                 <div className="mb-4 flex items-center gap-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
@@ -315,8 +391,9 @@ export default function WorkspaceSettingsForm({
                   </label>
                 </div>
               </section>
+              ) : null}
 
-              {workspace !== "admin" ? (
+              {showPayout ? (
                 <section className="rounded-[24px] border border-border bg-surface p-4">
                   <div className="mb-4 flex items-center gap-3">
                     <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
@@ -351,46 +428,76 @@ export default function WorkspaceSettingsForm({
                   </div>
                 </section>
               ) : null}
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification preferences</CardTitle>
-              <CardDescription>Choose the alerts that deserve your attention.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              {shownPreferences.map((preference) => (
-                <label
-                  key={preference.key}
-                  className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-surface p-4"
-                >
-                  <span className="flex gap-3">
-                    <span className="mt-1 flex h-9 w-9 items-center justify-center rounded-xl bg-white text-primary shadow-sm">
-                      <Bell className="h-4 w-4" />
+              {showSecurity ? (
+                <section className="space-y-3 rounded-[24px] border border-border bg-surface p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
+                      <Smartphone className="h-4 w-4" />
                     </span>
-                    <span>
-                      <span className="block font-semibold text-foreground">{preference.title}</span>
-                      <span className="mt-1 block text-sm leading-6 text-muted-foreground">
-                        {preference.detail}
+                    <div>
+                      <p className="font-semibold text-foreground">Two-factor authentication</p>
+                      <p className="text-sm text-muted-foreground">
+                        Preference only until verification setup is enabled.
+                      </p>
+                    </div>
+                  </div>
+                  <label className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-foreground">
+                    Request 2FA protection
+                    <input
+                      name="twoFactorPreferenceEnabled"
+                      type="checkbox"
+                      defaultChecked={settings.two_factor_preference_enabled}
+                      className="h-5 w-5 rounded border-border text-primary focus:ring-primary"
+                    />
+                  </label>
+                  <Select name="twoFactorMethod" defaultValue={settings.two_factor_method}>
+                    <option value="authenticator">Authenticator app</option>
+                    <option value="email">Email code</option>
+                  </Select>
+                  <Badge variant={settings.two_factor_preference_enabled ? "warning" : "neutral"}>
+                    {settings.two_factor_preference_enabled ? "Setup requested" : "Not requested"}
+                  </Badge>
+                </section>
+              ) : null}
+
+              {showNotifications ? (
+                <section className="grid gap-3">
+                  {shownPreferences.map((preference) => (
+                    <label
+                      key={preference.key}
+                      className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-surface p-4"
+                    >
+                      <span className="flex gap-3">
+                        <span className="mt-1 flex h-9 w-9 items-center justify-center rounded-xl bg-white text-primary shadow-sm">
+                          <Bell className="h-4 w-4" />
+                        </span>
+                        <span>
+                          <span className="block font-semibold text-foreground">
+                            {preference.title}
+                          </span>
+                          <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                            {preference.detail}
+                          </span>
+                        </span>
                       </span>
-                    </span>
-                  </span>
-                  <input
-                    className="mt-2 h-5 w-5 rounded border-border text-primary focus:ring-primary"
-                    name={preference.key}
-                    type="checkbox"
-                    defaultChecked={settings.notification_preferences[preference.key] ?? true}
-                  />
-                </label>
-              ))}
+                      <input
+                        className="mt-2 h-5 w-5 rounded border-border text-primary focus:ring-primary"
+                        name={preference.key}
+                        type="checkbox"
+                        defaultChecked={settings.notification_preferences[preference.key] ?? true}
+                      />
+                    </label>
+                  ))}
+                </section>
+              ) : null}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
               <CardTitle>Save changes</CardTitle>
-              <CardDescription>Changes apply to this workspace immediately.</CardDescription>
+              <CardDescription>Appearance changes apply after the save completes.</CardDescription>
             </CardHeader>
             <CardContent>
               <SubmitButton pendingLabel="Saving changes..." className="w-full">
@@ -402,6 +509,7 @@ export default function WorkspaceSettingsForm({
       </div>
 
       <aside className="space-y-6">
+        {showStatusPanel ? (
         <Card>
           <CardHeader>
             <CardTitle>Workspace status</CardTitle>
@@ -445,46 +553,15 @@ export default function WorkspaceSettingsForm({
             ) : null}
           </CardContent>
         </Card>
+        ) : null}
 
+        {showSecurity ? (
         <Card>
           <CardHeader>
             <CardTitle>Security</CardTitle>
             <CardDescription>Password and two-factor preferences.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <section className="space-y-3 rounded-[24px] border border-border bg-surface p-4">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
-                  <Smartphone className="h-4 w-4" />
-                </span>
-                <div>
-                  <p className="font-semibold text-foreground">Two-factor authentication</p>
-                  <p className="text-sm text-muted-foreground">MFA enforcement will use this preference once provider setup is enabled.</p>
-                </div>
-              </div>
-              <label className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-foreground">
-                Request 2FA protection
-                <input
-                  form={settingsFormId}
-                  name="twoFactorPreferenceEnabled"
-                  type="checkbox"
-                  defaultChecked={settings.two_factor_preference_enabled}
-                  className="h-5 w-5 rounded border-border text-primary focus:ring-primary"
-                />
-              </label>
-              <Select
-                form={settingsFormId}
-                name="twoFactorMethod"
-                defaultValue={settings.two_factor_method}
-              >
-                <option value="authenticator">Authenticator app</option>
-                <option value="email">Email code</option>
-              </Select>
-              <Badge variant={settings.two_factor_preference_enabled ? "warning" : "neutral"}>
-                {settings.two_factor_preference_enabled ? "Setup requested" : "Not requested"}
-              </Badge>
-            </section>
-
             <form action={passwordFormAction} className="space-y-3 rounded-[24px] border border-border bg-surface p-4">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
@@ -508,6 +585,7 @@ export default function WorkspaceSettingsForm({
             </form>
           </CardContent>
         </Card>
+        ) : null}
       </aside>
     </div>
   );

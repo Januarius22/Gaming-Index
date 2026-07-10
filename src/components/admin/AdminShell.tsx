@@ -8,18 +8,25 @@ import AdminTopbar from "@/components/admin/AdminTopbar";
 import LogoutConfirmButton from "@/components/auth/LogoutConfirmButton";
 import { buttonClassName } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-import type { Profile, SidebarCounts } from "@/types";
+import type { Profile, ProfileSettings, SidebarCounts } from "@/types";
 
 export default function AdminShell({
   profile,
   sidebarCounts,
+  settings,
   children
 }: {
   profile: Profile;
   sidebarCounts: SidebarCounts;
+  settings: ProfileSettings;
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const preferenceClassName = cn(
+    settings.theme_preference === "dark" && "gi-theme-dark",
+    settings.theme_preference === "system" && "gi-theme-system",
+    `gi-font-${settings.font_size_preference}`
+  );
 
   useEffect(() => {
     const savedValue = window.localStorage.getItem("gi-admin-sidebar-collapsed");
@@ -35,7 +42,7 @@ export default function AdminShell({
   };
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className={cn("min-h-screen bg-surface", preferenceClassName)}>
       <div className="flex min-h-screen items-center justify-center px-6 py-12 xl:hidden">
         <div className="w-full max-w-xl rounded-[32px] border border-border/70 bg-white p-8 text-center shadow-[0_24px_80px_-48px_rgba(6,43,99,0.3)]">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-primary-soft text-primary">

@@ -6,15 +6,17 @@ import { AccountShellProvider } from "@/components/account/AccountShellContext";
 import AccountSidebar from "@/components/account/AccountSidebar";
 import AccountTopbar from "@/components/account/AccountTopbar";
 import { cn } from "@/lib/utils";
-import type { Profile, SidebarCounts } from "@/types";
+import type { Profile, ProfileSettings, SidebarCounts } from "@/types";
 
 export default function AccountShell({
   profile,
   sidebarCounts,
+  settings,
   children
 }: {
   profile: Profile;
   sidebarCounts: SidebarCounts;
+  settings: ProfileSettings;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -50,6 +52,11 @@ export default function AccountShell({
   };
 
   const sidebarExpanded = !collapsed || (supportsHoverPreview && hoverPreviewOpen);
+  const preferenceClassName = cn(
+    settings.theme_preference === "dark" && "gi-theme-dark",
+    settings.theme_preference === "system" && "gi-theme-system",
+    `gi-font-${settings.font_size_preference}`
+  );
 
   return (
     <AccountShellProvider
@@ -58,7 +65,7 @@ export default function AccountShell({
         sidebarCollapsed: !sidebarExpanded
       }}
     >
-      <div className="min-h-screen bg-surface">
+      <div className={cn("min-h-screen bg-surface", preferenceClassName)}>
         <div className="flex min-h-screen">
           <div
             className={cn(

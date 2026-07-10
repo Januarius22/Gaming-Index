@@ -1,6 +1,6 @@
 import SellerShell from "@/components/seller/SellerShell";
 import { requireSellerProfile } from "@/lib/auth";
-import { getSellerSidebarCounts } from "@/lib/data";
+import { getProfileSettings, getSellerSidebarCounts } from "@/lib/data";
 
 export default async function SellerLayout({
   children
@@ -8,7 +8,14 @@ export default async function SellerLayout({
   children: React.ReactNode;
 }>) {
   const profile = await requireSellerProfile();
-  const sidebarCounts = await getSellerSidebarCounts(profile);
+  const [sidebarCounts, settings] = await Promise.all([
+    getSellerSidebarCounts(profile),
+    getProfileSettings(profile.id)
+  ]);
 
-  return <SellerShell profile={profile} sidebarCounts={sidebarCounts}>{children}</SellerShell>;
+  return (
+    <SellerShell profile={profile} sidebarCounts={sidebarCounts} settings={settings}>
+      {children}
+    </SellerShell>
+  );
 }

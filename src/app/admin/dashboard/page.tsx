@@ -10,8 +10,17 @@ export default async function AdminDashboardPage() {
   const profile = await requireAdminProfile();
   const [{ stats }, notifications] = await Promise.all([
     getAdminDashboardStats(),
-    getProfileNotifications(profile.id, 3)
+    getProfileNotifications(profile.id, 10)
   ]);
+  const dashboardNotifications = notifications
+    .filter((notification) => {
+      const searchable = `${notification.type} ${notification.title}`.toLowerCase();
+
+      return !["resolved", "rejected", "refunded", "paid"].some((status) =>
+        searchable.includes(status)
+      );
+    })
+    .slice(0, 3);
 
   return (
     <div className="space-y-6">
@@ -33,7 +42,7 @@ export default async function AdminDashboardPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <NotificationList
-            notifications={notifications}
+            notifications={dashboardNotifications}
             emptyMessage="No admin notifications yet."
             compact
           />

@@ -1,6 +1,6 @@
 import AccountShell from "@/components/account/AccountShell";
 import { requireAccountProfile } from "@/lib/auth";
-import { getAccountSidebarCounts } from "@/lib/data";
+import { getAccountSidebarCounts, getProfileSettings } from "@/lib/data";
 
 export default async function AccountLayout({
   children
@@ -8,7 +8,14 @@ export default async function AccountLayout({
   children: React.ReactNode;
 }>) {
   const profile = await requireAccountProfile();
-  const sidebarCounts = await getAccountSidebarCounts(profile);
+  const [sidebarCounts, settings] = await Promise.all([
+    getAccountSidebarCounts(profile),
+    getProfileSettings(profile.id)
+  ]);
 
-  return <AccountShell profile={profile} sidebarCounts={sidebarCounts}>{children}</AccountShell>;
+  return (
+    <AccountShell profile={profile} sidebarCounts={sidebarCounts} settings={settings}>
+      {children}
+    </AccountShell>
+  );
 }

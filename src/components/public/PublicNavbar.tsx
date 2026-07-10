@@ -26,7 +26,7 @@ export default function PublicNavbar() {
     <header
       className={cn(
         "z-40 px-4 pt-4 sm:px-6 lg:px-8",
-        isHomePage ? "absolute inset-x-0 top-0 px-0 pt-0 sm:px-0 lg:px-0" : "sticky top-0"
+        isHomePage ? "fixed inset-x-0 top-0 px-0 pt-0 sm:px-0 lg:px-0" : "sticky top-0"
       )}
     >
       <div

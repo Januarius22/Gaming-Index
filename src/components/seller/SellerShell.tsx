@@ -5,15 +5,17 @@ import { useEffect, useState } from "react";
 import SellerSidebar from "@/components/seller/SellerSidebar";
 import SellerTopbar from "@/components/seller/SellerTopbar";
 import { cn } from "@/lib/utils";
-import type { Profile, SidebarCounts } from "@/types";
+import type { Profile, ProfileSettings, SidebarCounts } from "@/types";
 
 export default function SellerShell({
   profile,
   sidebarCounts,
+  settings,
   children
 }: {
   profile: Profile;
   sidebarCounts: SidebarCounts;
+  settings: ProfileSettings;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -31,9 +33,14 @@ export default function SellerShell({
       return next;
     });
   };
+  const preferenceClassName = cn(
+    settings.theme_preference === "dark" && "gi-theme-dark",
+    settings.theme_preference === "system" && "gi-theme-system",
+    `gi-font-${settings.font_size_preference}`
+  );
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className={cn("min-h-screen bg-surface", preferenceClassName)}>
       <div className="flex min-h-screen">
         <div
           className={cn(

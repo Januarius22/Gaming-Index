@@ -1,5 +1,4 @@
-import { changePasswordAction, updateAdminSettingsAction } from "@/actions/settings";
-import WorkspaceSettingsForm from "@/components/settings/WorkspaceSettingsForm";
+import SettingsHub from "@/components/settings/SettingsHub";
 import { requireAdminProfile } from "@/lib/auth";
 import { getProfileSettings } from "@/lib/data";
 
@@ -7,13 +6,5 @@ export default async function AdminSettingsPage() {
   const profile = await requireAdminProfile();
   const settings = await getProfileSettings(profile.id);
 
-  return (
-    <WorkspaceSettingsForm
-      action={updateAdminSettingsAction}
-      passwordAction={changePasswordAction}
-      profile={profile}
-      settings={settings}
-      workspace="admin"
-    />
-  );
+  return <SettingsHub settings={settings} workspace="admin" />;
 }
