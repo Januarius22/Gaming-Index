@@ -64,6 +64,7 @@ body {
   --warning: #f59e0b;
   --danger: #f87171;
   color-scheme: dark;
+  color: var(--foreground);
   background:
     radial-gradient(circle at top, rgba(79, 140, 255, 0.16), transparent 40%),
     linear-gradient(180deg, #08111f 0%, #101a2c 100%);
@@ -84,6 +85,7 @@ body {
     --warning: #f59e0b;
     --danger: #f87171;
     color-scheme: dark;
+    color: var(--foreground);
     background:
       radial-gradient(circle at top, rgba(79, 140, 255, 0.16), transparent 40%),
       linear-gradient(180deg, #08111f 0%, #101a2c 100%);
@@ -92,6 +94,14 @@ body {
 
 .gi-theme-dark .bg-white {
   background-color: #111d31;
+}
+
+.gi-theme-dark .bg-white\/90 {
+  background-color: rgba(17, 29, 49, 0.9);
+}
+
+.gi-theme-dark .bg-white\/92 {
+  background-color: rgba(17, 29, 49, 0.92);
 }
 
 .gi-theme-dark .bg-surface {
@@ -135,6 +145,14 @@ body {
 @media (prefers-color-scheme: dark) {
   .gi-theme-system .bg-white {
     background-color: #111d31;
+  }
+
+  .gi-theme-system .bg-white\/90 {
+    background-color: rgba(17, 29, 49, 0.9);
+  }
+
+  .gi-theme-system .bg-white\/92 {
+    background-color: rgba(17, 29, 49, 0.92);
   }
 
   .gi-theme-system .bg-surface {
