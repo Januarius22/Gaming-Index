@@ -30,7 +30,7 @@ export default function AdminShell({
 
   useEffect(() => {
     const savedValue = window.localStorage.getItem("gi-admin-sidebar-collapsed");
-    setCollapsed(savedValue === "true");
+    setCollapsed(savedValue === null ? window.innerWidth < 1024 : savedValue === "true");
   }, []);
 
   const toggleCollapsed = () => {
@@ -43,7 +43,7 @@ export default function AdminShell({
 
   return (
     <div className={cn("min-h-screen bg-surface", preferenceClassName)}>
-      <div className="flex min-h-screen items-center justify-center px-6 py-12 xl:hidden">
+      <div className="flex min-h-screen items-center justify-center px-6 py-12 min-[700px]:hidden">
         <div className="w-full max-w-xl rounded-[32px] border border-border/70 bg-white p-8 text-center shadow-[0_24px_80px_-48px_rgba(6,43,99,0.3)]">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-primary-soft text-primary">
             <Monitor className="h-8 w-8" />
@@ -68,7 +68,7 @@ export default function AdminShell({
         </div>
       </div>
 
-      <div className="hidden min-h-screen xl:flex">
+      <div className="hidden min-h-screen min-[700px]:flex">
         <div
           className={cn(
             "shrink-0 transition-[width] duration-300 ease-in-out",
