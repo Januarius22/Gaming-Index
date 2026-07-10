@@ -57,6 +57,51 @@ export async function updateCurrencyRateAction(formData: FormData) {
   redirect("/admin/currencies?notice=rate-saved");
 }
 
+export async function updateSellerReviewVisibilityAction(formData: FormData) {
+  const adminProfile = await requireAdminProfile();
+  const reviewId = String(formData.get("reviewId") ?? "").trim();
+  const nextVisibility = String(formData.get("nextVisibility") ?? "").trim();
+  const hiddenReason = String(formData.get("hiddenReason") ?? "").trim();
+  const shouldHide = nextVisibility === "hidden";
+
+  if (!reviewId || !["hidden", "visible"].includes(nextVisibility)) {
+    redirect("/admin/reviews?notice=invalid-review");
+  }
+
+  if (shouldHide && hiddenReason.length < 3) {
+    redirect("/admin/reviews?notice=reason-required");
+  }
+
+  if (!hasSupabaseEnv) {
+    redirect("/admin/reviews?notice=demo-review");
+  }
+
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    redirect("/admin/reviews?notice=review-failed");
+  }
+
+  const { error } = await supabase
+    .from("seller_ratings")
+    .update({
+      is_hidden: shouldHide,
+      hidden_reason: shouldHide ? hiddenReason : "",
+      hidden_by: shouldHide ? adminProfile.id : null,
+      hidden_at: shouldHide ? new Date().toISOString() : null
+    })
+    .eq("id", reviewId);
+
+  if (error) {
+    redirect(`/admin/reviews?notice=review-failed&error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/admin/reviews");
+  revalidatePath("/marketplace");
+  revalidatePath("/account/marketplace");
+  redirect(`/admin/reviews?notice=${shouldHide ? "review-hidden" : "review-restored"}`);
+}
+
 function getSafeAdminReturnPath(value: string) {
   return value.startsWith("/admin/") ? value : "/admin/listings";
 }

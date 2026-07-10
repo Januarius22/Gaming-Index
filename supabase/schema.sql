@@ -4034,6 +4034,28 @@ create policy "buyers can update their own seller ratings"
   using (auth.uid() = buyer_id)
   with check (auth.uid() = buyer_id);
 
+drop policy if exists "admins can moderate seller ratings" on public.seller_ratings;
+create policy "admins can moderate seller ratings"
+  on public.seller_ratings
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
 drop policy if exists "currency rates readable by everyone" on public.currency_rates;
 create policy "currency rates readable by everyone"
   on public.currency_rates

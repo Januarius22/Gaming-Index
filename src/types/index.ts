@@ -152,6 +152,15 @@ export interface SellerRating {
   created_at: string;
 }
 
+export interface AdminSellerReview extends SellerRating {
+  seller_name?: string;
+  seller_username?: string;
+  buyer_name?: string;
+  buyer_email?: string;
+  listing_title?: string;
+  order_reference?: string;
+}
+
 export interface CurrencyRate {
   code: string;
   name: string;

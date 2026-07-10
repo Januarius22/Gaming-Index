@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   Bell,
   ChevronRight,
+  CircleDollarSign,
   CreditCard,
   LockKeyhole,
   Moon,
@@ -18,6 +19,13 @@ const sections = [
     title: "Profile",
     detail: "Name, username, photo, and contact details.",
     icon: UserRound,
+    workspaces: ["account", "seller", "admin"] as Workspace[]
+  },
+  {
+    key: "currency",
+    title: "Currency",
+    detail: "Choose how prices are displayed in your workspace.",
+    icon: CircleDollarSign,
     workspaces: ["account", "seller", "admin"] as Workspace[]
   },
   {
@@ -97,8 +105,12 @@ export default function SettingsHub({
                     </span>
                     {section.key === "appearance" ? (
                       <span className="mt-4 block text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-                        {settings.display_currency} / {formatTheme(settings.theme_preference)} /{" "}
-                        {formatFontSize(settings.font_size_preference)}
+                        {formatTheme(settings.theme_preference)} / {formatFontSize(settings.font_size_preference)}
+                      </span>
+                    ) : null}
+                    {section.key === "currency" ? (
+                      <span className="mt-4 block text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                        {settings.display_currency}
                       </span>
                     ) : null}
                   </span>

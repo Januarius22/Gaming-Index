@@ -6,6 +6,7 @@ import {
   Camera,
   CheckCircle2,
   CreditCard,
+  CircleDollarSign,
   Fingerprint,
   KeyRound,
   Mail,
@@ -23,11 +24,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import Select from "@/components/ui/Select";
-import { defaultCurrencyRates } from "@/lib/utils";
-import type { ActionState, Profile, ProfileSettings } from "@/types";
+import type { ActionState, CurrencyRate, Profile, ProfileSettings } from "@/types";
 
 type Workspace = "account" | "seller" | "admin";
-export type SettingsSection = "profile" | "appearance" | "security" | "notifications" | "payout";
+export type SettingsSection =
+  | "profile"
+  | "currency"
+  | "appearance"
+  | "security"
+  | "notifications"
+  | "payout";
 
 type Preference = {
   key: string;
@@ -146,6 +152,7 @@ function getWorkspaceCopy(workspace: Workspace) {
 export default function WorkspaceSettingsForm({
   profile,
   settings,
+  currencyRates,
   workspace,
   section,
   action,
@@ -153,6 +160,7 @@ export default function WorkspaceSettingsForm({
 }: {
   profile: Profile;
   settings: ProfileSettings;
+  currencyRates?: CurrencyRate[];
   workspace: Workspace;
   section?: SettingsSection;
   action: (previousState: ActionState, formData: FormData) => Promise<ActionState>;
@@ -176,11 +184,26 @@ export default function WorkspaceSettingsForm({
   const profileInitial = profile.full_name.trim().charAt(0).toUpperCase() || "G";
   const activeSection = section ?? "profile";
   const showProfile = activeSection === "profile";
+  const showCurrency = activeSection === "currency";
   const showAppearance = activeSection === "appearance";
   const showSecurity = activeSection === "security";
   const showNotifications = activeSection === "notifications";
   const showPayout = activeSection === "payout" && workspace !== "admin";
   const showStatusPanel = activeSection === "profile";
+  const enabledCurrencyRates = currencyRates?.filter((rate) => rate.enabled) ?? [];
+  const availableCurrencyRates =
+    enabledCurrencyRates.length > 0
+      ? enabledCurrencyRates
+      : [
+          {
+            code: "NGN",
+            name: "Nigerian Naira",
+            symbol: "₦",
+            ngn_rate: 1,
+            enabled: true,
+            updated_at: ""
+          }
+        ];
 
   useEffect(() => {
     return () => {
@@ -201,9 +224,11 @@ export default function WorkspaceSettingsForm({
               <input type="hidden" name="phoneNumber" value={settings.phone_number} />
             </>
           ) : null}
+          {!showCurrency ? (
+            <input type="hidden" name="displayCurrency" value={settings.display_currency} />
+          ) : null}
           {!showAppearance ? (
             <>
-              <input type="hidden" name="displayCurrency" value={settings.display_currency} />
               <input type="hidden" name="themePreference" value={settings.theme_preference} />
               <input type="hidden" name="fontSizePreference" value={settings.font_size_preference} />
             </>
@@ -239,6 +264,8 @@ export default function WorkspaceSettingsForm({
               <CardTitle>
                 {activeSection === "profile"
                   ? copy.title
+                  : activeSection === "currency"
+                    ? "Currency"
                   : activeSection === "appearance"
                     ? "Appearance"
                     : activeSection === "security"
@@ -250,6 +277,8 @@ export default function WorkspaceSettingsForm({
               <CardDescription>
                 {activeSection === "profile"
                   ? copy.description
+                  : activeSection === "currency"
+                    ? "Choose the currency used for prices displayed in your workspace."
                   : activeSection === "appearance"
                     ? "Theme and reading preferences for this workspace."
                     : activeSection === "security"
@@ -368,20 +397,7 @@ export default function WorkspaceSettingsForm({
                     <p className="text-sm text-muted-foreground">Display preferences for your workspace.</p>
                   </div>
                 </div>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <label className="space-y-2">
-                    <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <CreditCard className="h-4 w-4 text-primary" />
-                      Display currency
-                    </span>
-                    <Select name="displayCurrency" defaultValue={settings.display_currency}>
-                      {defaultCurrencyRates.map((rate) => (
-                        <option key={rate.code} value={rate.code}>
-                          {rate.code} - {rate.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </label>
+                <div className="grid gap-4 md:grid-cols-2">
                   <label className="space-y-2">
                     <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                       <Moon className="h-4 w-4 text-primary" />
@@ -406,6 +422,34 @@ export default function WorkspaceSettingsForm({
                   </label>
                 </div>
               </section>
+              ) : null}
+
+              {showCurrency ? (
+                <section className="rounded-[24px] border border-border bg-surface p-4">
+                  <div className="mb-4 flex items-center gap-3">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
+                      <CircleDollarSign className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <h2 className="font-heading text-lg font-semibold text-foreground">
+                        Display currency
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        Financial records remain in NGN. This controls how prices are shown.
+                      </p>
+                    </div>
+                  </div>
+                  <label className="space-y-2">
+                    <span className="text-sm font-semibold text-foreground">Currency</span>
+                    <Select name="displayCurrency" defaultValue={settings.display_currency}>
+                      {availableCurrencyRates.map((rate) => (
+                        <option key={rate.code} value={rate.code}>
+                          {rate.code} - {rate.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </label>
+                </section>
               ) : null}
 
               {showPayout ? (

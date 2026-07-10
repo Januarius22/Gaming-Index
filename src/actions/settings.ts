@@ -251,6 +251,7 @@ async function saveWorkspaceSettings({
 
   revalidatePath(getSettingsPath(workspace));
   revalidatePath(`${getSettingsPath(workspace)}/profile`);
+  revalidatePath(`${getSettingsPath(workspace)}/currency`);
   revalidatePath(`${getSettingsPath(workspace)}/appearance`);
   revalidatePath(`${getSettingsPath(workspace)}/security`);
   revalidatePath(`${getSettingsPath(workspace)}/notifications`);

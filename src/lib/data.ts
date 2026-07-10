@@ -28,6 +28,7 @@ import {
 import type {
   ActivityItem,
   AdminAnalytics,
+  AdminSellerReview,
   AnalyticsDatum,
   CurrencyRate,
   DashboardStat,
@@ -453,6 +454,111 @@ async function getSupabaseSellerRatings() {
       is_hidden: Boolean(rating.is_hidden)
     }))
     .filter((rating) => !rating.is_hidden);
+}
+
+export async function getAdminSellerReviews(): Promise<AdminSellerReview[]> {
+  if (!hasSupabaseEnv) {
+    const [ratings, profiles, listings, orders] = await Promise.all([
+      getDemoSellerRatings(),
+      getDemoProfiles(),
+      getDemoListings(),
+      getDemoOrders()
+    ]);
+    const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
+    const listingMap = new Map(listings.map((listing) => [listing.id, listing]));
+    const orderMap = new Map(orders.map((order) => [order.id, order]));
+
+    return ratings.map((rating) => {
+      const seller = profileMap.get(rating.seller_id);
+      const buyer = profileMap.get(rating.buyer_id);
+      const listing = rating.listing_id ? listingMap.get(rating.listing_id) : null;
+      const order = rating.order_id ? orderMap.get(rating.order_id) : null;
+
+      return {
+        ...rating,
+        tags: Array.isArray(rating.tags) ? rating.tags : [],
+        is_hidden: Boolean(rating.is_hidden),
+        seller_name: seller?.full_name,
+        seller_username: seller?.username,
+        buyer_name: buyer?.full_name,
+        buyer_email: buyer?.email,
+        listing_title: listing?.title ?? order?.listing_title,
+        order_reference: order?.id
+      };
+    });
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("seller_ratings")
+      .select("*")
+      .order("created_at", { ascending: false });
+    const ratings = (data as SellerRating[] | null) ?? [];
+    const profileIds = Array.from(
+      new Set(ratings.flatMap((rating) => [rating.seller_id, rating.buyer_id]).filter(Boolean))
+    );
+    const listingIds = Array.from(
+      new Set(ratings.map((rating) => rating.listing_id).filter((id): id is string => Boolean(id)))
+    );
+    const orderIds = Array.from(
+      new Set(ratings.map((rating) => rating.order_id).filter((id): id is string => Boolean(id)))
+    );
+    const [{ data: profiles }, { data: listings }, { data: orders }] = await Promise.all([
+      profileIds.length > 0
+        ? supabase.from("profiles").select("id, full_name, username, email").in("id", profileIds)
+        : Promise.resolve({ data: [] }),
+      listingIds.length > 0
+        ? supabase.from("listings").select("id, title").in("id", listingIds)
+        : Promise.resolve({ data: [] }),
+      orderIds.length > 0
+        ? supabase.from("orders").select("id, listing_title").in("id", orderIds)
+        : Promise.resolve({ data: [] })
+    ]);
+    const profileMap = new Map(
+      ((profiles as Array<{ id: string; full_name: string; username: string; email: string }> | null) ?? []).map(
+        (profile) => [profile.id, profile]
+      )
+    );
+    const listingMap = new Map(
+      ((listings as Array<{ id: string; title: string }> | null) ?? []).map((listing) => [
+        listing.id,
+        listing
+      ])
+    );
+    const orderMap = new Map(
+      ((orders as Array<{ id: string; listing_title: string }> | null) ?? []).map((order) => [
+        order.id,
+        order
+      ])
+    );
+
+    return ratings.map((rating) => {
+      const seller = profileMap.get(rating.seller_id);
+      const buyer = profileMap.get(rating.buyer_id);
+      const listing = rating.listing_id ? listingMap.get(rating.listing_id) : null;
+      const order = rating.order_id ? orderMap.get(rating.order_id) : null;
+
+      return {
+        ...rating,
+        tags: Array.isArray(rating.tags) ? rating.tags : [],
+        is_hidden: Boolean(rating.is_hidden),
+        seller_name: seller?.full_name,
+        seller_username: seller?.username,
+        buyer_name: buyer?.full_name,
+        buyer_email: buyer?.email,
+        listing_title: listing?.title ?? order?.listing_title,
+        order_reference: order?.id
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
 async function getSupabaseListingDeliveryDetailsForListing(listingId: string) {

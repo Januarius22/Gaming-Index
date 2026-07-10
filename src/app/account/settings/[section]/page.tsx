@@ -6,9 +6,9 @@ import WorkspaceSettingsForm, {
   type SettingsSection
 } from "@/components/settings/WorkspaceSettingsForm";
 import { requireAccountProfile } from "@/lib/auth";
-import { getProfileSettings } from "@/lib/data";
+import { getCurrencyRates, getProfileSettings } from "@/lib/data";
 
-const sections = ["profile", "appearance", "security", "notifications", "payout"] as const;
+const sections = ["profile", "currency", "appearance", "security", "notifications", "payout"] as const;
 
 export default async function AccountSettingsSectionPage({
   params
@@ -22,7 +22,10 @@ export default async function AccountSettingsSectionPage({
   }
 
   const profile = await requireAccountProfile();
-  const settings = await getProfileSettings(profile.id);
+  const [settings, currencyRates] = await Promise.all([
+    getProfileSettings(profile.id),
+    getCurrencyRates()
+  ]);
 
   return (
     <div className="space-y-5">
@@ -36,6 +39,7 @@ export default async function AccountSettingsSectionPage({
       <WorkspaceSettingsForm
         action={updateAccountSettingsAction}
         passwordAction={changePasswordAction}
+        currencyRates={currencyRates}
         profile={profile}
         section={section as SettingsSection}
         settings={settings}
