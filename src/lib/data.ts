@@ -18,6 +18,7 @@ import {
   PLATFORM_COMMISSION_RATE,
   calculatePlatformFee,
   calculateSellerPayout,
+  defaultCurrencyRates,
   formatCompactCurrency,
   getListingHistoryTimestamp,
   isListingMarketplaceVisible,
@@ -28,6 +29,7 @@ import type {
   ActivityItem,
   AdminAnalytics,
   AnalyticsDatum,
+  CurrencyRate,
   DashboardStat,
   Dispute,
   DisputeAttachment,
@@ -63,6 +65,7 @@ export function getDefaultProfileSettings(profileId: string): ProfileSettings {
     default_bank_name: "",
     default_account_number: "",
     default_account_name: "",
+    display_currency: "NGN",
     theme_preference: "system",
     font_size_preference: "comfortable",
     two_factor_preference_enabled: false,
@@ -80,7 +83,7 @@ const seededMarketplaceListings: Listing[] = [
     game: "CODM",
     title: "CODM Ranked Account with Premium Weapons",
     description: "Well-maintained account with competitive loadouts and full access.",
-    price: 220,
+    price: 330000,
     platform: "Mobile",
     account_level: "Level 180",
     login_method: "Email",
@@ -96,7 +99,7 @@ const seededMarketplaceListings: Listing[] = [
     game: "Free Fire",
     title: "Free Fire Heroic Account",
     description: "High-rank account with rare bundles and active progression.",
-    price: 145,
+    price: 217500,
     platform: "Mobile",
     account_level: "Level 74",
     login_method: "Facebook",
@@ -112,7 +115,7 @@ const seededMarketplaceListings: Listing[] = [
     game: "DLS",
     title: "DLS Elite Squad Account",
     description: "Strong Dream League squad with upgraded stadium progress and rare players.",
-    price: 190,
+    price: 285000,
     platform: "Mobile",
     account_level: "Level 112",
     login_method: "Email",
@@ -133,7 +136,7 @@ const seededMarketplaceListings: Listing[] = [
     game: "PUBG Mobile",
     title: "PUBG Ace Account with Premium Skins",
     description: "Late-season account with mythic outfit pieces and premium inventory.",
-    price: 275,
+    price: 412500,
     platform: "Mobile",
     account_level: "Level 96",
     login_method: "Google",
@@ -173,6 +176,37 @@ const seededActivity: ActivityItem[] = [
 const visibleSeededMarketplaceListings = seededMarketplaceListings.filter((listing) =>
   isListingMarketplaceVisible(normalizeListing(listing))
 );
+
+export async function getCurrencyRates({ includeDisabled = false } = {}): Promise<CurrencyRate[]> {
+  if (!hasSupabaseEnv) {
+    return defaultCurrencyRates.filter((rate) => includeDisabled || rate.enabled);
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return defaultCurrencyRates.filter((rate) => includeDisabled || rate.enabled);
+    }
+
+    const { data } = await supabase
+      .from("currency_rates")
+      .select("*")
+      .order("code", { ascending: true });
+
+    const rates = ((data as CurrencyRate[] | null) ?? defaultCurrencyRates).map((rate) => ({
+      ...rate,
+      code: rate.code.toUpperCase(),
+      ngn_rate: Number(rate.ngn_rate || 1),
+      enabled: Boolean(rate.enabled)
+    }));
+
+    const visibleRates = rates.filter((rate) => includeDisabled || rate.enabled);
+    return visibleRates.length > 0 ? visibleRates : defaultCurrencyRates;
+  } catch {
+    return defaultCurrencyRates.filter((rate) => includeDisabled || rate.enabled);
+  }
+}
 
 function normalizeListing(listing: Listing): Listing {
   return {
@@ -224,12 +258,12 @@ async function getSupabaseListings() {
   const { data: profileRows } =
     sellerIds.length > 0
       ? await supabase
-          .from("profiles")
-          .select("id, full_name, username, is_banned")
+        .from("profiles")
+          .select("id, full_name, username, avatar_url, is_banned")
           .in("id", sellerIds)
-      : { data: [] as Array<{ id: string; full_name: string; username: string; is_banned: boolean }> };
+      : { data: [] as Array<{ id: string; full_name: string; username: string; avatar_url?: string; is_banned: boolean }> };
   const profileMap = new Map(
-    ((profileRows as Array<{ id: string; full_name: string; username: string; is_banned: boolean }> | null) ?? []).map(
+    ((profileRows as Array<{ id: string; full_name: string; username: string; avatar_url?: string; is_banned: boolean }> | null) ?? []).map(
       (profile) => [profile.id, profile]
     )
   );
@@ -249,6 +283,7 @@ async function getSupabaseListings() {
           normalizedListing.seller_username ||
           sellerProfile?.username ||
           "seller",
+        seller_avatar_url: sellerProfile?.avatar_url || "",
         seller_is_banned: sellerProfile?.is_banned ?? false,
         image_urls: await getSignedListingAssetUrls(
           supabase,
@@ -411,7 +446,13 @@ async function getSupabaseSellerRatings() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  return (data as SellerRating[] | null) ?? [];
+  return ((data as SellerRating[] | null) ?? [])
+    .map((rating) => ({
+      ...rating,
+      tags: Array.isArray(rating.tags) ? rating.tags : [],
+      is_hidden: Boolean(rating.is_hidden)
+    }))
+    .filter((rating) => !rating.is_hidden);
 }
 
 async function getSupabaseListingDeliveryDetailsForListing(listingId: string) {
@@ -912,6 +953,7 @@ export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCo
 
 export async function getProfileSettings(profileId: string): Promise<ProfileSettings> {
   const defaults = getDefaultProfileSettings(profileId);
+  const enabledCurrencyCodes = new Set((await getCurrencyRates()).map((rate) => rate.code));
 
   if (!hasSupabaseEnv) {
     return defaults;
@@ -939,6 +981,9 @@ export async function getProfileSettings(profileId: string): Promise<ProfileSett
     return {
       ...defaults,
       ...settings,
+      display_currency: enabledCurrencyCodes.has(settings.display_currency)
+        ? settings.display_currency
+        : defaults.display_currency,
       theme_preference: ["light", "dark", "system"].includes(settings.theme_preference)
         ? settings.theme_preference
         : defaults.theme_preference,

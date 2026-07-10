@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Notification } from "@/types";
 
 function formatMetadataKey(key: string) {
@@ -24,11 +24,7 @@ function formatMetadataValue(value: unknown) {
   }
 
   if (typeof value === "number") {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0
-    }).format(value);
+    return formatCurrency(value);
   }
 
   if (typeof value === "boolean") {

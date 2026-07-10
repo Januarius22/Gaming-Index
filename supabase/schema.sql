@@ -42,6 +42,7 @@ create table if not exists public.profile_settings (
   default_bank_name text not null default '',
   default_account_number text not null default '',
   default_account_name text not null default '',
+  display_currency text not null default 'NGN',
   theme_preference text not null default 'system' check (theme_preference in ('light', 'dark', 'system')),
   font_size_preference text not null default 'comfortable' check (font_size_preference in ('compact', 'comfortable', 'large')),
   two_factor_preference_enabled boolean not null default false,
@@ -55,6 +56,7 @@ alter table public.profile_settings add column if not exists phone_number text n
 alter table public.profile_settings add column if not exists default_bank_name text not null default '';
 alter table public.profile_settings add column if not exists default_account_number text not null default '';
 alter table public.profile_settings add column if not exists default_account_name text not null default '';
+alter table public.profile_settings add column if not exists display_currency text not null default 'NGN';
 alter table public.profile_settings add column if not exists theme_preference text not null default 'system';
 alter table public.profile_settings add column if not exists font_size_preference text not null default 'comfortable';
 alter table public.profile_settings add column if not exists two_factor_preference_enabled boolean not null default false;
@@ -77,6 +79,28 @@ alter table public.profile_settings add constraint profile_settings_font_size_pr
 alter table public.profile_settings drop constraint if exists profile_settings_two_factor_method_check;
 alter table public.profile_settings add constraint profile_settings_two_factor_method_check
   check (two_factor_method in ('authenticator', 'email'));
+alter table public.profile_settings drop constraint if exists profile_settings_display_currency_check;
+alter table public.profile_settings add constraint profile_settings_display_currency_check
+  check (display_currency ~ '^[A-Z]{3}$');
+
+create table if not exists public.currency_rates (
+  code text primary key,
+  name text not null,
+  symbol text not null,
+  ngn_rate numeric(18, 6) not null default 1 check (ngn_rate > 0),
+  enabled boolean not null default true,
+  updated_by uuid references public.profiles(id) on delete set null,
+  updated_at timestamp with time zone not null default now(),
+  created_at timestamp with time zone not null default now()
+);
+
+insert into public.currency_rates (code, name, symbol, ngn_rate, enabled)
+values
+  ('NGN', 'Nigerian Naira', '₦', 1, true),
+  ('USD', 'US Dollar', '$', 1500, true),
+  ('GBP', 'British Pound', '£', 1900, true),
+  ('EUR', 'Euro', '€', 1650, true)
+on conflict (code) do nothing;
 
 create table if not exists public.kyc_submissions (
   id uuid primary key default gen_random_uuid(),
@@ -2921,12 +2945,30 @@ create table if not exists public.seller_ratings (
   id uuid primary key default gen_random_uuid(),
   seller_id uuid not null references public.profiles(id) on delete cascade,
   buyer_id uuid not null references public.profiles(id) on delete cascade,
+  order_id uuid references public.orders(id) on delete set null,
   listing_id uuid references public.listings(id) on delete set null,
   rating integer not null check (rating between 1 and 5),
   review text not null default '',
-  created_at timestamp with time zone not null default now(),
-  unique (seller_id, buyer_id)
+  tags jsonb not null default '[]'::jsonb,
+  is_hidden boolean not null default false,
+  hidden_reason text not null default '',
+  hidden_by uuid references public.profiles(id) on delete set null,
+  hidden_at timestamp with time zone,
+  created_at timestamp with time zone not null default now()
 );
+
+alter table public.seller_ratings add column if not exists order_id uuid references public.orders(id) on delete set null;
+alter table public.seller_ratings add column if not exists tags jsonb not null default '[]'::jsonb;
+alter table public.seller_ratings add column if not exists is_hidden boolean not null default false;
+alter table public.seller_ratings add column if not exists hidden_reason text not null default '';
+alter table public.seller_ratings add column if not exists hidden_by uuid references public.profiles(id) on delete set null;
+alter table public.seller_ratings add column if not exists hidden_at timestamp with time zone;
+alter table public.seller_ratings drop constraint if exists seller_ratings_seller_id_buyer_id_key;
+alter table public.seller_ratings drop constraint if exists seller_ratings_order_id_key;
+alter table public.seller_ratings add constraint seller_ratings_order_id_key unique (order_id);
+create unique index if not exists seller_ratings_order_id_unique_idx
+  on public.seller_ratings(order_id)
+  where order_id is not null;
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -3060,6 +3102,7 @@ alter table public.support_tickets enable row level security;
 alter table public.support_ticket_messages enable row level security;
 alter table public.notifications enable row level security;
 alter table public.seller_ratings enable row level security;
+alter table public.currency_rates enable row level security;
 
 drop policy if exists "profiles readable by authenticated users" on public.profiles;
 drop policy if exists "users and admins can read profiles" on public.profiles;
@@ -3966,7 +4009,15 @@ create policy "seller ratings readable by everyone"
   on public.seller_ratings
   for select
   to anon, authenticated
-  using (true);
+  using (
+    is_hidden = false
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
 
 drop policy if exists "buyers can insert their own seller ratings" on public.seller_ratings;
 create policy "buyers can insert their own seller ratings"
@@ -3982,6 +4033,49 @@ create policy "buyers can update their own seller ratings"
   to authenticated
   using (auth.uid() = buyer_id)
   with check (auth.uid() = buyer_id);
+
+drop policy if exists "currency rates readable by everyone" on public.currency_rates;
+create policy "currency rates readable by everyone"
+  on public.currency_rates
+  for select
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "admins can insert currency rates" on public.currency_rates;
+create policy "admins can insert currency rates"
+  on public.currency_rates
+  for insert
+  to authenticated
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "admins can update currency rates" on public.currency_rates;
+create policy "admins can update currency rates"
+  on public.currency_rates
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
 
 drop policy if exists "authenticated users can upload their own kyc files" on storage.objects;
 create policy "authenticated users can upload their own kyc files"

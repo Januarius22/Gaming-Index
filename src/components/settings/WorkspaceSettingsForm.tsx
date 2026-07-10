@@ -23,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import Select from "@/components/ui/Select";
+import { defaultCurrencyRates } from "@/lib/utils";
 import type { ActionState, Profile, ProfileSettings } from "@/types";
 
 type Workspace = "account" | "seller" | "admin";
@@ -202,6 +203,7 @@ export default function WorkspaceSettingsForm({
           ) : null}
           {!showAppearance ? (
             <>
+              <input type="hidden" name="displayCurrency" value={settings.display_currency} />
               <input type="hidden" name="themePreference" value={settings.theme_preference} />
               <input type="hidden" name="fontSizePreference" value={settings.font_size_preference} />
             </>
@@ -366,7 +368,20 @@ export default function WorkspaceSettingsForm({
                     <p className="text-sm text-muted-foreground">Display preferences for your workspace.</p>
                   </div>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <label className="space-y-2">
+                    <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <CreditCard className="h-4 w-4 text-primary" />
+                      Display currency
+                    </span>
+                    <Select name="displayCurrency" defaultValue={settings.display_currency}>
+                      {defaultCurrencyRates.map((rate) => (
+                        <option key={rate.code} value={rate.code}>
+                          {rate.code} - {rate.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </label>
                   <label className="space-y-2">
                     <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                       <Moon className="h-4 w-4 text-primary" />

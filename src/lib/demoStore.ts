@@ -482,28 +482,35 @@ export async function saveDemoSellerRatings(ratings: SellerRating[]) {
 export async function upsertDemoSellerRating({
   sellerId,
   buyerId,
+  orderId,
   listingId,
   rating,
   review
 }: {
   sellerId: string;
   buyerId: string;
+  orderId?: string | null;
   listingId?: string | null;
   rating: number;
   review: string;
 }) {
   const ratings = await getDemoSellerRatings();
   const existing = ratings.find(
-    (entry) => entry.seller_id === sellerId && entry.buyer_id === buyerId
+    (entry) =>
+      (orderId && entry.order_id === orderId) ||
+      (!orderId && entry.seller_id === sellerId && entry.buyer_id === buyerId)
   );
 
   const nextEntry: SellerRating = {
     id: existing?.id ?? crypto.randomUUID(),
     seller_id: sellerId,
     buyer_id: buyerId,
+    order_id: orderId ?? null,
     listing_id: listingId,
     rating,
     review,
+    tags: [],
+    is_hidden: false,
     created_at: getNigeriaTimestamp()
   };
 

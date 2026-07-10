@@ -104,7 +104,7 @@ export default function SellerRatingPanel({
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              You can update your seller rating later if your experience changes.
+              Reviews are accepted only after a confirmed purchase for this listing.
             </p>
           </div>
 
@@ -118,7 +118,7 @@ export default function SellerRatingPanel({
               value={review}
               onChange={(event) => setReview(event.target.value)}
               className="min-h-28 rounded-2xl"
-              placeholder="Share a quick note about how reliable this seller feels."
+              placeholder="Share a short note about delivery, access, and communication."
             />
           </div>
 
@@ -133,8 +133,7 @@ export default function SellerRatingPanel({
         </form>
       ) : (
         <p className="mt-5 text-sm leading-6 text-muted-foreground">
-          Sign in with a buyer account to leave a seller rating and help surface top sellers in
-          the marketplace.
+          Verified buyers can leave a review after completing a purchase from this seller.
         </p>
       )}
     </div>

@@ -1,4 +1,4 @@
-import type { KycStatus, ListingStatus, OrderStatus, PaymentStatus } from "@/types";
+import type { CurrencyRate, KycStatus, ListingStatus, OrderStatus, PaymentStatus } from "@/types";
 
 export const APP_TIME_ZONE = "Africa/Lagos";
 export const APP_TIME_LABEL = "WAT";
@@ -10,21 +10,99 @@ export function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0
-  }).format(value);
+export const BASE_CURRENCY_CODE = "NGN";
+
+export const defaultCurrencyRates: CurrencyRate[] = [
+  {
+    code: "NGN",
+    name: "Nigerian Naira",
+    symbol: "₦",
+    ngn_rate: 1,
+    enabled: true,
+    updated_at: new Date(0).toISOString()
+  },
+  {
+    code: "USD",
+    name: "US Dollar",
+    symbol: "$",
+    ngn_rate: 1500,
+    enabled: true,
+    updated_at: new Date(0).toISOString()
+  },
+  {
+    code: "GBP",
+    name: "British Pound",
+    symbol: "£",
+    ngn_rate: 1900,
+    enabled: true,
+    updated_at: new Date(0).toISOString()
+  },
+  {
+    code: "EUR",
+    name: "Euro",
+    symbol: "€",
+    ngn_rate: 1650,
+    enabled: true,
+    updated_at: new Date(0).toISOString()
+  }
+];
+
+function getCurrencyLocale(currencyCode: string) {
+  if (currencyCode === "NGN") {
+    return "en-NG";
+  }
+
+  if (currencyCode === "GBP") {
+    return "en-GB";
+  }
+
+  if (currencyCode === "EUR") {
+    return "de-DE";
+  }
+
+  return "en-US";
 }
 
-export function formatCompactCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
+export function getCurrencyRate(currencyCode: string, rates = defaultCurrencyRates) {
+  const normalizedCode = currencyCode.toUpperCase();
+  return (
+    rates.find((rate) => rate.code === normalizedCode && rate.enabled) ??
+    rates.find((rate) => rate.code === BASE_CURRENCY_CODE) ??
+    defaultCurrencyRates[0]
+  );
+}
+
+export function convertNgnToDisplayCurrency(value: number, currencyCode = BASE_CURRENCY_CODE, rates = defaultCurrencyRates) {
+  const rate = getCurrencyRate(currencyCode, rates);
+
+  if (rate.code === BASE_CURRENCY_CODE) {
+    return value;
+  }
+
+  return value / rate.ngn_rate;
+}
+
+export function formatCurrency(value: number, currencyCode = BASE_CURRENCY_CODE, rates = defaultCurrencyRates) {
+  const rate = getCurrencyRate(currencyCode, rates);
+  const convertedValue = convertNgnToDisplayCurrency(value, rate.code, rates);
+
+  return new Intl.NumberFormat(getCurrencyLocale(rate.code), {
     style: "currency",
-    currency: "USD",
+    currency: rate.code,
+    maximumFractionDigits: 0
+  }).format(convertedValue);
+}
+
+export function formatCompactCurrency(value: number, currencyCode = BASE_CURRENCY_CODE, rates = defaultCurrencyRates) {
+  const rate = getCurrencyRate(currencyCode, rates);
+  const convertedValue = convertNgnToDisplayCurrency(value, rate.code, rates);
+
+  return new Intl.NumberFormat(getCurrencyLocale(rate.code), {
+    style: "currency",
+    currency: rate.code,
     notation: "compact",
-    maximumFractionDigits: value >= 1000 ? 1 : 0
-  }).format(value);
+    maximumFractionDigits: convertedValue >= 1000 ? 1 : 0
+  }).format(convertedValue);
 }
 
 export function calculatePlatformFee(amount: number, rate = PLATFORM_COMMISSION_RATE) {

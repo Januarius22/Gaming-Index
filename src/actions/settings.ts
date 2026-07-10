@@ -81,6 +81,7 @@ async function saveWorkspaceSettings({
   const defaultBankName = String(formData.get("defaultBankName") ?? "").trim();
   const defaultAccountNumber = String(formData.get("defaultAccountNumber") ?? "").trim();
   const defaultAccountName = String(formData.get("defaultAccountName") ?? "").trim();
+  const displayCurrency = String(formData.get("displayCurrency") ?? "NGN").trim().toUpperCase();
   const themePreference = String(formData.get("themePreference") ?? "system");
   const fontSizePreference = String(formData.get("fontSizePreference") ?? "comfortable");
   const twoFactorMethod = String(formData.get("twoFactorMethod") ?? "authenticator");
@@ -120,6 +121,13 @@ async function saveWorkspaceSettings({
     return {
       status: "error",
       message: "Choose a valid theme preference."
+    };
+  }
+
+  if (!/^[A-Z]{3}$/.test(displayCurrency)) {
+    return {
+      status: "error",
+      message: "Choose a valid display currency."
     };
   }
 
@@ -225,6 +233,7 @@ async function saveWorkspaceSettings({
     default_bank_name: defaultBankName,
     default_account_number: defaultAccountNumber,
     default_account_name: defaultAccountName,
+    display_currency: displayCurrency,
     theme_preference: themePreference,
     font_size_preference: fontSizePreference,
     two_factor_preference_enabled: twoFactorPreferenceEnabled,

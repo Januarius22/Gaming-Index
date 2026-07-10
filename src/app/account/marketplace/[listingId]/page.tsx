@@ -108,14 +108,28 @@ export default async function AccountMarketplaceListingDetailPage({
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="rounded-3xl bg-surface p-4 sm:p-5">
                     <div className="flex items-start justify-between gap-3">
-                      <div>
+                      <div className="flex min-w-0 gap-3">
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary-soft font-heading text-sm font-semibold text-primary ring-1 ring-border">
+                          {listing.seller_avatar_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={listing.seller_avatar_url}
+                              alt={`${listing.seller_username} profile`}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            listing.seller_name.charAt(0).toUpperCase()
+                          )}
+                        </span>
+                        <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground">Seller</p>
-                        <p className="mt-2 text-lg font-semibold text-foreground">
+                        <p className="mt-2 break-words text-lg font-semibold text-foreground">
                           {listing.seller_name}
                         </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
+                        <p className="mt-1 break-all text-sm text-muted-foreground">
                           @{listing.seller_username}
                         </p>
+                        </div>
                       </div>
                       {ratingState.tag === "top_seller" ? (
                         <Badge variant="info" className="uppercase tracking-[0.12em]">

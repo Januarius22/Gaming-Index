@@ -44,6 +44,7 @@ export interface ProfileSettings {
   default_bank_name: string;
   default_account_number: string;
   default_account_name: string;
+  display_currency: string;
   theme_preference: "light" | "dark" | "system";
   font_size_preference: "compact" | "comfortable" | "large";
   two_factor_preference_enabled: boolean;
@@ -110,6 +111,7 @@ export interface Listing {
   image_paths?: string[];
   image_urls?: string[];
   seller_is_banned?: boolean;
+  seller_avatar_url?: string;
   seller_rating?: number;
   seller_reviews?: number;
   seller_tag?: "top_seller" | null;
@@ -138,10 +140,27 @@ export interface SellerRating {
   id: string;
   seller_id: string;
   buyer_id: string;
+  order_id?: string | null;
   listing_id?: string | null;
   rating: number;
   review: string;
+  tags?: string[];
+  is_hidden?: boolean;
+  hidden_reason?: string;
+  hidden_by?: string | null;
+  hidden_at?: string | null;
   created_at: string;
+}
+
+export interface CurrencyRate {
+  code: string;
+  name: string;
+  symbol: string;
+  ngn_rate: number;
+  enabled: boolean;
+  updated_by?: string | null;
+  updated_at: string;
+  created_at?: string;
 }
 
 export interface Order {

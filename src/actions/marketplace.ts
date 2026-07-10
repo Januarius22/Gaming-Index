@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentProfile } from "@/lib/auth";
-import { upsertDemoSellerRating } from "@/lib/demoStore";
+import { getDemoOrders, upsertDemoSellerRating } from "@/lib/demoStore";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import type { ActionState } from "@/types";
@@ -54,16 +54,38 @@ export async function submitSellerRatingAction(
 
   if (hasSupabaseEnv) {
     const supabase = await getSupabaseServerClient();
+    const { data: order } = await supabase!
+      .from("orders")
+      .select("id")
+      .eq("buyer_id", profile.id)
+      .eq("seller_id", sellerId)
+      .eq("listing_id", listingId)
+      .eq("payment_status", "successful")
+      .in("status", ["processing", "completed"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!order?.id) {
+      return {
+        status: "error",
+        message: "Only buyers with a completed purchase can rate this seller."
+      };
+    }
+
     const { error } = await supabase!.from("seller_ratings").upsert(
       {
         seller_id: sellerId,
         buyer_id: profile.id,
+        order_id: order.id,
         listing_id: listingId,
         rating,
-        review
+        review,
+        tags: [],
+        is_hidden: false
       },
       {
-        onConflict: "seller_id,buyer_id"
+        onConflict: "order_id"
       }
     );
 
@@ -74,9 +96,29 @@ export async function submitSellerRatingAction(
       };
     }
   } else {
+    const orders = await getDemoOrders();
+    const order = orders
+      .filter(
+        (entry) =>
+          entry.buyer_id === profile.id &&
+          entry.seller_id === sellerId &&
+          entry.listing_id === listingId &&
+          entry.payment_status === "successful" &&
+          (entry.status === "processing" || entry.status === "completed")
+      )
+      .sort((left, right) => right.created_at.localeCompare(left.created_at))[0];
+
+    if (!order) {
+      return {
+        status: "error",
+        message: "Only buyers with a completed purchase can rate this seller."
+      };
+    }
+
     await upsertDemoSellerRating({
       sellerId,
       buyerId: profile.id,
+      orderId: order.id,
       listingId,
       rating,
       review

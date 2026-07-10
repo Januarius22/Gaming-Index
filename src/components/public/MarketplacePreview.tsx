@@ -38,6 +38,33 @@ const defaultFilters: MarketplaceFilters = {
   status: "all"
 };
 
+function SellerIdentityChip({ listing }: { listing: Listing }) {
+  const initial =
+    listing.seller_name?.trim().charAt(0).toUpperCase() ||
+    listing.seller_username?.trim().charAt(0).toUpperCase() ||
+    "S";
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary-soft text-xs font-semibold text-primary ring-1 ring-border">
+        {listing.seller_avatar_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={listing.seller_avatar_url}
+            alt={`${listing.seller_username} profile`}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          initial
+        )}
+      </span>
+      <span className="min-w-0 break-all text-sm font-medium text-muted-foreground">
+        @{listing.seller_username}
+      </span>
+    </div>
+  );
+}
+
 export default function MarketplacePreview({
   listings,
   title = "Featured marketplace listings",
@@ -441,16 +468,14 @@ export default function MarketplacePreview({
                           <div className="mt-auto border-t border-border/70 pt-5">
                             <div className="space-y-4">
                               <div className="min-w-0 space-y-2">
-                                <p className="break-words text-sm font-medium text-muted-foreground">
-                                  @{listing.seller_username}
-                                </p>
+                                <SellerIdentityChip listing={listing} />
                                 <p className="text-sm text-muted-foreground">
                                   {listing.seller_reviews ?? 0}{" "}
                                   {(listing.seller_reviews ?? 0) === 1 ? "buyer rating" : "buyer ratings"}
                                 </p>
                                 <p
                                   className="break-words font-heading text-3xl font-semibold leading-none text-foreground sm:text-[2.15rem]"
-                                  title={`$${listing.price.toLocaleString("en-US")}`}
+                                  title={formatCompactCurrency(listing.price)}
                                 >
                                   {formatCompactCurrency(listing.price)}
                                 </p>
@@ -561,16 +586,14 @@ export default function MarketplacePreview({
 
                           <div className="mt-auto space-y-4 border-t border-border/70 pt-5">
                             <div className="min-w-0 space-y-2">
-                              <p className="break-words text-sm font-medium text-muted-foreground">
-                                @{listing.seller_username}
-                              </p>
+                                <SellerIdentityChip listing={listing} />
                               <p className="text-sm text-muted-foreground">
                                 {listing.seller_reviews ?? 0}{" "}
                                 {(listing.seller_reviews ?? 0) === 1 ? "buyer rating" : "buyer ratings"}
                               </p>
                               <p
                                 className="break-words font-heading text-3xl font-semibold leading-none text-foreground sm:text-[2.15rem]"
-                                title={`$${listing.price.toLocaleString("en-US")}`}
+                                title={formatCompactCurrency(listing.price)}
                               >
                                 {formatCompactCurrency(listing.price)}
                               </p>

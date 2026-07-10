@@ -14,6 +14,49 @@ import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import { getNigeriaTimestamp } from "@/lib/utils";
 
+export async function updateCurrencyRateAction(formData: FormData) {
+  const adminProfile = await requireAdminProfile();
+  const code = String(formData.get("code") ?? "").trim().toUpperCase();
+  const name = String(formData.get("name") ?? "").trim();
+  const symbol = String(formData.get("symbol") ?? "").trim();
+  const ngnRate = Number(String(formData.get("ngnRate") ?? "").trim());
+  const enabled = formData.get("enabled") === "on" || code === "NGN";
+
+  if (!/^[A-Z]{3}$/.test(code) || !name || !symbol || !Number.isFinite(ngnRate) || ngnRate <= 0) {
+    redirect("/admin/currencies?notice=invalid-rate");
+  }
+
+  if (!hasSupabaseEnv) {
+    redirect("/admin/currencies?notice=demo-rate");
+  }
+
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    redirect("/admin/currencies?notice=failed");
+  }
+
+  const { error } = await supabase.from("currency_rates").upsert({
+    code,
+    name,
+    symbol,
+    ngn_rate: code === "NGN" ? 1 : ngnRate,
+    enabled,
+    updated_by: adminProfile.id,
+    updated_at: new Date().toISOString()
+  });
+
+  if (error) {
+    redirect(`/admin/currencies?notice=failed&error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/admin/currencies");
+  revalidatePath("/account/settings/appearance");
+  revalidatePath("/seller/settings/appearance");
+  revalidatePath("/admin/settings/appearance");
+  redirect("/admin/currencies?notice=rate-saved");
+}
+
 function getSafeAdminReturnPath(value: string) {
   return value.startsWith("/admin/") ? value : "/admin/listings";
 }

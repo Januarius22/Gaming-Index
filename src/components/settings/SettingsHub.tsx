@@ -97,7 +97,7 @@ export default function SettingsHub({
                     </span>
                     {section.key === "appearance" ? (
                       <span className="mt-4 block text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-                        {formatTheme(settings.theme_preference)} /{" "}
+                        {settings.display_currency} / {formatTheme(settings.theme_preference)} /{" "}
                         {formatFontSize(settings.font_size_preference)}
                       </span>
                     ) : null}

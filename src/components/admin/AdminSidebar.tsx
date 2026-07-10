@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Bell,
   BarChart3,
+  CircleDollarSign,
   FileCheck2,
   Headset,
   History,
@@ -60,7 +61,8 @@ const navGroups = [
     label: "Finance",
     items: [
       { href: "/admin/orders", label: "Orders", icon: ListOrdered },
-      { href: "/admin/withdrawals", label: "Withdrawals", icon: Landmark }
+      { href: "/admin/withdrawals", label: "Withdrawals", icon: Landmark },
+      { href: "/admin/currencies", label: "Currency Rates", icon: CircleDollarSign }
     ]
   },
   {
