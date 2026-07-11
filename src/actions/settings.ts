@@ -82,7 +82,7 @@ async function saveWorkspaceSettings({
   const defaultAccountNumber = String(formData.get("defaultAccountNumber") ?? "").trim();
   const defaultAccountName = String(formData.get("defaultAccountName") ?? "").trim();
   const displayCurrency = String(formData.get("displayCurrency") ?? "NGN").trim().toUpperCase();
-  const themePreference = String(formData.get("themePreference") ?? "system");
+  const themePreference = String(formData.get("themePreference") ?? "light");
   const fontSizePreference = String(formData.get("fontSizePreference") ?? "comfortable");
   const twoFactorMethod = String(formData.get("twoFactorMethod") ?? "authenticator");
   const twoFactorPreferenceEnabled = formData.get("twoFactorPreferenceEnabled") === "on";
@@ -227,6 +227,17 @@ async function saveWorkspaceSettings({
     };
   }
 
+  if (profile.seller_enabled) {
+    await supabase
+      .from("listings")
+      .update({
+        seller_name: fullName,
+        seller_username: username,
+        ...(avatarUpdate ? { seller_avatar_url: avatarUpdate.avatar_url } : {})
+      })
+      .eq("seller_id", profile.id);
+  }
+
   const { error: settingsError } = await supabase.from("profile_settings").upsert({
     profile_id: profile.id,
     phone_number: phoneNumber,
@@ -265,6 +276,10 @@ async function saveWorkspaceSettings({
   }
 
   if (workspace === "account") {
+    revalidatePath("/account/marketplace");
+    revalidatePath("/account/cart");
+    revalidatePath("/account/saved");
+    revalidatePath("/marketplace");
     revalidatePath("/account/checkout");
     revalidatePath("/account/withdrawals");
   }

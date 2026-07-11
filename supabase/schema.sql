@@ -43,7 +43,7 @@ create table if not exists public.profile_settings (
   default_account_number text not null default '',
   default_account_name text not null default '',
   display_currency text not null default 'NGN',
-  theme_preference text not null default 'system' check (theme_preference in ('light', 'dark', 'system')),
+  theme_preference text not null default 'light' check (theme_preference in ('light', 'dark', 'system')),
   font_size_preference text not null default 'comfortable' check (font_size_preference in ('compact', 'comfortable', 'large')),
   two_factor_preference_enabled boolean not null default false,
   two_factor_method text not null default 'authenticator' check (two_factor_method in ('authenticator', 'email')),
@@ -58,6 +58,7 @@ alter table public.profile_settings add column if not exists default_account_num
 alter table public.profile_settings add column if not exists default_account_name text not null default '';
 alter table public.profile_settings add column if not exists display_currency text not null default 'NGN';
 alter table public.profile_settings add column if not exists theme_preference text not null default 'system';
+alter table public.profile_settings alter column theme_preference set default 'light';
 alter table public.profile_settings add column if not exists font_size_preference text not null default 'comfortable';
 alter table public.profile_settings add column if not exists two_factor_preference_enabled boolean not null default false;
 alter table public.profile_settings add column if not exists two_factor_method text not null default 'authenticator';
@@ -188,6 +189,7 @@ create table if not exists public.listings (
   seller_id uuid not null references public.profiles(id) on delete cascade,
   seller_name text not null default '',
   seller_username text not null default '',
+  seller_avatar_url text not null default '',
   game text not null,
   title text not null,
   description text not null,
@@ -211,6 +213,7 @@ alter table public.listings add column if not exists image_names jsonb not null 
 alter table public.listings add column if not exists image_paths jsonb not null default '[]'::jsonb;
 alter table public.listings add column if not exists seller_name text not null default '';
 alter table public.listings add column if not exists seller_username text not null default '';
+alter table public.listings add column if not exists seller_avatar_url text not null default '';
 alter table public.listings add column if not exists account_level text not null default '';
 alter table public.listings add column if not exists login_method text not null default '';
 alter table public.listings add column if not exists extra_notes text;
@@ -222,12 +225,14 @@ alter table public.listings add column if not exists admin_action_by uuid refere
 update public.listings as listing
 set
   seller_name = coalesce(profile.full_name, listing.seller_name, ''),
-  seller_username = coalesce(profile.username, listing.seller_username, '')
+  seller_username = coalesce(profile.username, listing.seller_username, ''),
+  seller_avatar_url = coalesce(nullif(profile.avatar_url, ''), listing.seller_avatar_url, '')
 from public.profiles as profile
 where profile.id = listing.seller_id
   and (
     listing.seller_name = ''
     or listing.seller_username = ''
+    or listing.seller_avatar_url = ''
   );
 update public.listings
 set

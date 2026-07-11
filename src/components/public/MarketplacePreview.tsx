@@ -19,8 +19,14 @@ import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
-import { cn, formatCompactCurrency } from "@/lib/utils";
-import type { Listing } from "@/types";
+import {
+  cn,
+  convertDisplayCurrencyToNgn,
+  formatCompactCurrency,
+  gameOptions as supportedGameOptions,
+  getCurrencyRate
+} from "@/lib/utils";
+import type { CurrencyRate, Listing } from "@/types";
 
 interface MarketplaceFilters {
   minPrice: string;
@@ -77,6 +83,8 @@ export default function MarketplacePreview({
   savedListingIds = emptyListingIds,
   cartListingIds = emptyListingIds,
   itemsPerPage = 6,
+  displayCurrency = "NGN",
+  currencyRates,
   className
 }: {
   listings: Listing[];
@@ -90,6 +98,8 @@ export default function MarketplacePreview({
   savedListingIds?: string[];
   cartListingIds?: string[];
   itemsPerPage?: number;
+  displayCurrency?: string;
+  currencyRates?: CurrencyRate[];
   className?: string;
 }) {
   const pathname = usePathname();
@@ -103,8 +113,11 @@ export default function MarketplacePreview({
   const [draftFilters, setDraftFilters] = useState(defaultFilters);
   const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeCurrency, setActiveCurrency] = useState(displayCurrency);
   const sourceListings = context === "account" ? accountListings : listings;
   const isSavedCollectionPage = context === "account" && pathname === "/account/saved";
+  const activeCurrencyRate = getCurrencyRate(activeCurrency, currencyRates);
+  const formatPrice = (value: number) => formatCompactCurrency(value, activeCurrencyRate.code, currencyRates);
 
   useEffect(() => {
     setAccountListings(listings);
@@ -118,9 +131,13 @@ export default function MarketplacePreview({
     setLocalCartListingIds(cartListingIds);
   }, [cartListingIds]);
 
-  const gameOptions = Array.from(new Set(sourceListings.map((listing) => listing.game))).sort(
-    (left, right) => left.localeCompare(right)
-  );
+  useEffect(() => {
+    setActiveCurrency(displayCurrency);
+  }, [displayCurrency]);
+
+  const gameOptions = Array.from(
+    new Set([...supportedGameOptions, ...sourceListings.map((listing) => listing.game)])
+  ).sort((left, right) => left.localeCompare(right));
   const minPrice = draftFilters.minPrice ? Number(draftFilters.minPrice) : null;
   const maxPrice = draftFilters.maxPrice ? Number(draftFilters.maxPrice) : null;
   const minPriceInvalid =
@@ -213,8 +230,12 @@ export default function MarketplacePreview({
   };
 
   const filteredListings = sourceListings.filter((listing) => {
-    const appliedMinPrice = appliedFilters.minPrice ? Number(appliedFilters.minPrice) : null;
-    const appliedMaxPrice = appliedFilters.maxPrice ? Number(appliedFilters.maxPrice) : null;
+    const appliedMinPrice = appliedFilters.minPrice
+      ? convertDisplayCurrencyToNgn(Number(appliedFilters.minPrice), activeCurrencyRate.code, currencyRates)
+      : null;
+    const appliedMaxPrice = appliedFilters.maxPrice
+      ? convertDisplayCurrencyToNgn(Number(appliedFilters.maxPrice), activeCurrencyRate.code, currencyRates)
+      : null;
 
     if (
       appliedMinPrice !== null &&
@@ -298,6 +319,25 @@ export default function MarketplacePreview({
 
         {enableSearch ? (
           <div className="rounded-[28px] border border-border/70 bg-white p-4 shadow-[0_18px_50px_-40px_rgba(6,43,99,0.35)] sm:p-5">
+            <div className="mb-4 flex flex-col gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Display currency</p>
+                <p className="text-xs text-muted-foreground">
+                  Prices are stored in NGN and shown in your selected currency.
+                </p>
+              </div>
+              <Select
+                value={activeCurrencyRate.code}
+                onChange={(event) => setActiveCurrency(event.target.value)}
+                className="h-11 w-full rounded-2xl sm:w-56"
+              >
+                {(currencyRates?.filter((rate) => rate.enabled) ?? [activeCurrencyRate]).map((rate) => (
+                  <option key={rate.code} value={rate.code}>
+                    {rate.code} - {rate.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
             <form
               onSubmit={(event) => {
                 event.preventDefault();
@@ -317,7 +357,7 @@ export default function MarketplacePreview({
                   type="number"
                   min="0"
                   inputMode="numeric"
-                  placeholder="Min price"
+                  placeholder={`Min price (${activeCurrencyRate.code})`}
                   className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
                 />
 
@@ -327,7 +367,7 @@ export default function MarketplacePreview({
                   type="number"
                   min={minPrice ?? 0}
                   inputMode="numeric"
-                  placeholder="Max price"
+                  placeholder={`Max price (${activeCurrencyRate.code})`}
                   className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
                 />
 
@@ -423,7 +463,7 @@ export default function MarketplacePreview({
 
                   if (context === "account") {
                     return (
-                      <Card className="group flex h-full flex-col overflow-hidden border-border/70 transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_-48px_rgba(6,43,99,0.45)]">
+                      <Card className="group flex h-full cursor-pointer flex-col overflow-hidden border-border/70 transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_-48px_rgba(6,43,99,0.45)]">
                         <Link href={detailHref} className="relative block p-3 pb-0">
                           <ListingPhotoGrid listing={listing} className="rounded-[28px]" />
                           <div className="pointer-events-none absolute inset-x-6 top-6 flex items-start justify-between gap-3">
@@ -442,6 +482,9 @@ export default function MarketplacePreview({
                               </Badge>
                             ) : null}
                           </div>
+                          <span className="pointer-events-none absolute bottom-5 right-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/30 bg-white/95 text-primary shadow-sm transition group-hover:scale-105 group-hover:bg-primary group-hover:text-white">
+                            <ArrowUpRight className="h-4 w-4" />
+                          </span>
                         </Link>
                         <CardContent className="flex flex-1 flex-col p-6 sm:p-7">
                           <div className="flex items-start justify-between gap-4">
@@ -475,9 +518,9 @@ export default function MarketplacePreview({
                                 </p>
                                 <p
                                   className="break-words font-heading text-3xl font-semibold leading-none text-foreground sm:text-[2.15rem]"
-                                  title={formatCompactCurrency(listing.price)}
+                                  title={formatPrice(listing.price)}
                                 >
-                                  {formatCompactCurrency(listing.price)}
+                                  {formatPrice(listing.price)}
                                 </p>
                               </div>
 
@@ -544,7 +587,7 @@ export default function MarketplacePreview({
 
                   return (
                     <Link href={detailHref} className="block h-full">
-                      <Card className="group flex h-full flex-col overflow-hidden border-border/70 transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_-48px_rgba(6,43,99,0.45)]">
+                      <Card className="group flex h-full cursor-pointer flex-col overflow-hidden border-border/70 transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_-48px_rgba(6,43,99,0.45)]">
                         <div className="relative p-3 pb-0">
                           <ListingPhotoGrid listing={listing} className="rounded-[28px]" />
                           <div className="pointer-events-none absolute inset-x-6 top-6 flex items-start justify-between gap-3">
@@ -563,6 +606,9 @@ export default function MarketplacePreview({
                               </Badge>
                             ) : null}
                           </div>
+                          <span className="pointer-events-none absolute bottom-5 right-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/30 bg-white/95 text-primary shadow-sm transition group-hover:scale-105 group-hover:bg-primary group-hover:text-white">
+                            <ArrowUpRight className="h-4 w-4" />
+                          </span>
                         </div>
                         <CardContent className="flex flex-1 flex-col p-6 sm:p-7">
                           <div className="flex items-start justify-between gap-4">
@@ -593,9 +639,9 @@ export default function MarketplacePreview({
                               </p>
                               <p
                                 className="break-words font-heading text-3xl font-semibold leading-none text-foreground sm:text-[2.15rem]"
-                                title={formatCompactCurrency(listing.price)}
+                                title={formatPrice(listing.price)}
                               >
-                                {formatCompactCurrency(listing.price)}
+                                {formatPrice(listing.price)}
                               </p>
                             </div>
 

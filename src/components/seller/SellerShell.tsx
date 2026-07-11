@@ -35,7 +35,6 @@ export default function SellerShell({
   };
   const preferenceClassName = cn(
     settings.theme_preference === "dark" && "gi-theme-dark",
-    settings.theme_preference === "system" && "gi-theme-system",
     `gi-font-${settings.font_size_preference}`
   );
 

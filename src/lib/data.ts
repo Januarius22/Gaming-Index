@@ -67,7 +67,7 @@ export function getDefaultProfileSettings(profileId: string): ProfileSettings {
     default_account_number: "",
     default_account_name: "",
     display_currency: "NGN",
-    theme_preference: "system",
+    theme_preference: "light",
     font_size_preference: "comfortable",
     two_factor_preference_enabled: false,
     two_factor_method: "authenticator",
@@ -284,7 +284,7 @@ async function getSupabaseListings() {
           normalizedListing.seller_username ||
           sellerProfile?.username ||
           "seller",
-        seller_avatar_url: sellerProfile?.avatar_url || "",
+        seller_avatar_url: sellerProfile?.avatar_url || normalizedListing.seller_avatar_url || "",
         seller_is_banned: sellerProfile?.is_banned ?? false,
         image_urls: await getSignedListingAssetUrls(
           supabase,
@@ -1998,6 +1998,13 @@ export async function getSellerRatingState(sellerId: string, buyerId?: string | 
 }
 
 export async function getSellerDashboardStats(profile: Profile): Promise<DashboardStat[]> {
+  const [settings, currencyRates] = await Promise.all([
+    getProfileSettings(profile.id),
+    getCurrencyRates()
+  ]);
+  const formatDisplayCurrency = (value: number) =>
+    formatCompactCurrency(value, settings.display_currency, currencyRates);
+
   if (!hasSupabaseEnv) {
     const [listings, orders] = await Promise.all([
       getDemoListings(),
@@ -2034,7 +2041,7 @@ export async function getSellerDashboardStats(profile: Profile): Promise<Dashboa
       },
       {
         label: "Available Balance",
-        value: formatCompactCurrency(wallet.available_balance),
+        value: formatDisplayCurrency(wallet.available_balance),
         helper: "Ready for withdrawal",
         href: "/seller/wallet"
       }
@@ -2088,9 +2095,9 @@ export async function getSellerDashboardStats(profile: Profile): Promise<Dashboa
       },
       {
         label: "Available Balance",
-        value: formatCompactCurrency(wallet.available_balance),
+        value: formatDisplayCurrency(wallet.available_balance),
         helper: wallet.pending_balance > 0
-          ? `${formatCompactCurrency(wallet.pending_balance)} pending`
+          ? `${formatDisplayCurrency(wallet.pending_balance)} pending`
           : "Ready for withdrawal",
         href: "/seller/wallet"
       }
@@ -2100,16 +2107,18 @@ export async function getSellerDashboardStats(profile: Profile): Promise<Dashboa
       { label: "Total Listings", value: "0", helper: "All account listings", href: "/seller/listings" },
       { label: "Active Listings", value: "0", helper: "Approved and live", href: "/seller/listings" },
       { label: "Pending Orders", value: "0", helper: "Orders awaiting action", href: "/seller/orders" },
-      { label: "Available Balance", value: "$0", helper: "Ready for withdrawal", href: "/seller/wallet" }
+      { label: "Available Balance", value: formatDisplayCurrency(0), helper: "Ready for withdrawal", href: "/seller/wallet" }
     ];
   }
 }
 
 export async function getAccountDashboardStats(profile: Profile): Promise<DashboardStat[]> {
-  const [savedListingIds, cartListingIds, wallet] = await Promise.all([
+  const [savedListingIds, cartListingIds, wallet, settings, currencyRates] = await Promise.all([
     getSavedListingIds(),
     getCartListingIds(),
-    getProfileWallet(profile.id)
+    getProfileWallet(profile.id),
+    getProfileSettings(profile.id),
+    getCurrencyRates()
   ]);
 
   return [
@@ -2141,7 +2150,7 @@ export async function getAccountDashboardStats(profile: Profile): Promise<Dashbo
     },
     {
       label: "Wallet Credit",
-      value: formatCompactCurrency(wallet.available_balance),
+      value: formatCompactCurrency(wallet.available_balance, settings.display_currency, currencyRates),
       helper: "Available after refunds",
       href: "/account/wallet"
     }

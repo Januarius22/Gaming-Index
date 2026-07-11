@@ -14,8 +14,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import PaginationControls from "@/components/ui/PaginationControls";
 import {
   getCartMarketplaceListings,
+  getCurrencyRates,
+  getProfileSettings,
   getSavedMarketplaceListingIds
 } from "@/lib/data";
+import { requireAccountProfile } from "@/lib/auth";
 import { formatCompactCurrency, formatDate, paginateItems, parsePageParam } from "@/lib/utils";
 
 function getNoticeMessage(notice?: string) {
@@ -47,13 +50,18 @@ export default async function AccountCartPage({
 }: {
   searchParams?: Promise<{ notice?: string; page?: string }>;
 }) {
+  const profile = await requireAccountProfile();
   const resolvedSearchParams =
     searchParams ?? Promise.resolve<{ notice?: string; page?: string }>({});
-  const [{ notice, page }, cartListings, savedListingIds] = await Promise.all([
+  const [{ notice, page }, cartListings, savedListingIds, settings, currencyRates] = await Promise.all([
     resolvedSearchParams,
     getCartMarketplaceListings(),
-    getSavedMarketplaceListingIds()
+    getSavedMarketplaceListingIds(),
+    getProfileSettings(profile.id),
+    getCurrencyRates()
   ]);
+  const displayCurrency = settings.display_currency;
+  const formatPrice = (value: number) => formatCompactCurrency(value, displayCurrency, currencyRates);
   const noticeState = getNoticeMessage(notice);
   const availableListingsCount = cartListings.filter((listing) => listing.status !== "sold").length;
   const soldListingsCount = cartListings.length - availableListingsCount;
@@ -128,7 +136,7 @@ export default async function AccountCartPage({
               <div className="rounded-3xl bg-surface p-5">
                 <p className="text-sm text-muted-foreground">Estimated total</p>
                 <p className="mt-2 font-heading text-4xl font-semibold text-foreground">
-                  {formatCompactCurrency(estimatedTotal)}
+                  {formatPrice(estimatedTotal)}
                 </p>
               </div>
             </CardContent>
@@ -202,7 +210,7 @@ export default async function AccountCartPage({
                         <div>
                           <p className="text-muted-foreground">Price</p>
                           <p className="mt-1 font-heading text-2xl font-semibold text-foreground">
-                            {formatCompactCurrency(listing.price)}
+                            {formatPrice(listing.price)}
                           </p>
                         </div>
                       </div>

@@ -6,9 +6,12 @@ import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import {
   getCartMarketplaceListingIds,
+  getCurrencyRates,
+  getProfileSettings,
   getSavedMarketplaceListingIds,
   getSavedMarketplaceListings
 } from "@/lib/data";
+import { requireAccountProfile } from "@/lib/auth";
 
 function getNoticeMessage(notice?: string) {
   switch (notice) {
@@ -35,12 +38,15 @@ export default async function AccountSavedPage({
 }: {
   searchParams?: Promise<{ notice?: string }>;
 }) {
+  const profile = await requireAccountProfile();
   const resolvedSearchParams = searchParams ?? Promise.resolve<{ notice?: string }>({});
-  const [{ notice }, savedListings, savedListingIds, cartListingIds] = await Promise.all([
+  const [{ notice }, savedListings, savedListingIds, cartListingIds, settings, currencyRates] = await Promise.all([
     resolvedSearchParams,
     getSavedMarketplaceListings(),
     getSavedMarketplaceListingIds(),
-    getCartMarketplaceListingIds()
+    getCartMarketplaceListingIds(),
+    getProfileSettings(profile.id),
+    getCurrencyRates()
   ]);
   const noticeState = getNoticeMessage(notice);
 
@@ -89,6 +95,8 @@ export default async function AccountSavedPage({
           context="account"
           savedListingIds={savedListingIds}
           cartListingIds={cartListingIds}
+          displayCurrency={settings.display_currency}
+          currencyRates={currencyRates}
           itemsPerPage={6}
           className="pb-0 pt-0"
         />

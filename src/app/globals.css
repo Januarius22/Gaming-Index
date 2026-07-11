@@ -112,6 +112,23 @@ body {
   color: #cfe0ff;
 }
 
+.gi-theme-dark .text-black,
+.gi-theme-dark .text-slate-950,
+.gi-theme-dark .text-slate-900,
+.gi-theme-dark .text-slate-800,
+.gi-theme-dark .text-gray-950,
+.gi-theme-dark .text-gray-900,
+.gi-theme-dark .text-gray-800 {
+  color: var(--foreground);
+}
+
+.gi-theme-dark .text-slate-700,
+.gi-theme-dark .text-slate-600,
+.gi-theme-dark .text-gray-700,
+.gi-theme-dark .text-gray-600 {
+  color: var(--muted-foreground);
+}
+
 .gi-theme-dark .bg-primary-dark {
   background-color: #063b86;
 }

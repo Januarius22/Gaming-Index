@@ -7,7 +7,7 @@ import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { requireAccountProfile } from "@/lib/auth";
-import { getBuyerOrderDetail } from "@/lib/data";
+import { getBuyerOrderDetail, getCurrencyRates, getProfileSettings } from "@/lib/data";
 import { formatCurrency } from "@/lib/utils";
 
 export default async function PurchaseSuccessPage({
@@ -17,13 +17,18 @@ export default async function PurchaseSuccessPage({
 }) {
   const profile = await requireAccountProfile();
   const { orderId } = await params;
-  const orderDetail = await getBuyerOrderDetail(profile, orderId);
+  const [orderDetail, settings, currencyRates] = await Promise.all([
+    getBuyerOrderDetail(profile, orderId),
+    getProfileSettings(profile.id),
+    getCurrencyRates()
+  ]);
 
   if (!orderDetail) {
     redirect("/account/orders");
   }
 
   const { order, listing, paymentConfirmed, deliveryAvailable } = orderDetail;
+  const displayCurrency = settings.display_currency;
 
   if (!paymentConfirmed) {
     redirect(`/account/checkout/${order.id}`);
@@ -62,7 +67,7 @@ export default async function PurchaseSuccessPage({
             <div className="rounded-3xl bg-surface p-4">
               <p className="text-sm text-muted-foreground">Amount paid</p>
               <p className="mt-2 font-heading text-2xl font-semibold text-foreground">
-                {formatCurrency(order.amount)}
+                {formatCurrency(order.amount, displayCurrency, currencyRates)}
               </p>
             </div>
             <div className="rounded-3xl bg-surface p-4">

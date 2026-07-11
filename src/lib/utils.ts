@@ -82,6 +82,16 @@ export function convertNgnToDisplayCurrency(value: number, currencyCode = BASE_C
   return value / rate.ngn_rate;
 }
 
+export function convertDisplayCurrencyToNgn(value: number, currencyCode = BASE_CURRENCY_CODE, rates = defaultCurrencyRates) {
+  const rate = getCurrencyRate(currencyCode, rates);
+
+  if (rate.code === BASE_CURRENCY_CODE) {
+    return value;
+  }
+
+  return value * rate.ngn_rate;
+}
+
 export function formatCurrency(value: number, currencyCode = BASE_CURRENCY_CODE, rates = defaultCurrencyRates) {
   const rate = getCurrencyRate(currencyCode, rates);
   const convertedValue = convertNgnToDisplayCurrency(value, rate.code, rates);

@@ -5,7 +5,7 @@ import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import PaginationControls from "@/components/ui/PaginationControls";
 import { requireAccountProfile } from "@/lib/auth";
-import { getBuyerOrders } from "@/lib/data";
+import { getBuyerOrders, getCurrencyRates, getProfileSettings } from "@/lib/data";
 import {
   formatCurrency,
   formatDate,
@@ -23,7 +23,12 @@ export default async function AccountOrdersPage({
 }) {
   const profile = await requireAccountProfile();
   const params = (await searchParams) ?? {};
-  const orders = await getBuyerOrders(profile);
+  const [orders, settings, currencyRates] = await Promise.all([
+    getBuyerOrders(profile),
+    getProfileSettings(profile.id),
+    getCurrencyRates()
+  ]);
+  const displayCurrency = settings.display_currency;
   const requestedPage = parsePageParam(params.page);
   const {
     items: paginatedOrders,
@@ -89,7 +94,7 @@ export default async function AccountOrdersPage({
                     <tr key={order.id} className="border-b border-border/60">
                       <td className="px-4 py-4 font-medium text-foreground">{order.id.slice(0, 8)}</td>
                       <td className="px-4 py-4">{order.listing_title}</td>
-                      <td className="px-4 py-4">{formatCurrency(order.amount)}</td>
+                      <td className="px-4 py-4">{formatCurrency(order.amount, displayCurrency, currencyRates)}</td>
                       <td className="px-4 py-4">
                         <Badge variant={statusVariant(order.status)}>{titleCase(order.status)}</Badge>
                       </td>

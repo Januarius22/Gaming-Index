@@ -169,6 +169,8 @@ export default function WorkspaceSettingsForm({
   const [state, formAction] = useActionState(action, initialState);
   const [passwordState, passwordFormAction] = useActionState(passwordAction, initialState);
   const [selectedAvatar, setSelectedAvatar] = useState<File | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState(settings.display_currency);
+  const [selectedFontSize, setSelectedFontSize] = useState(settings.font_size_preference);
   const copy = getWorkspaceCopy(workspace);
   const shownPreferences = preferences.filter((preference) =>
     preference.workspaces.includes(workspace)
@@ -204,6 +206,9 @@ export default function WorkspaceSettingsForm({
             updated_at: ""
           }
         ];
+  const selectedThemePreference =
+    settings.theme_preference === "system" ? "light" : settings.theme_preference;
+  const [selectedTheme, setSelectedTheme] = useState(selectedThemePreference);
 
   useEffect(() => {
     return () => {
@@ -212,6 +217,12 @@ export default function WorkspaceSettingsForm({
       }
     };
   }, [avatarPreviewUrl]);
+
+  useEffect(() => {
+    setSelectedCurrency(settings.display_currency);
+    setSelectedTheme(selectedThemePreference);
+    setSelectedFontSize(settings.font_size_preference);
+  }, [settings.display_currency, settings.font_size_preference, selectedThemePreference]);
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
@@ -225,12 +236,12 @@ export default function WorkspaceSettingsForm({
             </>
           ) : null}
           {!showCurrency ? (
-            <input type="hidden" name="displayCurrency" value={settings.display_currency} />
+            <input type="hidden" name="displayCurrency" value={selectedCurrency} />
           ) : null}
           {!showAppearance ? (
             <>
-              <input type="hidden" name="themePreference" value={settings.theme_preference} />
-              <input type="hidden" name="fontSizePreference" value={settings.font_size_preference} />
+              <input type="hidden" name="themePreference" value={selectedTheme} />
+              <input type="hidden" name="fontSizePreference" value={selectedFontSize} />
             </>
           ) : null}
           {!showSecurity ? (
@@ -311,7 +322,7 @@ export default function WorkspaceSettingsForm({
 
                 <div className="grid gap-5 lg:grid-cols-[9rem_minmax(0,1fr)] lg:items-start">
                   <div className="space-y-3">
-                    <div className="relative mx-auto flex h-32 w-32 items-center justify-center overflow-hidden rounded-[26px] border border-border bg-white text-primary shadow-sm lg:mx-0">
+                    <label className="group relative mx-auto flex h-32 w-32 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-border bg-white text-primary shadow-sm transition hover:border-primary/40 lg:mx-0">
                       {avatarPreviewUrl || profile.avatar_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -322,10 +333,9 @@ export default function WorkspaceSettingsForm({
                       ) : (
                         <span className="font-heading text-5xl font-semibold">{profileInitial}</span>
                       )}
-                    </div>
-                    <label className="mx-auto flex h-11 w-full max-w-36 cursor-pointer items-center justify-center rounded-2xl border border-border bg-white px-3 text-center text-sm font-semibold text-foreground shadow-sm transition hover:border-primary/30 hover:bg-primary-soft hover:text-primary lg:mx-0">
-                      <Camera className="mr-2 inline h-4 w-4" />
-                      Change photo
+                      <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-primary text-white shadow-lg transition group-hover:scale-105">
+                        <Camera className="h-4 w-4" />
+                      </span>
                       <input
                         name="avatarFile"
                         type="file"
@@ -403,8 +413,11 @@ export default function WorkspaceSettingsForm({
                       <Moon className="h-4 w-4 text-primary" />
                       Theme
                     </span>
-                    <Select name="themePreference" defaultValue={settings.theme_preference}>
-                      <option value="system">System</option>
+                    <Select
+                      name="themePreference"
+                      value={selectedTheme}
+                      onChange={(event) => setSelectedTheme(event.target.value as "light" | "dark")}
+                    >
                       <option value="light">Light</option>
                       <option value="dark">Dark</option>
                     </Select>
@@ -414,7 +427,13 @@ export default function WorkspaceSettingsForm({
                       <Type className="h-4 w-4 text-primary" />
                       Font size
                     </span>
-                    <Select name="fontSizePreference" defaultValue={settings.font_size_preference}>
+                    <Select
+                      name="fontSizePreference"
+                      value={selectedFontSize}
+                      onChange={(event) =>
+                        setSelectedFontSize(event.target.value as ProfileSettings["font_size_preference"])
+                      }
+                    >
                       <option value="compact">Compact</option>
                       <option value="comfortable">Comfortable</option>
                       <option value="large">Large</option>
@@ -441,7 +460,11 @@ export default function WorkspaceSettingsForm({
                   </div>
                   <label className="space-y-2">
                     <span className="text-sm font-semibold text-foreground">Currency</span>
-                    <Select name="displayCurrency" defaultValue={settings.display_currency}>
+                    <Select
+                      name="displayCurrency"
+                      value={selectedCurrency}
+                      onChange={(event) => setSelectedCurrency(event.target.value)}
+                    >
                       {availableCurrencyRates.map((rate) => (
                         <option key={rate.code} value={rate.code}>
                           {rate.code} - {rate.name}

@@ -31,6 +31,8 @@ export default async function AdminSupportDetailPage({
     notFound();
   }
 
+  const closed = ticketData.ticket.status === "closed" || ticketData.ticket.status === "resolved";
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -91,22 +93,28 @@ export default async function AdminSupportDetailPage({
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Reply</CardTitle>
-          <CardDescription>Send an update to the requester.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SupportReplyForm
-            ticketId={ticketData.ticket.id}
-            action={replyToSupportTicketAction}
-            hiddenFields={{
-              requesterId: ticketData.ticket.profile_id,
-              workspace: ticketData.ticket.workspace
-            }}
-          />
-        </CardContent>
-      </Card>
+      {closed ? (
+        <p className="rounded-[22px] border border-border bg-surface p-5 text-sm text-muted-foreground">
+          This support request is closed.
+        </p>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Reply</CardTitle>
+            <CardDescription>Send an update to the requester.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SupportReplyForm
+              ticketId={ticketData.ticket.id}
+              action={replyToSupportTicketAction}
+              hiddenFields={{
+                requesterId: ticketData.ticket.profile_id,
+                workspace: ticketData.ticket.workspace
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

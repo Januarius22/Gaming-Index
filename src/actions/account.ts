@@ -658,7 +658,7 @@ export async function requestBuyerWithdrawalAction(
 ): Promise<ActionState> {
   await requireAccountProfile();
 
-  const amount = Number(String(formData.get("amount") ?? "").trim());
+  const amount = Number(String(formData.get("amount") ?? "").replace(/,/g, "").trim());
   const bankName = String(formData.get("bankName") ?? "").trim();
   const accountNumber = String(formData.get("accountNumber") ?? "").trim();
   const accountName = String(formData.get("accountName") ?? "").trim();

@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import BuyerWithdrawalRequestForm from "@/components/account/BuyerWithdrawalRequestForm";
 import PaginationControls from "@/components/ui/PaginationControls";
 import { requireAccountProfile } from "@/lib/auth";
-import { getProfileSettings, getProfileWallet, getProfileWithdrawalRequests } from "@/lib/data";
+import { getCurrencyRates, getProfileSettings, getProfileWallet, getProfileWithdrawalRequests } from "@/lib/data";
 import { formatCurrency, formatDate, paginateItems, parsePageParam, titleCase } from "@/lib/utils";
 
 const statusVariant = {
@@ -20,11 +20,13 @@ export default async function AccountWithdrawalsPage({
   searchParams?: Promise<{ page?: string }>;
 }) {
   const profile = await requireAccountProfile();
-  const [wallet, withdrawalRequests, settings] = await Promise.all([
+  const [wallet, withdrawalRequests, settings, currencyRates] = await Promise.all([
     getProfileWallet(profile.id),
     getProfileWithdrawalRequests(profile.id),
-    getProfileSettings(profile.id)
+    getProfileSettings(profile.id),
+    getCurrencyRates()
   ]);
+  const displayCurrency = settings.display_currency;
   const params = (await searchParams) ?? {};
   const requestedPage = parsePageParam(params.page);
   const {
@@ -44,7 +46,11 @@ export default async function AccountWithdrawalsPage({
           <CardDescription>Send available refund credit to your bank account.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-5 pt-0 sm:p-6 sm:pt-0">
-          <BuyerWithdrawalRequestForm availableBalance={wallet.available_balance} settings={settings} />
+          <BuyerWithdrawalRequestForm
+            availableBalance={wallet.available_balance}
+            settings={settings}
+            currencyRates={currencyRates}
+          />
         </CardContent>
       </Card>
 
@@ -57,13 +63,13 @@ export default async function AccountWithdrawalsPage({
           <div className="rounded-[22px] bg-primary-dark p-4 text-white">
             <p className="text-sm text-blue-100">Available now</p>
             <p className="mt-3 break-words font-heading text-3xl font-semibold">
-              {formatCurrency(wallet.available_balance)}
+              {formatCurrency(wallet.available_balance, displayCurrency, currencyRates)}
             </p>
           </div>
           <div className="rounded-[22px] bg-surface p-4">
             <p className="text-sm text-muted-foreground">Refunds received</p>
             <p className="mt-3 break-words font-heading text-2xl font-semibold text-foreground">
-              {formatCurrency(wallet.total_deposited)}
+              {formatCurrency(wallet.total_deposited, displayCurrency, currencyRates)}
             </p>
           </div>
         </CardContent>
@@ -97,7 +103,7 @@ export default async function AccountWithdrawalsPage({
                 className="flex flex-col gap-3 rounded-[22px] bg-surface p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
-                  <p className="font-semibold text-foreground">{formatCurrency(request.amount)}</p>
+                  <p className="font-semibold text-foreground">{formatCurrency(request.amount, displayCurrency, currencyRates)}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {request.bank_name || "Bank not provided"} on {formatDate(request.created_at)}
                   </p>

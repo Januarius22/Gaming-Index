@@ -7,7 +7,12 @@ import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { getCurrentProfile, getDashboardRoute } from "@/lib/auth";
-import { getMarketplaceListingById, getSellerRatingState } from "@/lib/data";
+import {
+  getCurrencyRates,
+  getMarketplaceListingById,
+  getProfileSettings,
+  getSellerRatingState
+} from "@/lib/data";
 import {
   formatCompactCurrency,
   formatDate
@@ -26,7 +31,12 @@ export default async function MarketplaceListingDetailPage({
     notFound();
   }
 
-  const ratingState = await getSellerRatingState(listing.seller_id, profile?.id);
+  const [ratingState, settings, currencyRates] = await Promise.all([
+    getSellerRatingState(listing.seller_id, profile?.id),
+    profile ? getProfileSettings(profile.id) : Promise.resolve(null),
+    getCurrencyRates()
+  ]);
+  const displayCurrency = settings?.display_currency ?? "NGN";
 
   const ctaHref = profile ? getDashboardRoute(profile.role) : "/auth/login";
   const ctaLabel = profile
@@ -165,7 +175,7 @@ export default async function MarketplaceListingDetailPage({
               <div>
                 <p className="text-sm text-muted-foreground">Price</p>
                 <p className="mt-2 break-words font-heading text-[clamp(2rem,9vw,3.5rem)] font-semibold leading-tight tracking-tight text-foreground">
-                  {formatCompactCurrency(listing.price)}
+                  {formatCompactCurrency(listing.price, displayCurrency, currencyRates)}
                 </p>
               </div>
 

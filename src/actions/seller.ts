@@ -56,7 +56,7 @@ export async function requestWithdrawalAction(
 ): Promise<WithdrawalActionState> {
   await requireSellerProfile();
 
-  const amount = Number(String(formData.get("amount") ?? "").trim());
+  const amount = Number(String(formData.get("amount") ?? "").replace(/,/g, "").trim());
   const bankName = String(formData.get("bankName") ?? "").trim();
   const accountNumber = String(formData.get("accountNumber") ?? "").trim();
   const accountName = String(formData.get("accountName") ?? "").trim();
@@ -665,7 +665,7 @@ export async function saveListingSubmission({
     String(formData.get("deliveryReleaseConfirmed") ?? "").trim() === "yes";
   const deliveryNotPersonalConfirmed =
     String(formData.get("deliveryNotPersonalConfirmed") ?? "").trim() === "yes";
-  const price = Number(formData.get("price") ?? 0);
+  const price = Number(String(formData.get("price") ?? "0").replace(/,/g, ""));
   const listingImageEntries = formData.getAll("listingImage");
   const listingImageFiles = listingImageEntries
     .map((entry) => getUploadedFile(entry))
@@ -784,6 +784,7 @@ export async function saveListingSubmission({
       seller_id: seller.id,
       seller_name: seller.full_name,
       seller_username: seller.username,
+      seller_avatar_url: seller.avatar_url ?? "",
       game,
       title,
       description,

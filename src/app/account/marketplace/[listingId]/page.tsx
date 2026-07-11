@@ -16,7 +16,9 @@ import Badge from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
 import {
   getCartMarketplaceListingIds,
+  getCurrencyRates,
   getMarketplaceListingById,
+  getProfileSettings,
   getSavedMarketplaceListingIds,
   getSellerRatingState
 } from "@/lib/data";
@@ -63,16 +65,19 @@ export default async function AccountMarketplaceListingDetailPage({
   }
 
   const resolvedSearchParams = searchParams ?? Promise.resolve<{ notice?: string }>({});
-  const [{ notice }, ratingState, savedListingIds, cartListingIds] = await Promise.all([
+  const [{ notice }, ratingState, savedListingIds, cartListingIds, settings, currencyRates] = await Promise.all([
     resolvedSearchParams,
     getSellerRatingState(listing.seller_id, profile.id),
     getSavedMarketplaceListingIds(),
-    getCartMarketplaceListingIds()
+    getCartMarketplaceListingIds(),
+    getProfileSettings(profile.id),
+    getCurrencyRates()
   ]);
 
   const noticeState = getNoticeMessage(notice);
   const isSaved = savedListingIds.includes(listing.id);
   const isInCart = cartListingIds.includes(listing.id);
+  const displayCurrency = settings.display_currency;
 
   return (
     <section className="-mx-2 px-2 py-6 sm:mx-0 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
@@ -206,7 +211,7 @@ export default async function AccountMarketplaceListingDetailPage({
               <div>
                 <p className="text-sm text-muted-foreground">Price</p>
                 <p className="mt-2 break-words font-heading text-[clamp(2rem,9vw,3.5rem)] font-semibold leading-tight tracking-tight text-foreground">
-                  {formatCompactCurrency(listing.price)}
+                  {formatCompactCurrency(listing.price, displayCurrency, currencyRates)}
                 </p>
               </div>
 

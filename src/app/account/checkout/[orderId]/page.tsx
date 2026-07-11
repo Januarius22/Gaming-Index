@@ -10,7 +10,7 @@ import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import { requireAccountProfile } from "@/lib/auth";
-import { getBuyerOrderDetail } from "@/lib/data";
+import { getBuyerOrderDetail, getCurrencyRates, getProfileSettings } from "@/lib/data";
 import {
   formatCurrency,
   formatDate,
@@ -62,6 +62,12 @@ export default async function AccountCheckoutPage({
     searchParams ?? Promise.resolve<{ notice?: string }>({})
   ]);
   const orderDetail = await getBuyerOrderDetail(profile, orderId);
+  const [settings, currencyRates] = await Promise.all([
+    getProfileSettings(profile.id),
+    getCurrencyRates()
+  ]);
+  const displayCurrency = settings.display_currency;
+  const formatPrice = (value: number) => formatCurrency(value, displayCurrency, currencyRates);
   const noticeState = getNoticeMessage(resolvedSearchParams.notice);
 
   if (!orderDetail) {
@@ -169,7 +175,7 @@ export default async function AccountCheckoutPage({
                 <div className="min-w-0 sm:text-right">
                   <p className="text-muted-foreground">Price</p>
                   <p className="mt-1 break-words font-heading text-2xl font-semibold text-foreground">
-                    {formatCurrency(order.amount)}
+                    {formatPrice(order.amount)}
                   </p>
                 </div>
                 <div className="min-w-0">
@@ -298,7 +304,7 @@ export default async function AccountCheckoutPage({
                       <div>
                         <p className="text-sm text-muted-foreground">Amount payable</p>
                         <p className="mt-2 font-heading text-4xl font-semibold text-foreground">
-                          {formatCurrency(order.amount)}
+                          {formatPrice(order.amount)}
                         </p>
                       </div>
                       <div className="rounded-2xl bg-white p-3 text-primary shadow-sm">

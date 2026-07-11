@@ -2,9 +2,12 @@ import MarketplacePreview from "@/components/public/MarketplacePreview";
 import FormMessage from "@/components/auth/FormMessage";
 import {
   getCartMarketplaceListingIds,
+  getCurrencyRates,
   getMarketplaceCatalog,
+  getProfileSettings,
   getSavedMarketplaceListingIds
 } from "@/lib/data";
+import { requireAccountProfile } from "@/lib/auth";
 
 function getNoticeMessage(notice?: string) {
   switch (notice) {
@@ -35,12 +38,15 @@ export default async function AccountMarketplacePage({
 }: {
   searchParams?: Promise<{ notice?: string }>;
 }) {
+  const profile = await requireAccountProfile();
   const resolvedSearchParams = searchParams ?? Promise.resolve<{ notice?: string }>({});
-  const [{ notice }, listings, savedListingIds, cartListingIds] = await Promise.all([
+  const [{ notice }, listings, savedListingIds, cartListingIds, settings, currencyRates] = await Promise.all([
     resolvedSearchParams,
     getMarketplaceCatalog(),
     getSavedMarketplaceListingIds(),
-    getCartMarketplaceListingIds()
+    getCartMarketplaceListingIds(),
+    getProfileSettings(profile.id),
+    getCurrencyRates()
   ]);
   const noticeState = getNoticeMessage(notice);
 
@@ -56,6 +62,8 @@ export default async function AccountMarketplacePage({
         context="account"
         savedListingIds={savedListingIds}
         cartListingIds={cartListingIds}
+        displayCurrency={settings.display_currency}
+        currencyRates={currencyRates}
         itemsPerPage={6}
         className="pb-0 pt-0"
       />

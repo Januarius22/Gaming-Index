@@ -59,19 +59,24 @@ export default async function AccountSupportDetailPage({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Reply</CardTitle>
-          <CardDescription>{closed ? "This request is closed." : "Continue the conversation with support."}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SupportReplyForm
-            ticketId={ticketData.ticket.id}
-            action={replyToAccountSupportTicketAction}
-            disabled={closed}
-          />
-        </CardContent>
-      </Card>
+      {closed ? (
+        <p className="rounded-[22px] border border-border bg-surface p-5 text-sm text-muted-foreground">
+          This support request is closed.
+        </p>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Reply</CardTitle>
+            <CardDescription>Continue the conversation with support.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SupportReplyForm
+              ticketId={ticketData.ticket.id}
+              action={replyToAccountSupportTicketAction}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

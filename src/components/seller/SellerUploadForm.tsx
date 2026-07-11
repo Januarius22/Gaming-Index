@@ -20,6 +20,7 @@ export default function SellerUploadForm({
 }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [priceInput, setPriceInput] = useState("");
   const router = useRouter();
   const pathname = usePathname();
   const previewUrl = useMemo(
@@ -89,7 +90,19 @@ export default function SellerUploadForm({
               <label htmlFor="price" className="text-sm font-semibold text-foreground">
                 Price
               </label>
-              <Input id="price" name="price" type="number" min="1" placeholder="200" required />
+              <Input
+                id="price"
+                type="text"
+                inputMode="numeric"
+                value={priceInput}
+                onChange={(event) => {
+                  const digits = event.target.value.replace(/[^\d]/g, "");
+                  setPriceInput(digits ? new Intl.NumberFormat("en-NG").format(Number(digits)) : "");
+                }}
+                placeholder="200,000"
+                required
+              />
+              <input type="hidden" name="price" value={priceInput.replace(/,/g, "")} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <label htmlFor="title" className="text-sm font-semibold text-foreground">

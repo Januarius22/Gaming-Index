@@ -9,7 +9,7 @@ import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { requireAccountProfile } from "@/lib/auth";
-import { getBuyerOrderDetail } from "@/lib/data";
+import { getBuyerOrderDetail, getCurrencyRates, getProfileSettings } from "@/lib/data";
 import {
   formatCurrency,
   formatDate,
@@ -80,6 +80,12 @@ export default async function AccountOrderDetailPage({
   const orderDetail = await getBuyerOrderDetail(profile, orderId, {
     includeDeliveryDetails: showDelivery
   });
+  const [settings, currencyRates] = await Promise.all([
+    getProfileSettings(profile.id),
+    getCurrencyRates()
+  ]);
+  const displayCurrency = settings.display_currency;
+  const formatPrice = (value: number) => formatCurrency(value, displayCurrency, currencyRates);
   const noticeState = getNoticeMessage(resolvedSearchParams.notice);
 
   if (!orderDetail) {
@@ -141,7 +147,7 @@ export default async function AccountOrderDetailPage({
           <div className="rounded-3xl bg-surface p-5">
             <p className="text-sm text-muted-foreground">Amount</p>
             <p className="mt-2 font-heading text-3xl font-semibold text-foreground">
-              {formatCurrency(order.amount)}
+              {formatPrice(order.amount)}
             </p>
           </div>
           <div className="rounded-3xl bg-surface p-5">

@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { requestBuyerWithdrawalAction } from "@/actions/account";
 import FormMessage from "@/components/auth/FormMessage";
 import SubmitButton from "@/components/auth/SubmitButton";
 import Input from "@/components/ui/Input";
-import type { ActionState, ProfileSettings } from "@/types";
+import { formatCurrency } from "@/lib/utils";
+import type { ActionState, CurrencyRate, ProfileSettings } from "@/types";
 
 const initialState: ActionState = {
   status: "idle"
@@ -13,15 +14,20 @@ const initialState: ActionState = {
 
 export default function BuyerWithdrawalRequestForm({
   availableBalance,
-  settings
+  settings,
+  currencyRates
 }: {
   availableBalance: number;
   settings?: Pick<
     ProfileSettings,
-    "default_bank_name" | "default_account_number" | "default_account_name"
+    "default_bank_name" | "default_account_number" | "default_account_name" | "display_currency"
   >;
+  currencyRates?: CurrencyRate[];
 }) {
   const [state, formAction] = useActionState(requestBuyerWithdrawalAction, initialState);
+  const displayCurrency = settings?.display_currency ?? "NGN";
+  const [amountInput, setAmountInput] = useState("");
+  const rawAmount = amountInput.replace(/,/g, "");
 
   return (
     <form action={formAction} className="space-y-4">
@@ -35,14 +41,26 @@ export default function BuyerWithdrawalRequestForm({
         </label>
         <Input
           id="amount"
-          name="amount"
-          type="number"
-          min="1"
-          max={availableBalance}
-          step="0.01"
+          type="text"
+          inputMode="decimal"
+          value={amountInput}
+          onChange={(event) => {
+            const cleaned = event.target.value.replace(/[^\d.]/g, "");
+            const [whole = "", decimal = ""] = cleaned.split(".");
+            const formattedWhole = whole
+              ? new Intl.NumberFormat("en-NG").format(Number(whole))
+              : "";
+            setAmountInput(
+              cleaned.includes(".") ? `${formattedWhole}.${decimal.slice(0, 2)}` : formattedWhole
+            );
+          }}
           placeholder="0.00"
           required
         />
+        <input type="hidden" name="amount" value={rawAmount} />
+        <p className="text-xs font-medium text-muted-foreground">
+          Available balance: {formatCurrency(availableBalance, displayCurrency, currencyRates)}
+        </p>
       </div>
       <div className="space-y-2">
         <label htmlFor="bankName" className="text-sm font-semibold text-foreground">
