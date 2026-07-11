@@ -7,6 +7,7 @@ import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminTopbar from "@/components/admin/AdminTopbar";
 import LogoutConfirmButton from "@/components/auth/LogoutConfirmButton";
 import NotificationToastStack from "@/components/notifications/NotificationToastStack";
+import { useLiveNotifications } from "@/components/notifications/useLiveNotifications";
 import { buttonClassName } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import type { Notification, Profile, ProfileSettings, SidebarCounts } from "@/types";
@@ -25,6 +26,11 @@ export default function AdminShell({
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const liveNotifications = useLiveNotifications({
+    initialNotifications: notifications,
+    initialSidebarCounts: sidebarCounts,
+    notificationsPath: "/admin/notifications"
+  });
   const preferenceClassName = cn(
     settings.theme_preference === "dark" && "gi-theme-dark",
     `gi-font-${settings.font_size_preference}`
@@ -45,7 +51,7 @@ export default function AdminShell({
 
   return (
     <div className={cn("min-h-screen bg-surface", preferenceClassName)}>
-      <NotificationToastStack notifications={notifications} />
+      <NotificationToastStack notifications={liveNotifications.notifications} />
       <div className="flex min-h-screen items-center justify-center px-6 py-12 min-[700px]:hidden">
         <div className="w-full max-w-xl rounded-[32px] border border-border/70 bg-white p-8 text-center shadow-[0_24px_80px_-48px_rgba(6,43,99,0.3)]">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-primary-soft text-primary">
@@ -84,7 +90,7 @@ export default function AdminShell({
               collapsed ? "w-24" : "w-80"
             )}
           >
-            <AdminSidebar profile={profile} sidebarCounts={sidebarCounts} collapsed={collapsed} />
+            <AdminSidebar profile={profile} sidebarCounts={liveNotifications.sidebarCounts} collapsed={collapsed} />
           </div>
         </div>
 

@@ -6,6 +6,7 @@ import { AccountShellProvider } from "@/components/account/AccountShellContext";
 import AccountSidebar from "@/components/account/AccountSidebar";
 import AccountTopbar from "@/components/account/AccountTopbar";
 import NotificationToastStack from "@/components/notifications/NotificationToastStack";
+import { useLiveNotifications } from "@/components/notifications/useLiveNotifications";
 import { cn } from "@/lib/utils";
 import type { Notification, Profile, ProfileSettings, SidebarCounts } from "@/types";
 
@@ -26,6 +27,11 @@ export default function AccountShell({
   const [collapsed, setCollapsed] = useState(false);
   const [hoverPreviewOpen, setHoverPreviewOpen] = useState(false);
   const [supportsHoverPreview, setSupportsHoverPreview] = useState(false);
+  const liveNotifications = useLiveNotifications({
+    initialNotifications: notifications,
+    initialSidebarCounts: sidebarCounts,
+    notificationsPath: "/account/notifications"
+  });
 
   useEffect(() => {
     const savedValue = window.localStorage.getItem("gi-account-sidebar-collapsed");
@@ -68,7 +74,7 @@ export default function AccountShell({
       }}
     >
       <div className={cn("min-h-screen bg-surface", preferenceClassName)}>
-        <NotificationToastStack notifications={notifications} />
+        <NotificationToastStack notifications={liveNotifications.notifications} />
         <div className="flex min-h-screen">
           <div
             className={cn(
@@ -105,7 +111,7 @@ export default function AccountShell({
                 sidebarExpanded ? "w-80" : "w-24"
               )}
             >
-              <AccountSidebar profile={profile} sidebarCounts={sidebarCounts} collapsed={!sidebarExpanded} />
+              <AccountSidebar profile={profile} sidebarCounts={liveNotifications.sidebarCounts} collapsed={!sidebarExpanded} />
             </div>
           </div>
 
@@ -126,7 +132,7 @@ export default function AccountShell({
                   className="h-full w-[84%] max-w-xs overflow-y-auto"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <AccountSidebar profile={profile} sidebarCounts={sidebarCounts} mobile onNavigate={() => setOpen(false)} />
+                  <AccountSidebar profile={profile} sidebarCounts={liveNotifications.sidebarCounts} mobile onNavigate={() => setOpen(false)} />
                 </motion.div>
               </motion.div>
             ) : null}

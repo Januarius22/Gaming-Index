@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import NotificationToastStack from "@/components/notifications/NotificationToastStack";
+import { useLiveNotifications } from "@/components/notifications/useLiveNotifications";
 import SellerSidebar from "@/components/seller/SellerSidebar";
 import SellerTopbar from "@/components/seller/SellerTopbar";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,11 @@ export default function SellerShell({
 }) {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const liveNotifications = useLiveNotifications({
+    initialNotifications: notifications,
+    initialSidebarCounts: sidebarCounts,
+    notificationsPath: "/seller/notifications"
+  });
 
   useEffect(() => {
     const savedValue = window.localStorage.getItem("gi-seller-sidebar-collapsed");
@@ -43,7 +49,7 @@ export default function SellerShell({
 
   return (
     <div className={cn("min-h-screen bg-surface", preferenceClassName)}>
-      <NotificationToastStack notifications={notifications} />
+      <NotificationToastStack notifications={liveNotifications.notifications} />
       <div className="flex min-h-screen">
         <div
           className={cn(
@@ -57,7 +63,7 @@ export default function SellerShell({
               collapsed ? "w-24" : "w-80"
             )}
           >
-            <SellerSidebar profile={profile} sidebarCounts={sidebarCounts} collapsed={collapsed} />
+            <SellerSidebar profile={profile} sidebarCounts={liveNotifications.sidebarCounts} collapsed={collapsed} />
           </div>
         </div>
 
@@ -78,7 +84,7 @@ export default function SellerShell({
                 className="h-full w-[84%] max-w-xs overflow-y-auto"
                 onClick={(event) => event.stopPropagation()}
               >
-                <SellerSidebar profile={profile} sidebarCounts={sidebarCounts} mobile onNavigate={() => setOpen(false)} />
+                <SellerSidebar profile={profile} sidebarCounts={liveNotifications.sidebarCounts} mobile onNavigate={() => setOpen(false)} />
               </motion.div>
             </motion.div>
           ) : null}
