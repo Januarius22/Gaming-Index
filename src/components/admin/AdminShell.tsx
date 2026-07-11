@@ -6,19 +6,22 @@ import { useEffect, useState } from "react";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminTopbar from "@/components/admin/AdminTopbar";
 import LogoutConfirmButton from "@/components/auth/LogoutConfirmButton";
+import NotificationToastStack from "@/components/notifications/NotificationToastStack";
 import { buttonClassName } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-import type { Profile, ProfileSettings, SidebarCounts } from "@/types";
+import type { Notification, Profile, ProfileSettings, SidebarCounts } from "@/types";
 
 export default function AdminShell({
   profile,
   sidebarCounts,
   settings,
+  notifications = [],
   children
 }: {
   profile: Profile;
   sidebarCounts: SidebarCounts;
   settings: ProfileSettings;
+  notifications?: Notification[];
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -42,6 +45,7 @@ export default function AdminShell({
 
   return (
     <div className={cn("min-h-screen bg-surface", preferenceClassName)}>
+      <NotificationToastStack notifications={notifications} />
       <div className="flex min-h-screen items-center justify-center px-6 py-12 min-[700px]:hidden">
         <div className="w-full max-w-xl rounded-[32px] border border-border/70 bg-white p-8 text-center shadow-[0_24px_80px_-48px_rgba(6,43,99,0.3)]">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-primary-soft text-primary">

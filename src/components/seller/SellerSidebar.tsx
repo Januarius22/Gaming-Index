@@ -6,6 +6,8 @@ import {
   ArrowLeft,
   BarChart3,
   Bell,
+  BookOpen,
+  CircleHelp,
   CreditCard,
   FileCheck2,
   History,
@@ -18,6 +20,7 @@ import {
   ReceiptText,
   Settings,
   ShieldAlert,
+  Star,
   Upload,
   X
 } from "lucide-react";
@@ -31,7 +34,10 @@ const dashboardItem = { href: "/seller/dashboard", label: "Dashboard", icon: Lay
 const navGroups = [
   {
     label: "Insights",
-    items: [{ href: "/seller/analytics", label: "Analytics", icon: BarChart3 }]
+    items: [
+      { href: "/seller/analytics", label: "Analytics", icon: BarChart3 },
+      { href: "/seller/reviews", label: "Reviews", icon: Star }
+    ]
   },
   {
     label: "Listings",
@@ -62,6 +68,8 @@ const navGroups = [
       items: [
         { href: "/seller/notifications", label: "Notifications", icon: Bell },
         { href: "/seller/support", label: "Support", icon: LifeBuoy },
+        { href: "/seller/help", label: "Help", icon: BookOpen },
+        { href: "/seller/faq", label: "FAQs", icon: CircleHelp },
         { href: "/seller/feedback", label: "Feedback", icon: MessageSquareText },
         { href: "/seller/settings", label: "Settings", icon: Settings }
       ]

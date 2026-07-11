@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import {
   Bell,
   BarChart3,
+  BookOpen,
+  CircleHelp,
   CircleDollarSign,
   FileCheck2,
   Headset,
@@ -71,6 +73,8 @@ const navGroups = [
     label: "Account",
     items: [
       { href: "/admin/notifications", label: "Notifications", icon: Bell },
+      { href: "/admin/help", label: "Help", icon: BookOpen },
+      { href: "/admin/faq", label: "FAQs", icon: CircleHelp },
       { href: "/admin/settings", label: "Settings", icon: Settings }
     ]
   }

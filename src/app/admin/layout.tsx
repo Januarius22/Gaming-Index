@@ -1,6 +1,6 @@
 import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminProfile } from "@/lib/auth";
-import { getAdminSidebarCounts, getProfileSettings } from "@/lib/data";
+import { getAdminSidebarCounts, getProfileNotifications, getProfileSettings } from "@/lib/data";
 
 export default async function AdminLayout({
   children
@@ -8,13 +8,19 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }>) {
   const profile = await requireAdminProfile();
-  const [sidebarCounts, settings] = await Promise.all([
+  const [sidebarCounts, settings, notifications] = await Promise.all([
     getAdminSidebarCounts(profile),
-    getProfileSettings(profile.id)
+    getProfileSettings(profile.id),
+    getProfileNotifications(profile.id, 3)
   ]);
 
   return (
-    <AdminShell profile={profile} sidebarCounts={sidebarCounts} settings={settings}>
+    <AdminShell
+      profile={profile}
+      sidebarCounts={sidebarCounts}
+      settings={settings}
+      notifications={notifications}
+    >
       {children}
     </AdminShell>
   );

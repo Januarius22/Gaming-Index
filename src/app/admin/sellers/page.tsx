@@ -1,15 +1,24 @@
+import Link from "next/link";
 import Badge from "@/components/ui/Badge";
+import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import PaginationControls from "@/components/ui/PaginationControls";
-import { getAdminSellers } from "@/lib/data";
-import { formatDate, paginateItems, parsePageParam, statusVariant, titleCase } from "@/lib/utils";
+import { getAdminSellerOverview } from "@/lib/data";
+import {
+  formatCompactCurrency,
+  formatDate,
+  paginateItems,
+  parsePageParam,
+  statusVariant,
+  titleCase
+} from "@/lib/utils";
 
 export default async function AdminSellersPage({
   searchParams
 }: {
   searchParams?: Promise<{ page?: string }>;
 }) {
-  const sellers = await getAdminSellers();
+  const sellers = await getAdminSellerOverview();
   const params = (await searchParams) ?? {};
   const requestedPage = parsePageParam(params.page);
   const {
@@ -26,7 +35,7 @@ export default async function AdminSellersPage({
       <CardHeader>
         <CardTitle>Sellers</CardTitle>
         <CardDescription>
-          Users who unlocked seller tools, their verification posture, and onboarding recency.
+          Seller identity, marketplace activity, ratings, disputes, and contact shortcuts.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -44,30 +53,80 @@ export default async function AdminSellersPage({
           <table className="min-w-full text-left text-sm">
             <thead>
               <tr className="border-b border-border text-muted-foreground">
-                <th className="px-4 py-3 font-medium">Name</th>
-                <th className="px-4 py-3 font-medium">Username</th>
-                <th className="px-4 py-3 font-medium">Email</th>
-                <th className="px-4 py-3 font-medium">KYC Status</th>
-                <th className="px-4 py-3 font-medium">Created Date</th>
+                <th className="px-4 py-3 font-medium">Seller</th>
+                <th className="px-4 py-3 font-medium">KYC</th>
+                <th className="px-4 py-3 font-medium">Marketplace</th>
+                <th className="px-4 py-3 font-medium">Sales</th>
+                <th className="px-4 py-3 font-medium">Rating</th>
+                <th className="px-4 py-3 font-medium">Risk</th>
+                <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {sellers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                     No seller-enabled users yet.
                   </td>
                 </tr>
               ) : (
                 paginatedSellers.map((seller) => (
                   <tr key={seller.id} className="border-b border-border/60">
-                    <td className="px-4 py-4 font-medium text-foreground">{seller.full_name}</td>
-                    <td className="px-4 py-4">@{seller.username}</td>
-                    <td className="px-4 py-4">{seller.email}</td>
+                    <td className="px-4 py-4">
+                      <p className="font-semibold text-foreground">{seller.full_name}</p>
+                      <p className="text-muted-foreground">@{seller.username}</p>
+                      <p className="mt-1 break-all text-xs text-muted-foreground">{seller.email}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Joined {formatDate(seller.created_at)}
+                      </p>
+                    </td>
                     <td className="px-4 py-4">
                       <Badge variant={statusVariant(seller.kyc_status)}>{titleCase(seller.kyc_status)}</Badge>
                     </td>
-                    <td className="px-4 py-4">{formatDate(seller.created_at)}</td>
+                    <td className="px-4 py-4">
+                      <p className="font-semibold text-foreground">
+                        {seller.active_listings_count} active
+                      </p>
+                      <p className="text-muted-foreground">{seller.listings_count} total listings</p>
+                    </td>
+                    <td className="px-4 py-4">
+                      <p className="font-semibold text-foreground">{seller.paid_orders_count} paid</p>
+                      <p className="text-muted-foreground">
+                        {formatCompactCurrency(seller.seller_revenue)}
+                      </p>
+                    </td>
+                    <td className="px-4 py-4">
+                      <p className="font-semibold text-foreground">
+                        {seller.reviews_count > 0 ? seller.average_rating.toFixed(1) : "New"}
+                      </p>
+                      <p className="text-muted-foreground">{seller.reviews_count} reviews</p>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="space-y-2">
+                        <Badge variant={seller.open_disputes_count > 0 ? "warning" : "neutral"}>
+                          {seller.open_disputes_count} open disputes
+                        </Badge>
+                        {seller.seller_strikes && seller.seller_strikes > 0 ? (
+                          <Badge variant="danger">{seller.seller_strikes} strikes</Badge>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          href={`mailto:${seller.email}`}
+                          className={buttonClassName({ variant: "secondary", size: "sm" })}
+                        >
+                          Email
+                        </a>
+                        <Link
+                          href={`/admin/disputes`}
+                          className={buttonClassName({ variant: "ghost", size: "sm" })}
+                        >
+                          Cases
+                        </Link>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}

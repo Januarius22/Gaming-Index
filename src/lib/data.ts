@@ -561,6 +561,13 @@ export async function getAdminSellerReviews(): Promise<AdminSellerReview[]> {
   }
 }
 
+export async function getSellerReceivedReviews(sellerId: string): Promise<AdminSellerReview[]> {
+  const reviews = await getAdminSellerReviews();
+  return reviews
+    .filter((review) => review.seller_id === sellerId && !review.is_hidden)
+    .sort((left, right) => right.created_at.localeCompare(left.created_at));
+}
+
 async function getSupabaseListingDeliveryDetailsForListing(listingId: string) {
   const supabase = await getSupabaseServerClient();
 
@@ -2830,6 +2837,46 @@ export async function getAdminUsers() {
 export async function getAdminSellers() {
   const users = await getAdminUsers();
   return users.filter((user) => user.role !== "admin" && user.seller_enabled);
+}
+
+export async function getAdminSellerOverview() {
+  const [sellers, orders, disputes, reviews, listings] = await Promise.all([
+    getAdminSellers(),
+    getAdminOrders(),
+    getAdminDisputes(),
+    getAdminSellerReviews(),
+    hasSupabaseEnv ? getSupabaseListings().catch(() => [] as Listing[]) : getDemoListings()
+  ]);
+
+  return sellers.map((seller) => {
+    const sellerOrders = orders.filter((order) => order.seller_id === seller.id);
+    const sellerListings = listings.filter((listing) => listing.seller_id === seller.id);
+    const sellerDisputes = disputes.filter((dispute) => dispute.seller_id === seller.id);
+    const sellerReviews = reviews.filter((review) => review.seller_id === seller.id && !review.is_hidden);
+    const paidOrders = sellerOrders.filter((order) => order.payment_status === "successful");
+    const revenue = paidOrders.reduce(
+      (sum, order) => sum + Number(order.seller_payout_amount ?? order.amount ?? 0),
+      0
+    );
+    const averageRating =
+      sellerReviews.length > 0
+        ? sellerReviews.reduce((sum, review) => sum + Number(review.rating ?? 0), 0) /
+          sellerReviews.length
+        : 0;
+
+    return {
+      ...seller,
+      listings_count: sellerListings.length,
+      active_listings_count: sellerListings.filter((listing) => listing.status === "approved").length,
+      paid_orders_count: paidOrders.length,
+      open_disputes_count: sellerDisputes.filter((dispute) =>
+        ["open", "reviewing"].includes(dispute.status)
+      ).length,
+      reviews_count: sellerReviews.length,
+      average_rating: averageRating,
+      seller_revenue: revenue
+    };
+  });
 }
 
 export async function getAdminKycQueue() {

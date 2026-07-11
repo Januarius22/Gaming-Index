@@ -2,20 +2,23 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import NotificationToastStack from "@/components/notifications/NotificationToastStack";
 import SellerSidebar from "@/components/seller/SellerSidebar";
 import SellerTopbar from "@/components/seller/SellerTopbar";
 import { cn } from "@/lib/utils";
-import type { Profile, ProfileSettings, SidebarCounts } from "@/types";
+import type { Notification, Profile, ProfileSettings, SidebarCounts } from "@/types";
 
 export default function SellerShell({
   profile,
   sidebarCounts,
   settings,
+  notifications = [],
   children
 }: {
   profile: Profile;
   sidebarCounts: SidebarCounts;
   settings: ProfileSettings;
+  notifications?: Notification[];
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -40,6 +43,7 @@ export default function SellerShell({
 
   return (
     <div className={cn("min-h-screen bg-surface", preferenceClassName)}>
+      <NotificationToastStack notifications={notifications} />
       <div className="flex min-h-screen">
         <div
           className={cn(

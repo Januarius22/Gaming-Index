@@ -5,18 +5,21 @@ import { useEffect, useState } from "react";
 import { AccountShellProvider } from "@/components/account/AccountShellContext";
 import AccountSidebar from "@/components/account/AccountSidebar";
 import AccountTopbar from "@/components/account/AccountTopbar";
+import NotificationToastStack from "@/components/notifications/NotificationToastStack";
 import { cn } from "@/lib/utils";
-import type { Profile, ProfileSettings, SidebarCounts } from "@/types";
+import type { Notification, Profile, ProfileSettings, SidebarCounts } from "@/types";
 
 export default function AccountShell({
   profile,
   sidebarCounts,
   settings,
+  notifications = [],
   children
 }: {
   profile: Profile;
   sidebarCounts: SidebarCounts;
   settings: ProfileSettings;
+  notifications?: Notification[];
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -65,6 +68,7 @@ export default function AccountShell({
       }}
     >
       <div className={cn("min-h-screen bg-surface", preferenceClassName)}>
+        <NotificationToastStack notifications={notifications} />
         <div className="flex min-h-screen">
           <div
             className={cn(

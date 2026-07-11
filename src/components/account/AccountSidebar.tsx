@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import {
   Bookmark,
   Bell,
+  BookOpen,
+  CircleHelp,
   CreditCard,
   Landmark,
   LayoutDashboard,
@@ -76,6 +78,8 @@ export default function AccountSidebar({
       items: [
         { href: "/account/notifications", label: "Notifications", icon: Bell },
         { href: "/account/support", label: "Support", icon: LifeBuoy },
+        { href: "/account/help", label: "Help", icon: BookOpen },
+        { href: "/account/faq", label: "FAQs", icon: CircleHelp },
         { href: "/account/feedback", label: "Feedback", icon: MessageSquareText },
         { href: "/account/settings", label: "Settings", icon: Settings }
       ]
