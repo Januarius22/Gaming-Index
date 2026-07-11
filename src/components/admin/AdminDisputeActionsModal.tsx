@@ -19,6 +19,7 @@ export default function AdminDisputeActionsModal({
   sellerStrikes = 0,
   sellerRestrictedUntil,
   sellerRestrictionReason,
+  sellerVisible,
   closed,
   updateDispute,
   refundDispute,
@@ -32,6 +33,7 @@ export default function AdminDisputeActionsModal({
   sellerStrikes?: number;
   sellerRestrictedUntil?: string | null;
   sellerRestrictionReason?: string;
+  sellerVisible?: boolean;
   closed: boolean;
   updateDispute: ActionHandler;
   refundDispute: ActionHandler;
@@ -65,7 +67,7 @@ export default function AdminDisputeActionsModal({
                   Case outcome
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Update the dispute status.
+                  Decide whether this case needs seller input or a final outcome.
                 </p>
               </div>
               <Badge variant={closed ? "neutral" : "warning"}>{disputeStatus}</Badge>
@@ -75,13 +77,23 @@ export default function AdminDisputeActionsModal({
               <form action={updateDispute}>
                 <input type="hidden" name="disputeId" value={disputeId} />
                 <input type="hidden" name="orderId" value={orderId} />
-                <input type="hidden" name="nextStatus" value="reviewing" />
+                <input type="hidden" name="nextStatus" value="under_investigation" />
                 <SubmitButton
                   className="w-full"
                   variant="secondary"
-                  disabled={closed || disputeStatus === "reviewing"}
+                  disabled={closed || disputeStatus === "under_investigation"}
                 >
-                  Mark reviewing
+                  Mark under investigation
+                </SubmitButton>
+              </form>
+
+              <form action={updateDispute} className="space-y-3">
+                <input type="hidden" name="disputeId" value={disputeId} />
+                <input type="hidden" name="orderId" value={orderId} />
+                <input type="hidden" name="nextStatus" value="awaiting_seller_response" />
+                <Textarea name="adminNote" placeholder="Question or instruction for the seller" required />
+                <SubmitButton className="w-full" variant="secondary" disabled={closed || sellerVisible}>
+                  Escalate to seller
                 </SubmitButton>
               </form>
 
@@ -89,9 +101,9 @@ export default function AdminDisputeActionsModal({
                 <input type="hidden" name="disputeId" value={disputeId} />
                 <input type="hidden" name="orderId" value={orderId} />
                 <input type="hidden" name="nextStatus" value="resolved" />
-                <Textarea name="adminNote" placeholder="Resolution note" required />
+                <Textarea name="adminNote" placeholder="Final decision note" required />
                 <SubmitButton className="w-full" disabled={closed}>
-                  Resolve seller favor
+                  Release funds to seller
                 </SubmitButton>
               </form>
 
@@ -121,7 +133,17 @@ export default function AdminDisputeActionsModal({
                 <input type="hidden" name="nextStatus" value="rejected" />
                 <Textarea name="adminNote" placeholder="Rejection note" required />
                 <SubmitButton className="w-full" variant="danger" disabled={closed}>
-                  Reject case
+                  Reject dispute
+                </SubmitButton>
+              </form>
+
+              <form action={updateDispute} className="space-y-3">
+                <input type="hidden" name="disputeId" value={disputeId} />
+                <input type="hidden" name="orderId" value={orderId} />
+                <input type="hidden" name="nextStatus" value="lock_discussion" />
+                <Textarea name="adminNote" placeholder="Lock note" required />
+                <SubmitButton className="w-full" variant="secondary" disabled={closed}>
+                  Lock discussion
                 </SubmitButton>
               </form>
             </div>

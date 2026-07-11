@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentProfile, requireAccountProfile } from "@/lib/auth";
-import { getBuyerOrderDetail } from "@/lib/data";
+import { getBuyerOrderDetail, isOrderDisputeEligible } from "@/lib/data";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import type { ActionState } from "@/types";
@@ -64,6 +64,11 @@ function revalidateDisputePaths(disputeId: string, orderId?: string) {
 export async function openDisputeCaseAction(formData: FormData) {
   const profile = await requireAccountProfile();
   const orderId = String(formData.get("orderId") ?? "").trim();
+  const disputeReason = String(formData.get("disputeReason") ?? "").trim();
+  const disputeDetails = String(formData.get("disputeDetails") ?? "").trim();
+  const evidenceFiles = formData
+    .getAll("evidenceFiles")
+    .filter((value): value is File => value instanceof File && value.size > 0);
 
   if (!orderId) {
     redirect("/account/disputes?notice=invalid-order");
@@ -79,16 +84,64 @@ export async function openDisputeCaseAction(formData: FormData) {
     redirect("/account/disputes?notice=order-not-found");
   }
 
-  const details = `Buyer opened a case for ${orderDetail.order.listing_title || "this order"}.`;
+  if (!isOrderDisputeEligible(orderDetail.order)) {
+    redirect("/account/disputes?notice=order-not-eligible");
+  }
+
+  if (!disputeReason || disputeDetails.length < 20) {
+    redirect("/account/disputes?notice=case-details-required");
+  }
+
+  const imageCount = evidenceFiles.filter((file) => file.type.startsWith("image/")).length;
+  const videoCount = evidenceFiles.filter((file) => file.type.startsWith("video/")).length;
+
+  if (evidenceFiles.length === 0 || imageCount === 0) {
+    redirect("/account/disputes?notice=screenshot-required");
+  }
+
+  if (
+    evidenceFiles.length > MAX_EVIDENCE_FILES ||
+    imageCount > MAX_EVIDENCE_IMAGES ||
+    videoCount > MAX_EVIDENCE_VIDEOS ||
+    evidenceFiles.some((file) => {
+      const isImage = file.type.startsWith("image/");
+      const isVideo = file.type.startsWith("video/");
+      return (
+        (!isImage && !isVideo) ||
+        (isImage && file.size > MAX_IMAGE_SIZE) ||
+        (isVideo && file.size > MAX_VIDEO_SIZE)
+      );
+    })
+  ) {
+    redirect("/account/disputes?notice=invalid-evidence");
+  }
+
   const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase!.rpc("submit_order_dispute", {
     target_order_id: orderId,
-    dispute_reason: "Account issue",
-    dispute_details: details
+    dispute_reason: disputeReason,
+    dispute_details: disputeDetails
   });
 
   if (error || !data) {
     redirect(`/account/disputes?notice=case-open-failed&error=${encodeURIComponent(error?.message ?? "Case could not be opened.")}`);
+  }
+
+  const evidenceFormData = new FormData();
+  evidenceFormData.set("disputeId", String(data));
+  evidenceFormData.set("orderId", orderId);
+  evidenceFormData.set("returnTo", `/account/disputes/${data}`);
+  evidenceFormData.set("message", "Evidence submitted for admin review.");
+  evidenceFiles.forEach((file) => evidenceFormData.append("evidenceFiles", file));
+
+  const evidenceResult = await submitDisputeMessage(evidenceFormData);
+
+  if (evidenceResult.status === "error") {
+    redirect(
+      `/account/disputes/${data}?notice=message-error&message=${encodeURIComponent(
+        evidenceResult.message ?? "Case opened, but evidence upload failed."
+      )}`
+    );
   }
 
   revalidateDisputePaths(String(data), orderId);

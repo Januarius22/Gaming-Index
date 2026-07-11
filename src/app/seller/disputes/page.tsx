@@ -7,11 +7,14 @@ import { getSellerDisputes } from "@/lib/data";
 import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
 
 const statusVariant = {
-  open: "danger",
-  reviewing: "warning",
+  pending_admin_review: "warning",
+  awaiting_seller_response: "info",
+  under_investigation: "warning",
   resolved: "success",
   rejected: "neutral",
-  refunded: "success"
+  refunded: "success",
+  open: "danger",
+  reviewing: "warning"
 } as const;
 
 export default async function SellerDisputesPage() {

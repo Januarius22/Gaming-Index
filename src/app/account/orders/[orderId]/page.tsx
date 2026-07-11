@@ -9,7 +9,7 @@ import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { requireAccountProfile } from "@/lib/auth";
-import { getBuyerOrderDetail, getCurrencyRates, getProfileSettings } from "@/lib/data";
+import { getBuyerOrderDetail, getCurrencyRates, getProfileSettings, isOrderDisputeEligible } from "@/lib/data";
 import {
   formatCurrency,
   formatDate,
@@ -118,10 +118,7 @@ export default async function AccountOrderDetailPage({
   const checkoutActive = isPendingCheckoutActive(order);
   const deliveryVisible = Boolean(showDelivery && deliveryDetails && paymentConfirmed);
   const revealedDeliveryDetails = deliveryVisible ? deliveryDetails : null;
-  const canOpenDispute =
-    paymentConfirmed &&
-    order.escrow_status !== "disputed" &&
-    order.escrow_status !== "refunded";
+  const canOpenDispute = isOrderDisputeEligible(order);
 
   return (
     <div className="space-y-6">
@@ -424,7 +421,7 @@ export default async function AccountOrderDetailPage({
             </Card>
           ) : null}
 
-          {paymentConfirmed ? (
+          {paymentConfirmed && canOpenDispute ? (
             <Card className="border-border/70">
               <CardHeader>
                 <CardTitle>Report a problem</CardTitle>
@@ -436,11 +433,11 @@ export default async function AccountOrderDetailPage({
                 <Link
                   href="/account/disputes"
                   className={buttonClassName({
-                    variant: canOpenDispute ? "danger" : "secondary",
+                    variant: "danger",
                     className: "rounded-2xl"
                   })}
                 >
-                  {canOpenDispute ? "Open dispute" : "View dispute cases"}
+                  Open dispute
                 </Link>
               </CardContent>
             </Card>

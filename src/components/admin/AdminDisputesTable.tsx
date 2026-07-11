@@ -12,11 +12,14 @@ import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
 import type { Dispute, DisputeStatus } from "@/types";
 
 const statusVariant = {
-  open: "danger",
-  reviewing: "warning",
+  pending_admin_review: "warning",
+  awaiting_seller_response: "info",
+  under_investigation: "warning",
   resolved: "success",
   rejected: "neutral",
-  refunded: "success"
+  refunded: "success",
+  open: "danger",
+  reviewing: "warning"
 } as const;
 
 export default function AdminDisputesTable({ disputes }: { disputes: Dispute[] }) {
@@ -24,7 +27,7 @@ export default function AdminDisputesTable({ disputes }: { disputes: Dispute[] }
   const [visibleDisputes, setVisibleDisputes] = useState(disputes);
   const [reviewingDispute, setReviewingDispute] = useState<{
     dispute: Dispute;
-    status: "resolved" | "rejected" | "refunded";
+    status: "resolved" | "rejected" | "refunded" | "awaiting_seller_response";
   } | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
@@ -153,16 +156,25 @@ export default function AdminDisputesTable({ disputes }: { disputes: Dispute[] }
                         >
                           <input type="hidden" name="disputeId" value={dispute.id} />
                           <input type="hidden" name="orderId" value={dispute.order_id} />
-                          <input type="hidden" name="nextStatus" value="reviewing" />
+                          <input type="hidden" name="nextStatus" value="under_investigation" />
                           <Button
                             size="sm"
                             type="submit"
                             variant="secondary"
-                            disabled={closed || dispute.status === "reviewing" || isSubmitting}
+                            disabled={closed || dispute.status === "under_investigation" || isSubmitting}
                           >
-                            Reviewing
+                            Investigating
                           </Button>
                         </form>
+                        <Button
+                          size="sm"
+                          type="button"
+                          variant="secondary"
+                          disabled={closed || isSubmitting || dispute.seller_visible}
+                          onClick={() => setReviewingDispute({ dispute, status: "awaiting_seller_response" })}
+                        >
+                          Escalate
+                        </Button>
                         <Button
                           size="sm"
                           type="button"
@@ -197,11 +209,17 @@ export default function AdminDisputesTable({ disputes }: { disputes: Dispute[] }
         title={
           reviewingDispute?.status === "refunded"
             ? "Issue refund?"
+            : reviewingDispute?.status === "awaiting_seller_response"
+              ? "Escalate to seller?"
             : reviewingDispute?.status === "resolved"
               ? "Resolve dispute?"
               : "Reject dispute?"
         }
-        description="The buyer and seller will receive your note."
+        description={
+          reviewingDispute?.status === "awaiting_seller_response"
+            ? "The seller will receive access to this case."
+            : "The relevant parties will receive your note."
+        }
       >
         {reviewingDispute ? (
           <form
@@ -249,6 +267,8 @@ export default function AdminDisputesTable({ disputes }: { disputes: Dispute[] }
                   ? "Saving..."
                   : reviewingDispute.status === "refunded"
                     ? "Issue refund"
+                    : reviewingDispute.status === "awaiting_seller_response"
+                      ? "Escalate seller"
                     : reviewingDispute.status === "resolved"
                       ? "Resolve dispute"
                       : "Reject dispute"}

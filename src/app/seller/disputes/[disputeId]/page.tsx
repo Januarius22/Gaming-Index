@@ -13,11 +13,14 @@ import { getDisputeCase } from "@/lib/data";
 import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
 
 const statusVariant = {
-  open: "danger",
-  reviewing: "warning",
+  pending_admin_review: "warning",
+  awaiting_seller_response: "info",
+  under_investigation: "warning",
   resolved: "success",
   rejected: "neutral",
-  refunded: "success"
+  refunded: "success",
+  open: "danger",
+  reviewing: "warning"
 } as const;
 
 export default async function SellerDisputeCasePage({
@@ -41,7 +44,8 @@ export default async function SellerDisputeCasePage({
   const closed =
     caseData.dispute.status === "resolved" ||
     caseData.dispute.status === "rejected" ||
-    caseData.dispute.status === "refunded";
+    caseData.dispute.status === "refunded" ||
+    Boolean(caseData.dispute.locked_at);
 
   return (
     <div className="space-y-6">
@@ -80,7 +84,10 @@ export default async function SellerDisputeCasePage({
         </CardContent>
       </Card>
 
-      <DisputeInstructions />
+      <DisputeInstructions
+        sellerVisible={Boolean(caseData.dispute.seller_visible)}
+        locked={Boolean(caseData.dispute.locked_at)}
+      />
       <DisputeThread messages={caseData.messages} currentUserId={profile.id} />
       <div className="sticky bottom-0 z-30 -mx-4 bg-gradient-to-t from-[#061c3f] via-[#061c3f] to-transparent pb-[env(safe-area-inset-bottom)] pt-4 sm:mx-0 sm:px-0 sm:pb-3">
         <DisputeMessageForm

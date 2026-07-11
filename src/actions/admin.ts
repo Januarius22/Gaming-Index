@@ -565,18 +565,22 @@ export async function updateOrderDisputeAction(formData: FormData) {
   const nextStatus = String(formData.get("nextStatus") ?? "").trim();
   const adminNote = String(formData.get("adminNote") ?? "").trim();
 
-  if (
-    !disputeId ||
-    !orderId ||
-    (nextStatus !== "reviewing" && nextStatus !== "resolved" && nextStatus !== "rejected")
-  ) {
+  const validStatuses = [
+    "under_investigation",
+    "awaiting_seller_response",
+    "resolved",
+    "rejected",
+    "lock_discussion"
+  ];
+
+  if (!disputeId || !orderId || !validStatuses.includes(nextStatus)) {
     return {
       status: "error" as const,
       message: "Dispute update is invalid."
     };
   }
 
-  if ((nextStatus === "resolved" || nextStatus === "rejected") && !adminNote) {
+  if (nextStatus !== "under_investigation" && !adminNote) {
     return {
       status: "error" as const,
       message: "Add a note before closing this dispute."
@@ -622,13 +626,17 @@ export async function updateOrderDisputeAction(formData: FormData) {
   return {
     status: "success" as const,
     message:
-      nextStatus === "reviewing"
-        ? "Dispute marked as reviewing."
+      nextStatus === "under_investigation"
+        ? "Dispute marked under investigation."
+        : nextStatus === "awaiting_seller_response"
+          ? "Seller has been invited to respond."
+          : nextStatus === "lock_discussion"
+            ? "Dispute discussion locked."
         : nextStatus === "resolved"
-          ? "Dispute resolved."
+          ? "Seller funds released."
           : "Dispute rejected.",
     disputeId,
-    nextStatus,
+    nextStatus: nextStatus === "lock_discussion" ? "under_investigation" : nextStatus,
     adminNote
   };
 }

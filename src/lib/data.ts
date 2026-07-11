@@ -58,6 +58,13 @@ import type {
 const KYC_STORAGE_BUCKET = "kyc-documents";
 const LISTING_STORAGE_BUCKET = "listing-media";
 const DISPUTE_EVIDENCE_BUCKET = "dispute-evidence";
+const ACTIVE_DISPUTE_STATUSES = [
+  "pending_admin_review",
+  "awaiting_seller_response",
+  "under_investigation",
+  "open",
+  "reviewing"
+];
 
 export function getDefaultProfileSettings(profileId: string): ProfileSettings {
   return {
@@ -840,7 +847,7 @@ async function getUnreadDisputeCount(profile: Profile, scope: "buyer" | "seller"
     } else if (scope === "seller") {
       disputeQuery = disputeQuery.eq("seller_id", profile.id);
     } else {
-      disputeQuery = disputeQuery.in("status", ["open", "reviewing"]);
+      disputeQuery = disputeQuery.in("status", ACTIVE_DISPUTE_STATUSES);
     }
 
     const { data: disputeData } = await disputeQuery;
@@ -1464,9 +1471,16 @@ function normalizeDispute(
     ...dispute,
     reason: dispute.reason ?? "",
     details: dispute.details ?? "",
-    status: dispute.status ?? "open",
+    status: dispute.status ?? "pending_admin_review",
     admin_note: dispute.admin_note ?? "",
     resolution: dispute.resolution ?? "",
+    seller_visible: Boolean(dispute.seller_visible),
+    locked_at: dispute.locked_at ?? null,
+    locked_by: dispute.locked_by ?? null,
+    assigned_admin_id: dispute.assigned_admin_id ?? null,
+    final_outcome: dispute.final_outcome ?? "",
+    final_note: dispute.final_note ?? "",
+    resolved_at: dispute.resolved_at ?? null,
     opened_by: dispute.opened_by ?? null,
     reviewed_by: dispute.reviewed_by ?? null,
     reviewed_at: dispute.reviewed_at ?? null,
@@ -1620,15 +1634,25 @@ export async function getBuyerDisputeCandidates(profile: Profile) {
   const disputeByOrderId = new Map(disputes.map((dispute) => [dispute.order_id, dispute]));
 
   return orders
-    .filter((order) =>
-      order.payment_status === "successful" &&
-      (order.status === "processing" || order.status === "completed") &&
-      order.escrow_status !== "refunded"
-    )
+    .filter(isOrderDisputeEligible)
     .map((order) => ({
       order,
       dispute: disputeByOrderId.get(order.id) ?? null
     }));
+}
+
+export function isOrderDisputeEligible(order: Order) {
+  const holdExpiry = order.seller_hold_expires_at
+    ? new Date(order.seller_hold_expires_at).getTime()
+    : 0;
+
+  return (
+    order.payment_status === "successful" &&
+    (order.status === "processing" || order.status === "completed") &&
+    order.escrow_status !== "refunded" &&
+    order.escrow_status !== "released" &&
+    (!holdExpiry || holdExpiry >= Date.now())
+  );
 }
 
 export async function getBuyerDisputes(profile: Profile) {
@@ -1671,6 +1695,7 @@ export async function getSellerDisputes(profile: Profile) {
       .from("disputes")
       .select("*")
       .eq("seller_id", profile.id)
+      .eq("seller_visible", true)
       .order("last_message_at", { ascending: false });
 
     return enrichDisputes((data as Dispute[] | null) ?? []);
@@ -1743,7 +1768,7 @@ export async function getDisputeCase(
     const allowed =
       scope === "admin" ||
       (scope === "buyer" && dispute.buyer_id === profile.id) ||
-      (scope === "seller" && dispute.seller_id === profile.id);
+      (scope === "seller" && dispute.seller_id === profile.id && Boolean(dispute.seller_visible));
 
     if (!allowed) {
       return null;
@@ -2598,7 +2623,7 @@ export async function getAdminAnalytics(): Promise<AdminAnalytics> {
   const pendingWithdrawals = withdrawals.filter((request) =>
     ["pending", "approved"].includes(request.status)
   );
-  const openDisputes = disputes.filter((dispute) => ["open", "reviewing"].includes(dispute.status));
+  const openDisputes = disputes.filter((dispute) => ACTIVE_DISPUTE_STATUSES.includes(dispute.status));
   const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
   const sellerRows = new Map<
     string,
@@ -2763,7 +2788,7 @@ export async function getSellerAnalytics(profile: Profile): Promise<SellerAnalyt
       },
       {
         label: "Open Disputes",
-        value: String(disputes.filter((dispute) => ["open", "reviewing"].includes(dispute.status)).length),
+        value: String(disputes.filter((dispute) => ACTIVE_DISPUTE_STATUSES.includes(dispute.status)).length),
         helper: "Needs attention",
         href: "/seller/disputes"
       }
@@ -2870,7 +2895,7 @@ export async function getAdminSellerOverview() {
       active_listings_count: sellerListings.filter((listing) => listing.status === "approved").length,
       paid_orders_count: paidOrders.length,
       open_disputes_count: sellerDisputes.filter((dispute) =>
-        ["open", "reviewing"].includes(dispute.status)
+        ACTIVE_DISPUTE_STATUSES.includes(dispute.status)
       ).length,
       reviews_count: sellerReviews.length,
       average_rating: averageRating,

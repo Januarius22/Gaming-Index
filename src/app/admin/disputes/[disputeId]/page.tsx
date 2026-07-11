@@ -20,11 +20,14 @@ import { getDisputeCase } from "@/lib/data";
 import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
 
 const statusVariant = {
-  open: "danger",
-  reviewing: "warning",
+  pending_admin_review: "warning",
+  awaiting_seller_response: "info",
+  under_investigation: "warning",
   resolved: "success",
   rejected: "neutral",
-  refunded: "success"
+  refunded: "success",
+  open: "danger",
+  reviewing: "warning"
 } as const;
 
 export default async function AdminDisputeCasePage({
@@ -49,6 +52,7 @@ export default async function AdminDisputeCasePage({
     caseData.dispute.status === "resolved" ||
     caseData.dispute.status === "rejected" ||
     caseData.dispute.status === "refunded";
+  const messagingDisabled = closed || Boolean(caseData.dispute.locked_at);
   async function updateDispute(formData: FormData) {
     "use server";
 
@@ -95,6 +99,7 @@ export default async function AdminDisputeCasePage({
             sellerStrikes={sellerProfile?.seller_strikes ?? 0}
             sellerRestrictedUntil={sellerProfile?.seller_restricted_until ?? null}
             sellerRestrictionReason={sellerProfile?.seller_restriction_reason ?? ""}
+            sellerVisible={Boolean(caseData.dispute.seller_visible)}
             closed={closed}
             updateDispute={updateDispute}
             refundDispute={refundDispute}
@@ -141,7 +146,10 @@ export default async function AdminDisputeCasePage({
           </CardContent>
         </Card>
 
-        <DisputeInstructions />
+        <DisputeInstructions
+          sellerVisible={Boolean(caseData.dispute.seller_visible)}
+          locked={Boolean(caseData.dispute.locked_at)}
+        />
         <DisputeThread messages={caseData.messages} currentUserId={profile.id} />
         <div className="sticky bottom-0 z-30 -mx-4 bg-gradient-to-t from-background via-background to-transparent pb-[env(safe-area-inset-bottom)] pt-4 sm:mx-0 sm:px-0 sm:pb-3">
           <DisputeMessageForm
@@ -150,7 +158,7 @@ export default async function AdminDisputeCasePage({
             returnTo={`/admin/disputes/${caseData.dispute.id}`}
             currentUserId={profile.id}
             senderRole="admin"
-            disabled={closed}
+            disabled={messagingDisabled}
           />
         </div>
       </div>

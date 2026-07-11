@@ -422,9 +422,16 @@ create table if not exists public.disputes (
   seller_id uuid not null references public.profiles(id) on delete cascade,
   reason text not null,
   details text not null,
-  status text not null default 'open' check (status in ('open', 'reviewing', 'resolved', 'rejected', 'refunded')),
+  status text not null default 'pending_admin_review' check (status in ('pending_admin_review', 'awaiting_seller_response', 'under_investigation', 'resolved', 'rejected', 'refunded', 'open', 'reviewing')),
   admin_note text not null default '',
   resolution text not null default '',
+  seller_visible boolean not null default false,
+  locked_at timestamp with time zone,
+  locked_by uuid references public.profiles(id) on delete set null,
+  assigned_admin_id uuid references public.profiles(id) on delete set null,
+  final_outcome text not null default '',
+  final_note text not null default '',
+  resolved_at timestamp with time zone,
   opened_by uuid references public.profiles(id) on delete set null,
   reviewed_by uuid references public.profiles(id) on delete set null,
   reviewed_at timestamp with time zone,
@@ -438,17 +445,31 @@ alter table public.disputes add column if not exists buyer_id uuid references pu
 alter table public.disputes add column if not exists seller_id uuid references public.profiles(id) on delete cascade;
 alter table public.disputes add column if not exists reason text not null default '';
 alter table public.disputes add column if not exists details text not null default '';
-alter table public.disputes add column if not exists status text not null default 'open';
+alter table public.disputes add column if not exists status text not null default 'pending_admin_review';
 alter table public.disputes add column if not exists admin_note text not null default '';
 alter table public.disputes add column if not exists resolution text not null default '';
+alter table public.disputes add column if not exists seller_visible boolean not null default false;
+alter table public.disputes add column if not exists locked_at timestamp with time zone;
+alter table public.disputes add column if not exists locked_by uuid references public.profiles(id) on delete set null;
+alter table public.disputes add column if not exists assigned_admin_id uuid references public.profiles(id) on delete set null;
+alter table public.disputes add column if not exists final_outcome text not null default '';
+alter table public.disputes add column if not exists final_note text not null default '';
+alter table public.disputes add column if not exists resolved_at timestamp with time zone;
 alter table public.disputes add column if not exists opened_by uuid references public.profiles(id) on delete set null;
 alter table public.disputes add column if not exists reviewed_by uuid references public.profiles(id) on delete set null;
 alter table public.disputes add column if not exists reviewed_at timestamp with time zone;
 alter table public.disputes add column if not exists closed_at timestamp with time zone;
 alter table public.disputes add column if not exists last_message_at timestamp with time zone not null default now();
+update public.disputes
+set status = case
+  when status = 'open' then 'pending_admin_review'
+  when status = 'reviewing' then 'under_investigation'
+  else status
+end
+where status in ('open', 'reviewing');
 alter table public.disputes drop constraint if exists disputes_status_check;
 alter table public.disputes add constraint disputes_status_check
-  check (status in ('open', 'reviewing', 'resolved', 'rejected', 'refunded'));
+  check (status in ('pending_admin_review', 'awaiting_seller_response', 'under_investigation', 'resolved', 'rejected', 'refunded', 'open', 'reviewing'));
 alter table public.disputes drop constraint if exists disputes_details_check;
 alter table public.disputes add constraint disputes_details_check
   check (length(trim(details)) >= 20);
@@ -502,6 +523,21 @@ alter table public.dispute_attachments add constraint dispute_attachments_file_t
 alter table public.dispute_attachments drop constraint if exists dispute_attachments_video_duration_check;
 alter table public.dispute_attachments add constraint dispute_attachments_video_duration_check
   check (file_type <> 'video' or duration_seconds is null or duration_seconds <= 15);
+
+create table if not exists public.dispute_audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  dispute_id uuid not null references public.disputes(id) on delete cascade,
+  actor_id uuid references public.profiles(id) on delete set null,
+  action text not null,
+  note text not null default '',
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.dispute_audit_logs add column if not exists actor_id uuid references public.profiles(id) on delete set null;
+alter table public.dispute_audit_logs add column if not exists action text not null default '';
+alter table public.dispute_audit_logs add column if not exists note text not null default '';
+alter table public.dispute_audit_logs add column if not exists metadata jsonb not null default '{}'::jsonb;
 
 create table if not exists public.seller_enforcements (
   id uuid primary key default gen_random_uuid(),
@@ -1259,11 +1295,25 @@ begin
     raise exception 'Only paid orders can be disputed.';
   end if;
 
+  if target_order.escrow_status in ('released', 'refunded')
+    or (
+      target_order.seller_hold_expires_at is not null
+      and target_order.seller_hold_expires_at < now()
+    ) then
+    raise exception 'This order is outside the dispute window.';
+  end if;
+
   if exists (
     select 1
     from public.disputes as existing_dispute
     where existing_dispute.order_id = target_order.id
-      and existing_dispute.status in ('open', 'reviewing')
+      and existing_dispute.status in (
+        'pending_admin_review',
+        'awaiting_seller_response',
+        'under_investigation',
+        'open',
+        'reviewing'
+      )
   ) then
     raise exception 'A dispute is already open for this order.';
   end if;
@@ -1275,6 +1325,8 @@ begin
     seller_id,
     reason,
     details,
+    status,
+    seller_visible,
     opened_by,
     last_message_at
   )
@@ -1285,6 +1337,8 @@ begin
     target_order.seller_id,
     trim(dispute_reason),
     trim(dispute_details),
+    'pending_admin_review',
+    false,
     requester_id,
     now()
   )
@@ -1315,8 +1369,7 @@ begin
     link_path,
     metadata
   )
-  values
-  (
+  values (
     requester_id,
     'buyer_dispute_opened',
     'Dispute opened',
@@ -1327,18 +1380,24 @@ begin
       'order_id', target_order.id,
       'reason', trim(dispute_reason)
     )
-  ),
-  (
-    target_order.seller_id,
-    'seller_dispute_opened',
-    'Order dispute opened',
-    'A buyer opened a dispute for ' || target_order.listing_title || '.',
-    '/seller/disputes/' || dispute_id,
+  );
+
+  insert into public.dispute_audit_logs (
+    dispute_id,
+    actor_id,
+    action,
+    note,
+    metadata
+  )
+  values (
+    dispute_id,
+    requester_id,
+    'opened',
+    trim(dispute_reason),
     jsonb_build_object(
-      'dispute_id', dispute_id,
       'order_id', target_order.id,
       'listing_id', target_order.listing_id,
-      'reason', trim(dispute_reason)
+      'seller_visible', false
     )
   );
 
@@ -1406,9 +1465,13 @@ begin
     raise exception 'This dispute is closed.';
   end if;
 
+  if dispute_row.locked_at is not null then
+    raise exception 'This dispute discussion is locked.';
+  end if;
+
   if requester_id = dispute_row.buyer_id then
     sender_role := 'buyer';
-  elsif requester_id = dispute_row.seller_id then
+  elsif requester_id = dispute_row.seller_id and dispute_row.seller_visible then
     sender_role := 'seller';
   elsif exists (
     select 1
@@ -1489,7 +1552,8 @@ begin
   update public.disputes
   set
     status = case
-      when sender_role = 'admin' and status = 'open' then 'reviewing'
+      when sender_role = 'admin' and status in ('open', 'pending_admin_review') then 'under_investigation'
+      when sender_role = 'seller' and status = 'awaiting_seller_response' then 'under_investigation'
       else status
     end,
     last_message_at = now()
@@ -1514,7 +1578,7 @@ begin
     );
   end if;
 
-  if sender_role <> 'seller' then
+  if sender_role <> 'seller' and dispute_row.seller_visible then
     insert into public.notifications (
       profile_id,
       type,
@@ -1560,7 +1624,8 @@ as $$
 declare
   dispute_row public.disputes%rowtype;
   linked_order public.orders%rowtype;
-  seller_refund_amount numeric;
+  effective_status text;
+  final_outcome_value text;
 begin
   if not exists (
     select 1
@@ -1571,12 +1636,18 @@ begin
     raise exception 'Only admins can review disputes.';
   end if;
 
-  if next_status not in ('reviewing', 'resolved', 'rejected') then
+  if next_status not in (
+    'under_investigation',
+    'awaiting_seller_response',
+    'resolved',
+    'rejected',
+    'lock_discussion'
+  ) then
     raise exception 'Invalid dispute status.';
   end if;
 
-  if next_status in ('resolved', 'rejected') and trim(review_note) = '' then
-    raise exception 'Add a review note before closing this dispute.';
+  if next_status <> 'under_investigation' and trim(review_note) = '' then
+    raise exception 'Add an admin note before continuing.';
   end if;
 
   select *
@@ -1599,9 +1670,31 @@ begin
   where id = dispute_row.order_id
   for update;
 
+  effective_status := case
+    when next_status = 'lock_discussion' then 'under_investigation'
+    else next_status
+  end;
+  final_outcome_value := case
+    when next_status = 'resolved' then 'release_funds_to_seller'
+    when next_status = 'rejected' then 'dispute_rejected'
+    else ''
+  end;
+
   update public.disputes
   set
-    status = next_status,
+    status = effective_status,
+    seller_visible = case
+      when next_status = 'awaiting_seller_response' then true
+      else seller_visible
+    end,
+    locked_at = case
+      when next_status = 'lock_discussion' then now()
+      else locked_at
+    end,
+    locked_by = case
+      when next_status = 'lock_discussion' then auth.uid()
+      else locked_by
+    end,
     admin_note = case
       when trim(review_note) = '' then admin_note
       else trim(review_note)
@@ -1609,6 +1702,18 @@ begin
     resolution = case
       when next_status in ('resolved', 'rejected') then trim(review_note)
       else resolution
+    end,
+    final_outcome = case
+      when final_outcome_value <> '' then final_outcome_value
+      else final_outcome
+    end,
+    final_note = case
+      when next_status in ('resolved', 'rejected') then trim(review_note)
+      else final_note
+    end,
+    resolved_at = case
+      when next_status in ('resolved', 'rejected') then now()
+      else resolved_at
     end,
     reviewed_by = auth.uid(),
     reviewed_at = now(),
@@ -1630,12 +1735,40 @@ begin
     auth.uid(),
     'admin',
     case
-      when trim(review_note) = '' then 'This dispute is now under review.'
+      when trim(review_note) = '' then 'Gaming Index is reviewing this case.'
       else trim(review_note)
     end
   );
 
-  if next_status in ('resolved', 'rejected') then
+  insert into public.dispute_audit_logs (
+    dispute_id,
+    actor_id,
+    action,
+    note,
+    metadata
+  )
+  values (
+    dispute_row.id,
+    auth.uid(),
+    next_status,
+    trim(review_note),
+    jsonb_build_object(
+      'previous_status', dispute_row.status,
+      'next_status', effective_status,
+      'seller_visible', case
+        when next_status = 'awaiting_seller_response' then true
+        else dispute_row.seller_visible
+      end
+    )
+  );
+
+  if next_status = 'resolved' then
+    update public.orders
+    set escrow_status = 'holding'
+    where id = dispute_row.order_id;
+
+    perform public.release_seller_earning(dispute_row.order_id);
+  elsif next_status = 'rejected' then
     update public.orders
     set escrow_status = case
       when escrow_status = 'disputed' then 'holding'
@@ -1655,14 +1788,18 @@ begin
   values
   (
     dispute_row.buyer_id,
-    'buyer_dispute_' || next_status,
+    'buyer_dispute_' || effective_status,
     case
-      when next_status = 'reviewing' then 'Dispute under review'
+      when next_status = 'awaiting_seller_response' then 'Seller response requested'
+      when next_status = 'lock_discussion' then 'Dispute discussion locked'
+      when next_status = 'under_investigation' then 'Dispute under investigation'
       when next_status = 'resolved' then 'Dispute resolved'
       else 'Dispute rejected'
     end,
     case
-      when next_status = 'reviewing' then 'Admin is reviewing your dispute.'
+      when next_status = 'awaiting_seller_response' then 'Gaming Index has requested a seller response.'
+      when next_status = 'lock_discussion' then 'Gaming Index locked the discussion while the final review is completed.'
+      when next_status = 'under_investigation' then 'Gaming Index is investigating your dispute.'
       when next_status = 'resolved' then 'Your dispute has been resolved: ' || trim(review_note)
       else 'Your dispute was rejected: ' || trim(review_note)
     end,
@@ -1670,20 +1807,34 @@ begin
     jsonb_build_object(
       'dispute_id', dispute_row.id,
       'order_id', dispute_row.order_id,
-      'status', next_status,
+      'status', effective_status,
       'note', trim(review_note)
     )
-  ),
-  (
+  );
+
+  if next_status in ('awaiting_seller_response', 'resolved') or dispute_row.seller_visible then
+    insert into public.notifications (
+      profile_id,
+      type,
+      title,
+      message,
+      link_path,
+      metadata
+    )
+    values (
     dispute_row.seller_id,
-    'seller_dispute_' || next_status,
+    'seller_dispute_' || effective_status,
     case
-      when next_status = 'reviewing' then 'Dispute under review'
+      when next_status = 'awaiting_seller_response' then 'Response requested'
+      when next_status = 'lock_discussion' then 'Dispute discussion locked'
+      when next_status = 'under_investigation' then 'Dispute under investigation'
       when next_status = 'resolved' then 'Dispute resolved'
       else 'Dispute rejected'
     end,
     case
-      when next_status = 'reviewing' then 'Admin is reviewing a dispute on your order.'
+      when next_status = 'awaiting_seller_response' then 'Gaming Index needs your response on an order dispute.'
+      when next_status = 'lock_discussion' then 'Gaming Index locked the discussion while reviewing the case.'
+      when next_status = 'under_investigation' then 'Gaming Index is investigating a dispute on your order.'
       when next_status = 'resolved' then 'A dispute on your order was resolved: ' || trim(review_note)
       else 'A dispute on your order was rejected: ' || trim(review_note)
     end,
@@ -1692,10 +1843,11 @@ begin
       'dispute_id', dispute_row.id,
       'order_id', dispute_row.order_id,
       'listing_id', dispute_row.listing_id,
-      'status', next_status,
+      'status', effective_status,
       'note', trim(review_note)
     )
   );
+  end if;
 end;
 $$;
 
@@ -1815,11 +1967,36 @@ begin
     status = 'refunded',
     admin_note = trim(refund_note),
     resolution = trim(refund_note),
+    final_outcome = 'refund_buyer',
+    final_note = trim(refund_note),
+    resolved_at = now(),
+    locked_at = coalesce(locked_at, now()),
+    locked_by = coalesce(locked_by, auth.uid()),
     reviewed_by = auth.uid(),
     reviewed_at = now(),
     closed_at = now(),
     last_message_at = now()
   where id = dispute_row.id;
+
+  insert into public.dispute_audit_logs (
+    dispute_id,
+    actor_id,
+    action,
+    note,
+    metadata
+  )
+  values (
+    dispute_row.id,
+    auth.uid(),
+    'refund_buyer',
+    trim(refund_note),
+    jsonb_build_object(
+      'order_id', dispute_row.order_id,
+      'listing_id', dispute_row.listing_id,
+      'take_listing_down', take_listing_down,
+      'amount', linked_order.amount
+    )
+  );
 
   insert into public.dispute_messages (
     dispute_id,
@@ -2105,7 +2282,7 @@ begin
     where dispute.id = target_dispute_id
       and (
         viewer_id = dispute.buyer_id
-        or viewer_id = dispute.seller_id
+        or (viewer_id = dispute.seller_id and dispute.seller_visible)
         or exists (
           select 1
           from public.profiles as admin_profile
@@ -3097,6 +3274,7 @@ alter table public.disputes enable row level security;
 alter table public.dispute_messages enable row level security;
 alter table public.dispute_message_reads enable row level security;
 alter table public.dispute_attachments enable row level security;
+alter table public.dispute_audit_logs enable row level security;
 alter table public.seller_enforcements enable row level security;
 alter table public.wallets enable row level security;
 alter table public.wallet_transactions enable row level security;
@@ -3454,7 +3632,7 @@ create policy "buyers sellers and admins can read relevant disputes"
   to authenticated
   using (
     auth.uid() = buyer_id
-    or auth.uid() = seller_id
+    or (auth.uid() = seller_id and seller_visible)
     or exists (
       select 1
       from public.profiles as admin_profile
@@ -3504,7 +3682,7 @@ create policy "buyers sellers and admins can read dispute messages"
       where dispute.id = public.dispute_messages.dispute_id
         and (
           auth.uid() = dispute.buyer_id
-          or auth.uid() = dispute.seller_id
+          or (auth.uid() = dispute.seller_id and dispute.seller_visible)
           or exists (
             select 1
             from public.profiles as admin_profile
@@ -3528,7 +3706,7 @@ create policy "case participants can insert dispute messages"
       where dispute.id = public.dispute_messages.dispute_id
         and (
           (sender_role = 'buyer' and auth.uid() = dispute.buyer_id)
-          or (sender_role = 'seller' and auth.uid() = dispute.seller_id)
+          or (sender_role = 'seller' and auth.uid() = dispute.seller_id and dispute.seller_visible)
           or (
             sender_role = 'admin'
             and exists (
@@ -3556,7 +3734,7 @@ create policy "case participants can read dispute message receipts"
       where message.id = public.dispute_message_reads.message_id
         and (
           auth.uid() = dispute.buyer_id
-          or auth.uid() = dispute.seller_id
+          or (auth.uid() = dispute.seller_id and dispute.seller_visible)
           or exists (
             select 1
             from public.profiles as admin_profile
@@ -3579,7 +3757,7 @@ create policy "buyers sellers and admins can read dispute attachments"
       where dispute.id = public.dispute_attachments.dispute_id
         and (
           auth.uid() = dispute.buyer_id
-          or auth.uid() = dispute.seller_id
+          or (auth.uid() = dispute.seller_id and dispute.seller_visible)
           or exists (
             select 1
             from public.profiles as admin_profile
@@ -3603,7 +3781,7 @@ create policy "case participants can insert dispute attachments"
       where dispute.id = public.dispute_attachments.dispute_id
         and (
           auth.uid() = dispute.buyer_id
-          or auth.uid() = dispute.seller_id
+          or (auth.uid() = dispute.seller_id and dispute.seller_visible)
           or exists (
             select 1
             from public.profiles as admin_profile
@@ -3612,6 +3790,35 @@ create policy "case participants can insert dispute attachments"
           )
         )
     )
+  );
+
+drop policy if exists "admins can read dispute audit logs" on public.dispute_audit_logs;
+create policy "admins can read dispute audit logs"
+  on public.dispute_audit_logs
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "admins can insert dispute audit logs" on public.dispute_audit_logs;
+create policy "admins can insert dispute audit logs"
+  on public.dispute_audit_logs
+  for insert
+  to authenticated
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+    or auth.uid() = actor_id
   );
 
 drop policy if exists "sellers can read their own enforcement history" on public.seller_enforcements;
@@ -4209,7 +4416,21 @@ create policy "case participants and admins can read dispute evidence"
         select 1
         from public.disputes as dispute
         where dispute.id::text = (storage.foldername(name))[2]
-          and (dispute.buyer_id = auth.uid() or dispute.seller_id = auth.uid())
+          and (
+            dispute.buyer_id = auth.uid()
+            or (dispute.seller_id = auth.uid() and dispute.seller_visible)
+          )
+      )
+      or exists (
+        select 1
+        from public.dispute_attachments as attachment
+        join public.disputes as dispute
+          on dispute.id = attachment.dispute_id
+        where attachment.file_path = storage.objects.name
+          and (
+            dispute.buyer_id = auth.uid()
+            or (dispute.seller_id = auth.uid() and dispute.seller_visible)
+          )
       )
       or exists (
         select 1
@@ -4221,29 +4442,7 @@ create policy "case participants and admins can read dispute evidence"
   );
 
 drop policy if exists "users can delete their own dispute evidence" on storage.objects;
-create policy "users can delete their own dispute evidence"
-  on storage.objects
-  for delete
-  to authenticated
-  using (
-    bucket_id = 'dispute-evidence'
-    and auth.uid()::text = (storage.foldername(name))[1]
-  );
-
 drop policy if exists "admins can delete any dispute evidence" on storage.objects;
-create policy "admins can delete any dispute evidence"
-  on storage.objects
-  for delete
-  to authenticated
-  using (
-    bucket_id = 'dispute-evidence'
-    and exists (
-      select 1
-      from public.profiles as admin_profile
-      where admin_profile.id = auth.uid()
-        and admin_profile.role = 'admin'
-    )
-  );
 
 drop policy if exists "admins can upload withdrawal proofs" on storage.objects;
 create policy "admins can upload withdrawal proofs"

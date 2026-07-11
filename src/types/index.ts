@@ -13,7 +13,15 @@ export type ListingStatus =
 
 export type OrderStatus = "pending" | "processing" | "completed" | "cancelled";
 export type PaymentStatus = "pending" | "successful" | "failed";
-export type DisputeStatus = "open" | "reviewing" | "resolved" | "rejected" | "refunded";
+export type DisputeStatus =
+  | "pending_admin_review"
+  | "awaiting_seller_response"
+  | "under_investigation"
+  | "resolved"
+  | "rejected"
+  | "refunded"
+  | "open"
+  | "reviewing";
 
 export interface Profile {
   id: string;
@@ -211,6 +219,13 @@ export interface Dispute {
   status: DisputeStatus;
   admin_note: string;
   resolution?: string;
+  seller_visible?: boolean;
+  locked_at?: string | null;
+  locked_by?: string | null;
+  assigned_admin_id?: string | null;
+  final_outcome?: string;
+  final_note?: string;
+  resolved_at?: string | null;
   opened_by?: string | null;
   reviewed_by?: string | null;
   reviewed_at?: string | null;
