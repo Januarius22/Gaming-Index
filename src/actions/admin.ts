@@ -10,6 +10,7 @@ import {
   updateDemoListingStatus,
   updateDemoProfile
 } from "@/lib/demoStore";
+import { getDefaultBusinessSettings } from "@/lib/data";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import { getNigeriaTimestamp } from "@/lib/utils";
@@ -55,6 +56,87 @@ export async function updateCurrencyRateAction(formData: FormData) {
   revalidatePath("/seller/settings/appearance");
   revalidatePath("/admin/settings/appearance");
   redirect("/admin/currencies?notice=rate-saved");
+}
+
+function readPositiveNumber(formData: FormData, key: string, fallback: number) {
+  const value = Number(String(formData.get(key) ?? "").trim());
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+export async function updateBusinessSettingsAction(formData: FormData) {
+  const adminProfile = await requireAdminProfile();
+  const defaults = getDefaultBusinessSettings();
+  const commissionPercent = readPositiveNumber(
+    formData,
+    "platformCommissionPercent",
+    defaults.platform_commission_rate * 100
+  );
+  const platformCommissionRate = Math.min(Math.max(commissionPercent / 100, 0), 0.5);
+  const settings = {
+    id: "default",
+    platform_commission_rate: platformCommissionRate,
+    buyer_protection_hold_hours: readPositiveNumber(
+      formData,
+      "buyerProtectionHoldHours",
+      defaults.buyer_protection_hold_hours
+    ),
+    dispute_window_hours: readPositiveNumber(
+      formData,
+      "disputeWindowHours",
+      defaults.dispute_window_hours
+    ),
+    withdrawal_review_hours: readPositiveNumber(
+      formData,
+      "withdrawalReviewHours",
+      defaults.withdrawal_review_hours
+    ),
+    max_dispute_images: readPositiveNumber(formData, "maxDisputeImages", defaults.max_dispute_images),
+    max_dispute_videos: readPositiveNumber(formData, "maxDisputeVideos", defaults.max_dispute_videos),
+    max_dispute_video_seconds: readPositiveNumber(
+      formData,
+      "maxDisputeVideoSeconds",
+      defaults.max_dispute_video_seconds
+    ),
+    max_dispute_image_size_mb: readPositiveNumber(
+      formData,
+      "maxDisputeImageSizeMb",
+      defaults.max_dispute_image_size_mb
+    ),
+    max_dispute_video_size_mb: readPositiveNumber(
+      formData,
+      "maxDisputeVideoSizeMb",
+      defaults.max_dispute_video_size_mb
+    ),
+    max_listing_images: readPositiveNumber(formData, "maxListingImages", defaults.max_listing_images),
+    auto_release_enabled: formData.get("autoReleaseEnabled") === "on",
+    partial_refund_enabled: formData.get("partialRefundEnabled") === "on",
+    updated_by: adminProfile.id,
+    updated_at: new Date().toISOString()
+  };
+
+  if (!hasSupabaseEnv) {
+    redirect("/admin/business?notice=demo-business-settings");
+  }
+
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    redirect("/admin/business?notice=business-settings-failed");
+  }
+
+  const { error } = await supabase.from("business_settings").upsert(settings);
+
+  if (error) {
+    redirect(`/admin/business?notice=business-settings-failed&error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/admin/business");
+  revalidatePath("/admin/analytics");
+  revalidatePath("/admin/orders");
+  revalidatePath("/seller/analytics");
+  revalidatePath("/seller/dashboard");
+
+  redirect("/admin/business?notice=business-settings-saved");
 }
 
 export async function updateSellerReviewVisibilityAction(formData: FormData) {

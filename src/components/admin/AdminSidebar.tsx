@@ -8,6 +8,7 @@ import {
   BookOpen,
   CircleHelp,
   CircleDollarSign,
+  SlidersHorizontal,
   FileCheck2,
   Headset,
   History,
@@ -66,7 +67,8 @@ const navGroups = [
     items: [
       { href: "/admin/orders", label: "Orders", icon: ListOrdered },
       { href: "/admin/withdrawals", label: "Withdrawals", icon: Landmark },
-      { href: "/admin/currencies", label: "Currency Rates", icon: CircleDollarSign }
+      { href: "/admin/currencies", label: "Currency Rates", icon: CircleDollarSign },
+      { href: "/admin/business", label: "Business Settings", icon: SlidersHorizontal }
     ]
   },
   {

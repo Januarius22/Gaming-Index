@@ -8,6 +8,7 @@ import AdminTopbar from "@/components/admin/AdminTopbar";
 import LogoutConfirmButton from "@/components/auth/LogoutConfirmButton";
 import NotificationToastStack from "@/components/notifications/NotificationToastStack";
 import { useLiveNotifications } from "@/components/notifications/useLiveNotifications";
+import { usePreferenceClassName } from "@/components/settings/usePreferenceClassName";
 import { buttonClassName } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import type { Notification, Profile, ProfileSettings, SidebarCounts } from "@/types";
@@ -31,10 +32,7 @@ export default function AdminShell({
     initialSidebarCounts: sidebarCounts,
     notificationsPath: "/admin/notifications"
   });
-  const preferenceClassName = cn(
-    settings.theme_preference === "dark" && "gi-theme-dark",
-    `gi-font-${settings.font_size_preference}`
-  );
+  const preferenceClassName = usePreferenceClassName(settings);
 
   useEffect(() => {
     const savedValue = window.localStorage.getItem("gi-admin-sidebar-collapsed");

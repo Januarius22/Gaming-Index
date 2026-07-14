@@ -95,6 +95,76 @@ create table if not exists public.currency_rates (
   created_at timestamp with time zone not null default now()
 );
 
+create table if not exists public.business_settings (
+  id text primary key default 'default' check (id = 'default'),
+  platform_commission_rate numeric(5, 4) not null default 0.07 check (platform_commission_rate >= 0 and platform_commission_rate <= 0.5),
+  buyer_protection_hold_hours integer not null default 24 check (buyer_protection_hold_hours > 0),
+  dispute_window_hours integer not null default 24 check (dispute_window_hours > 0),
+  withdrawal_review_hours integer not null default 24 check (withdrawal_review_hours > 0),
+  max_dispute_images integer not null default 4 check (max_dispute_images > 0),
+  max_dispute_videos integer not null default 1 check (max_dispute_videos >= 0),
+  max_dispute_video_seconds integer not null default 15 check (max_dispute_video_seconds > 0),
+  max_dispute_image_size_mb integer not null default 8 check (max_dispute_image_size_mb > 0),
+  max_dispute_video_size_mb integer not null default 25 check (max_dispute_video_size_mb > 0),
+  max_listing_images integer not null default 1 check (max_listing_images > 0),
+  auto_release_enabled boolean not null default false,
+  partial_refund_enabled boolean not null default false,
+  updated_by uuid references public.profiles(id) on delete set null,
+  updated_at timestamp with time zone not null default now(),
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.business_settings add column if not exists platform_commission_rate numeric(5, 4) not null default 0.07;
+alter table public.business_settings add column if not exists buyer_protection_hold_hours integer not null default 24;
+alter table public.business_settings add column if not exists dispute_window_hours integer not null default 24;
+alter table public.business_settings add column if not exists withdrawal_review_hours integer not null default 24;
+alter table public.business_settings add column if not exists max_dispute_images integer not null default 4;
+alter table public.business_settings add column if not exists max_dispute_videos integer not null default 1;
+alter table public.business_settings add column if not exists max_dispute_video_seconds integer not null default 15;
+alter table public.business_settings add column if not exists max_dispute_image_size_mb integer not null default 8;
+alter table public.business_settings add column if not exists max_dispute_video_size_mb integer not null default 25;
+alter table public.business_settings add column if not exists max_listing_images integer not null default 1;
+alter table public.business_settings add column if not exists auto_release_enabled boolean not null default false;
+alter table public.business_settings add column if not exists partial_refund_enabled boolean not null default false;
+alter table public.business_settings add column if not exists updated_by uuid references public.profiles(id) on delete set null;
+alter table public.business_settings add column if not exists updated_at timestamp with time zone not null default now();
+alter table public.business_settings add column if not exists created_at timestamp with time zone not null default now();
+alter table public.business_settings alter column platform_commission_rate set default 0.07;
+alter table public.business_settings drop constraint if exists business_settings_platform_commission_rate_check;
+alter table public.business_settings add constraint business_settings_platform_commission_rate_check
+  check (platform_commission_rate >= 0 and platform_commission_rate <= 0.5);
+alter table public.business_settings drop constraint if exists business_settings_buyer_protection_hold_hours_check;
+alter table public.business_settings add constraint business_settings_buyer_protection_hold_hours_check
+  check (buyer_protection_hold_hours > 0);
+alter table public.business_settings drop constraint if exists business_settings_dispute_window_hours_check;
+alter table public.business_settings add constraint business_settings_dispute_window_hours_check
+  check (dispute_window_hours > 0);
+alter table public.business_settings drop constraint if exists business_settings_withdrawal_review_hours_check;
+alter table public.business_settings add constraint business_settings_withdrawal_review_hours_check
+  check (withdrawal_review_hours > 0);
+alter table public.business_settings drop constraint if exists business_settings_max_dispute_images_check;
+alter table public.business_settings add constraint business_settings_max_dispute_images_check
+  check (max_dispute_images > 0);
+alter table public.business_settings drop constraint if exists business_settings_max_dispute_videos_check;
+alter table public.business_settings add constraint business_settings_max_dispute_videos_check
+  check (max_dispute_videos >= 0);
+alter table public.business_settings drop constraint if exists business_settings_max_dispute_video_seconds_check;
+alter table public.business_settings add constraint business_settings_max_dispute_video_seconds_check
+  check (max_dispute_video_seconds > 0);
+alter table public.business_settings drop constraint if exists business_settings_max_dispute_image_size_mb_check;
+alter table public.business_settings add constraint business_settings_max_dispute_image_size_mb_check
+  check (max_dispute_image_size_mb > 0);
+alter table public.business_settings drop constraint if exists business_settings_max_dispute_video_size_mb_check;
+alter table public.business_settings add constraint business_settings_max_dispute_video_size_mb_check
+  check (max_dispute_video_size_mb > 0);
+alter table public.business_settings drop constraint if exists business_settings_max_listing_images_check;
+alter table public.business_settings add constraint business_settings_max_listing_images_check
+  check (max_listing_images > 0);
+
+insert into public.business_settings (id)
+values ('default')
+on conflict (id) do nothing;
+
 insert into public.currency_rates (code, name, symbol, ngn_rate, enabled)
 values
   ('NGN', 'Nigerian Naira', '₦', 1, true),
@@ -293,7 +363,7 @@ create table if not exists public.orders (
   listing_id uuid not null references public.listings(id) on delete cascade,
   listing_title text not null default '',
   amount numeric not null,
-  platform_fee_rate numeric(5, 4) not null default 0.15,
+  platform_fee_rate numeric(5, 4) not null default 0.07,
   platform_fee_amount numeric(18, 2) not null default 0,
   seller_payout_amount numeric(18, 2) not null default 0,
   status text not null default 'pending' check (status in ('pending', 'processing', 'completed', 'cancelled')),
@@ -311,7 +381,7 @@ create table if not exists public.orders (
 alter table public.orders add column if not exists buyer_id uuid references public.profiles(id) on delete cascade;
 alter table public.orders add column if not exists buyer_phone text not null default '';
 alter table public.orders add column if not exists listing_title text not null default '';
-alter table public.orders add column if not exists platform_fee_rate numeric(5, 4) not null default 0.15;
+alter table public.orders add column if not exists platform_fee_rate numeric(5, 4) not null default 0.07;
 alter table public.orders add column if not exists platform_fee_amount numeric(18, 2) not null default 0;
 alter table public.orders add column if not exists seller_payout_amount numeric(18, 2) not null default 0;
 alter table public.orders add column if not exists payment_status text not null default 'pending';
@@ -353,9 +423,9 @@ where payment_status = 'successful'
   and seller_payout_amount = 0;
 update public.orders
 set
-  platform_fee_rate = coalesce(nullif(platform_fee_rate, 0), 0.15),
-  platform_fee_amount = round(amount * coalesce(nullif(platform_fee_rate, 0), 0.15), 2),
-  seller_payout_amount = amount - round(amount * coalesce(nullif(platform_fee_rate, 0), 0.15), 2)
+  platform_fee_rate = coalesce(nullif(platform_fee_rate, 0), 0.07),
+  platform_fee_amount = round(amount * coalesce(nullif(platform_fee_rate, 0), 0.07), 2),
+  seller_payout_amount = amount - round(amount * coalesce(nullif(platform_fee_rate, 0), 0.07), 2)
 where payment_status <> 'successful'
   and (
     platform_fee_amount = 0
@@ -2587,7 +2657,15 @@ begin
     raise exception 'You cannot buy your own listing.';
   end if;
 
-  checkout_platform_fee_rate := coalesce(nullif(checkout_order.platform_fee_rate, 0), 0.15);
+  checkout_platform_fee_rate := coalesce(
+    nullif(checkout_order.platform_fee_rate, 0),
+    (
+      select coalesce(platform_commission_rate, 0.07)
+      from public.business_settings
+      where id = 'default'
+    ),
+    0.07
+  );
   checkout_platform_fee_amount := round(checkout_order.amount * checkout_platform_fee_rate, 2);
   checkout_seller_payout_amount := checkout_order.amount - checkout_platform_fee_amount;
 
@@ -3286,6 +3364,7 @@ alter table public.support_ticket_messages enable row level security;
 alter table public.notifications enable row level security;
 alter table public.seller_ratings enable row level security;
 alter table public.currency_rates enable row level security;
+alter table public.business_settings enable row level security;
 
 drop policy if exists "profiles readable by authenticated users" on public.profiles;
 drop policy if exists "users and admins can read profiles" on public.profiles;
@@ -4292,6 +4371,49 @@ create policy "admins can insert currency rates"
 drop policy if exists "admins can update currency rates" on public.currency_rates;
 create policy "admins can update currency rates"
   on public.currency_rates
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "business settings readable by authenticated users" on public.business_settings;
+create policy "business settings readable by authenticated users"
+  on public.business_settings
+  for select
+  to authenticated
+  using (true);
+
+drop policy if exists "admins can insert business settings" on public.business_settings;
+create policy "admins can insert business settings"
+  on public.business_settings
+  for insert
+  to authenticated
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "admins can update business settings" on public.business_settings;
+create policy "admins can update business settings"
+  on public.business_settings
   for update
   to authenticated
   using (

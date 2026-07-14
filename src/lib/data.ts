@@ -30,6 +30,7 @@ import type {
   AdminAnalytics,
   AdminSellerReview,
   AnalyticsDatum,
+  BusinessSettings,
   CurrencyRate,
   DashboardStat,
   Dispute,
@@ -79,6 +80,24 @@ export function getDefaultProfileSettings(profileId: string): ProfileSettings {
     two_factor_preference_enabled: false,
     two_factor_method: "authenticator",
     notification_preferences: {}
+  };
+}
+
+export function getDefaultBusinessSettings(): BusinessSettings {
+  return {
+    id: "default",
+    platform_commission_rate: PLATFORM_COMMISSION_RATE,
+    buyer_protection_hold_hours: 24,
+    dispute_window_hours: 24,
+    withdrawal_review_hours: 24,
+    max_dispute_images: 4,
+    max_dispute_videos: 1,
+    max_dispute_video_seconds: 15,
+    max_dispute_image_size_mb: 8,
+    max_dispute_video_size_mb: 25,
+    max_listing_images: 1,
+    auto_release_enabled: false,
+    partial_refund_enabled: false
   };
 }
 
@@ -213,6 +232,53 @@ export async function getCurrencyRates({ includeDisabled = false } = {}): Promis
     return visibleRates.length > 0 ? visibleRates : defaultCurrencyRates;
   } catch {
     return defaultCurrencyRates.filter((rate) => includeDisabled || rate.enabled);
+  }
+}
+
+export async function getBusinessSettings(): Promise<BusinessSettings> {
+  const defaults = getDefaultBusinessSettings();
+
+  if (!hasSupabaseEnv) {
+    return defaults;
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return defaults;
+    }
+
+    const { data, error } = await supabase
+      .from("business_settings")
+      .select("*")
+      .eq("id", "default")
+      .maybeSingle();
+
+    if (error || !data) {
+      return defaults;
+    }
+
+    const settings = data as BusinessSettings;
+
+    return {
+      ...defaults,
+      ...settings,
+      platform_commission_rate: Number(settings.platform_commission_rate ?? defaults.platform_commission_rate),
+      buyer_protection_hold_hours: Number(settings.buyer_protection_hold_hours ?? defaults.buyer_protection_hold_hours),
+      dispute_window_hours: Number(settings.dispute_window_hours ?? defaults.dispute_window_hours),
+      withdrawal_review_hours: Number(settings.withdrawal_review_hours ?? defaults.withdrawal_review_hours),
+      max_dispute_images: Number(settings.max_dispute_images ?? defaults.max_dispute_images),
+      max_dispute_videos: Number(settings.max_dispute_videos ?? defaults.max_dispute_videos),
+      max_dispute_video_seconds: Number(settings.max_dispute_video_seconds ?? defaults.max_dispute_video_seconds),
+      max_dispute_image_size_mb: Number(settings.max_dispute_image_size_mb ?? defaults.max_dispute_image_size_mb),
+      max_dispute_video_size_mb: Number(settings.max_dispute_video_size_mb ?? defaults.max_dispute_video_size_mb),
+      max_listing_images: Number(settings.max_listing_images ?? defaults.max_listing_images),
+      auto_release_enabled: Boolean(settings.auto_release_enabled),
+      partial_refund_enabled: Boolean(settings.partial_refund_enabled)
+    };
+  } catch {
+    return defaults;
   }
 }
 

@@ -206,9 +206,7 @@ export default function WorkspaceSettingsForm({
             updated_at: ""
           }
         ];
-  const selectedThemePreference =
-    settings.theme_preference === "system" ? "light" : settings.theme_preference;
-  const [selectedTheme, setSelectedTheme] = useState(selectedThemePreference);
+  const [selectedTheme, setSelectedTheme] = useState(settings.theme_preference);
 
   useEffect(() => {
     return () => {
@@ -220,9 +218,9 @@ export default function WorkspaceSettingsForm({
 
   useEffect(() => {
     setSelectedCurrency(settings.display_currency);
-    setSelectedTheme(selectedThemePreference);
+    setSelectedTheme(settings.theme_preference);
     setSelectedFontSize(settings.font_size_preference);
-  }, [settings.display_currency, settings.font_size_preference, selectedThemePreference]);
+  }, [settings.display_currency, settings.font_size_preference, settings.theme_preference]);
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
@@ -416,10 +414,13 @@ export default function WorkspaceSettingsForm({
                     <Select
                       name="themePreference"
                       value={selectedTheme}
-                      onChange={(event) => setSelectedTheme(event.target.value as "light" | "dark")}
+                      onChange={(event) =>
+                        setSelectedTheme(event.target.value as ProfileSettings["theme_preference"])
+                      }
                     >
                       <option value="light">Light</option>
                       <option value="dark">Dark</option>
+                      <option value="system">System</option>
                     </Select>
                   </label>
                   <label className="space-y-2">

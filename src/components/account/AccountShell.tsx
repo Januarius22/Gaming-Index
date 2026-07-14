@@ -7,6 +7,7 @@ import AccountSidebar from "@/components/account/AccountSidebar";
 import AccountTopbar from "@/components/account/AccountTopbar";
 import NotificationToastStack from "@/components/notifications/NotificationToastStack";
 import { useLiveNotifications } from "@/components/notifications/useLiveNotifications";
+import { usePreferenceClassName } from "@/components/settings/usePreferenceClassName";
 import { cn } from "@/lib/utils";
 import type { Notification, Profile, ProfileSettings, SidebarCounts } from "@/types";
 
@@ -61,10 +62,7 @@ export default function AccountShell({
   };
 
   const sidebarExpanded = !collapsed || (supportsHoverPreview && hoverPreviewOpen);
-  const preferenceClassName = cn(
-    settings.theme_preference === "dark" && "gi-theme-dark",
-    `gi-font-${settings.font_size_preference}`
-  );
+  const preferenceClassName = usePreferenceClassName(settings);
 
   return (
     <AccountShellProvider

@@ -180,6 +180,25 @@ export interface CurrencyRate {
   created_at?: string;
 }
 
+export interface BusinessSettings {
+  id: string;
+  platform_commission_rate: number;
+  buyer_protection_hold_hours: number;
+  dispute_window_hours: number;
+  withdrawal_review_hours: number;
+  max_dispute_images: number;
+  max_dispute_videos: number;
+  max_dispute_video_seconds: number;
+  max_dispute_image_size_mb: number;
+  max_dispute_video_size_mb: number;
+  max_listing_images: number;
+  auto_release_enabled: boolean;
+  partial_refund_enabled: boolean;
+  updated_by?: string | null;
+  updated_at?: string;
+  created_at?: string;
+}
+
 export interface Order {
   id: string;
   buyer_id?: string | null;

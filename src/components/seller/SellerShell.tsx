@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import NotificationToastStack from "@/components/notifications/NotificationToastStack";
 import { useLiveNotifications } from "@/components/notifications/useLiveNotifications";
+import { usePreferenceClassName } from "@/components/settings/usePreferenceClassName";
 import SellerSidebar from "@/components/seller/SellerSidebar";
 import SellerTopbar from "@/components/seller/SellerTopbar";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,8 @@ export default function SellerShell({
 }) {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [hoverPreviewOpen, setHoverPreviewOpen] = useState(false);
+  const [supportsHoverPreview, setSupportsHoverPreview] = useState(false);
   const liveNotifications = useLiveNotifications({
     initialNotifications: notifications,
     initialSidebarCounts: sidebarCounts,
@@ -35,6 +38,20 @@ export default function SellerShell({
     setCollapsed(savedValue === "true");
   }, []);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const syncSupport = () => {
+      setSupportsHoverPreview(mediaQuery.matches);
+    };
+
+    syncSupport();
+    mediaQuery.addEventListener("change", syncSupport);
+
+    return () => {
+      mediaQuery.removeEventListener("change", syncSupport);
+    };
+  }, []);
+
   const toggleCollapsed = () => {
     setCollapsed((current) => {
       const next = !current;
@@ -42,10 +59,8 @@ export default function SellerShell({
       return next;
     });
   };
-  const preferenceClassName = cn(
-    settings.theme_preference === "dark" && "gi-theme-dark",
-    `gi-font-${settings.font_size_preference}`
-  );
+  const sidebarExpanded = !collapsed || (supportsHoverPreview && hoverPreviewOpen);
+  const preferenceClassName = usePreferenceClassName(settings);
 
   return (
     <div className={cn("min-h-screen bg-surface", preferenceClassName)}>
@@ -54,16 +69,39 @@ export default function SellerShell({
         <div
           className={cn(
             "hidden shrink-0 transition-[width] duration-300 ease-in-out lg:block",
-            collapsed ? "w-24" : "w-80"
+            sidebarExpanded ? "w-80" : "w-24"
           )}
+          onMouseEnter={() => {
+            if (collapsed && supportsHoverPreview) {
+              setHoverPreviewOpen(true);
+            }
+          }}
+          onMouseLeave={() => {
+            if (collapsed) {
+              setHoverPreviewOpen(false);
+            }
+          }}
+          onFocusCapture={() => {
+            if (collapsed && supportsHoverPreview) {
+              setHoverPreviewOpen(true);
+            }
+          }}
+          onBlurCapture={(event) => {
+            if (
+              collapsed &&
+              !event.currentTarget.contains(event.relatedTarget as Node | null)
+            ) {
+              setHoverPreviewOpen(false);
+            }
+          }}
         >
           <div
             className={cn(
               "fixed inset-y-0 overflow-y-auto transition-[width] duration-300 ease-in-out",
-              collapsed ? "w-24" : "w-80"
+              sidebarExpanded ? "w-80" : "w-24"
             )}
           >
-            <SellerSidebar profile={profile} sidebarCounts={liveNotifications.sidebarCounts} collapsed={collapsed} />
+            <SellerSidebar profile={profile} sidebarCounts={liveNotifications.sidebarCounts} collapsed={!sidebarExpanded} />
           </div>
         </div>
 

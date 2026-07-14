@@ -3,7 +3,7 @@ import type { CurrencyRate, KycStatus, ListingStatus, OrderStatus, PaymentStatus
 export const APP_TIME_ZONE = "Africa/Lagos";
 export const APP_TIME_LABEL = "WAT";
 export const SOLD_LISTING_PUBLIC_VISIBILITY_HOURS = 24 * 7;
-export const PLATFORM_COMMISSION_RATE = 0.15;
+export const PLATFORM_COMMISSION_RATE = 0.07;
 export const PENDING_CHECKOUT_EXPIRY_MINUTES = 30;
 
 export function cn(...classes: Array<string | false | null | undefined>) {

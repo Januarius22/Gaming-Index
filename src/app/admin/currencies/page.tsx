@@ -1,6 +1,6 @@
 import { updateCurrencyRateAction } from "@/actions/admin";
+import SubmitButton from "@/components/auth/SubmitButton";
 import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import { getCurrencyRates } from "@/lib/data";
@@ -97,9 +97,9 @@ export default async function AdminCurrenciesPage({
                     {rate.enabled ? "Active" : "Off"}
                   </Badge>
                   <p className="text-xs text-muted-foreground">{formatDate(rate.updated_at)}</p>
-                  <Button type="submit" size="sm">
+                  <SubmitButton size="sm" pendingLabel="Saving...">
                     Save
-                  </Button>
+                  </SubmitButton>
                 </div>
               </form>
             ))}

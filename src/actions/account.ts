@@ -10,6 +10,7 @@ import {
   toggleSavedListingId
 } from "@/lib/buyerStore";
 import {
+  getBusinessSettings,
   getBuyerOrderDetail,
   getBuyerOrders,
   getMarketplaceListingById
@@ -24,6 +25,8 @@ import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import {
   getPendingCheckoutExpiresAt,
+  calculatePlatformFee,
+  calculateSellerPayout,
   getNigeriaTimestamp,
   isOrderPaymentConfirmed,
   isPendingCheckoutActive,
@@ -193,6 +196,11 @@ async function createPendingOrderForListing({
     return null;
   }
 
+  const businessSettings = await getBusinessSettings();
+  const platformFeeRate = businessSettings.platform_commission_rate;
+  const platformFeeAmount = calculatePlatformFee(amount, platformFeeRate);
+  const sellerPayoutAmount = calculateSellerPayout(amount, platformFeeRate);
+
   if (!hasSupabaseEnv) {
     return addDemoOrder({
       buyer_id: buyerId,
@@ -203,6 +211,9 @@ async function createPendingOrderForListing({
       listing_id: listingId,
       listing_title: listingTitle,
       amount,
+      platform_fee_rate: platformFeeRate,
+      platform_fee_amount: platformFeeAmount,
+      seller_payout_amount: sellerPayoutAmount,
       status: "pending",
       payment_status: "pending",
       payment_provider: "",
@@ -231,6 +242,9 @@ async function createPendingOrderForListing({
       listing_id: listingId,
       listing_title: listingTitle,
       amount,
+      platform_fee_rate: platformFeeRate,
+      platform_fee_amount: platformFeeAmount,
+      seller_payout_amount: sellerPayoutAmount,
       status: "pending",
       payment_status: "pending",
       payment_provider: "",

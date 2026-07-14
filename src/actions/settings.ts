@@ -319,6 +319,59 @@ export async function updateAdminSettingsAction(
   return saveWorkspaceSettings({ profile, workspace: "admin", formData });
 }
 
+export async function updateDisplayCurrencyPreferenceAction(currencyCode: string) {
+  const profile = await getCurrentProfile();
+  const displayCurrency = String(currencyCode ?? "").trim().toUpperCase();
+
+  if (!profile || !/^[A-Z]{3}$/.test(displayCurrency)) {
+    return {
+      ok: false,
+      message: "Currency preference was not saved."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      ok: true,
+      message: "Currency preference saved for this session."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    return {
+      ok: false,
+      message: "Currency preference could not be saved."
+    };
+  }
+
+  const { error } = await supabase.from("profile_settings").upsert({
+    profile_id: profile.id,
+    display_currency: displayCurrency,
+    updated_at: new Date().toISOString()
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: error.message
+    };
+  }
+
+  revalidatePath("/account/marketplace");
+  revalidatePath("/account/cart");
+  revalidatePath("/account/saved");
+  revalidatePath("/account/settings/currency");
+  revalidatePath("/seller/settings/currency");
+  revalidatePath("/admin/settings/currency");
+
+  return {
+    ok: true,
+    message: "Currency preference saved."
+  };
+}
+
 export async function changePasswordAction(
   _previousState: ActionState,
   formData: FormData

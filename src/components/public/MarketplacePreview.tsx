@@ -10,6 +10,7 @@ import {
   toggleCartListingInlineAction,
   toggleSavedListingInlineAction
 } from "@/actions/account";
+import { updateDisplayCurrencyPreferenceAction } from "@/actions/settings";
 import { useAccountShellState } from "@/components/account/AccountShellContext";
 import FormMessage from "@/components/auth/FormMessage";
 import SubmitButton from "@/components/auth/SubmitButton";
@@ -158,6 +159,14 @@ export default function MarketplacePreview({
       ...current,
       [key]: value
     }));
+  };
+
+  const updateActiveCurrency = (currencyCode: string) => {
+    setActiveCurrency(currencyCode);
+
+    if (context === "account") {
+      void updateDisplayCurrencyPreferenceAction(currencyCode);
+    }
   };
 
   const applyFilters = () => {
@@ -328,7 +337,7 @@ export default function MarketplacePreview({
               </div>
               <Select
                 value={activeCurrencyRate.code}
-                onChange={(event) => setActiveCurrency(event.target.value)}
+                onChange={(event) => updateActiveCurrency(event.target.value)}
                 className="h-11 w-full rounded-2xl sm:w-56"
               >
                 {(currencyRates?.filter((rate) => rate.enabled) ?? [activeCurrencyRate]).map((rate) => (
