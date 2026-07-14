@@ -91,6 +91,7 @@ export function getDefaultBusinessSettings(): BusinessSettings {
     buyer_protection_hold_hours: 24,
     dispute_window_hours: 24,
     withdrawal_review_hours: 24,
+    suspension_appeal_window_days: 60,
     max_dispute_images: 4,
     max_dispute_videos: 1,
     max_dispute_video_seconds: 15,
@@ -269,6 +270,9 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
       buyer_protection_hold_hours: Number(settings.buyer_protection_hold_hours ?? defaults.buyer_protection_hold_hours),
       dispute_window_hours: Number(settings.dispute_window_hours ?? defaults.dispute_window_hours),
       withdrawal_review_hours: Number(settings.withdrawal_review_hours ?? defaults.withdrawal_review_hours),
+      suspension_appeal_window_days: Number(
+        settings.suspension_appeal_window_days ?? defaults.suspension_appeal_window_days
+      ),
       max_dispute_images: Number(settings.max_dispute_images ?? defaults.max_dispute_images),
       max_dispute_videos: Number(settings.max_dispute_videos ?? defaults.max_dispute_videos),
       max_dispute_video_seconds: Number(settings.max_dispute_video_seconds ?? defaults.max_dispute_video_seconds),

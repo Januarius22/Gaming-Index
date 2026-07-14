@@ -6,10 +6,14 @@ import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { getCurrentProfile, getDashboardRoute } from "@/lib/auth";
+import { getBusinessSettings } from "@/lib/data";
 import { formatDate } from "@/lib/utils";
 
 export default async function SuspensionAppealPage() {
-  const profile = await getCurrentProfile();
+  const [profile, businessSettings] = await Promise.all([
+    getCurrentProfile(),
+    getBusinessSettings()
+  ]);
 
   if (!profile) {
     redirect("/auth/login");
@@ -22,6 +26,12 @@ export default async function SuspensionAppealPage() {
   if (!profile.is_banned) {
     redirect(getDashboardRoute(profile.role));
   }
+
+  const suspensionStartedAt = profile.banned_at ?? profile.created_at;
+  const appealExpiresAt = new Date(
+    new Date(suspensionStartedAt).getTime() +
+      businessSettings.suspension_appeal_window_days * 24 * 60 * 60 * 1000
+  ).toISOString();
 
   return (
     <main className="min-h-screen bg-surface px-4 py-10">
@@ -36,6 +46,9 @@ export default async function SuspensionAppealPage() {
             <CardDescription className="mx-auto mt-2 max-w-xl">
               Request a review if you believe this suspension should be reconsidered.
             </CardDescription>
+            <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Submit within {businessSettings.suspension_appeal_window_days} days - closes {formatDate(appealExpiresAt)}
+            </p>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">

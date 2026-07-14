@@ -7,10 +7,14 @@ import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { getCurrentProfile, getDashboardRoute } from "@/lib/auth";
+import { getBusinessSettings } from "@/lib/data";
 import { formatDate } from "@/lib/utils";
 
 export default async function AccountSuspendedPage() {
-  const profile = await getCurrentProfile();
+  const [profile, businessSettings] = await Promise.all([
+    getCurrentProfile(),
+    getBusinessSettings()
+  ]);
 
   if (!profile) {
     redirect("/auth/login");
@@ -23,6 +27,12 @@ export default async function AccountSuspendedPage() {
   if (!profile.is_banned) {
     redirect(getDashboardRoute(profile.role));
   }
+
+  const suspensionStartedAt = profile.banned_at ?? profile.created_at;
+  const appealExpiresAt = new Date(
+    new Date(suspensionStartedAt).getTime() +
+      businessSettings.suspension_appeal_window_days * 24 * 60 * 60 * 1000
+  ).toISOString();
 
   return (
     <main className="min-h-screen bg-surface px-4 py-10">
@@ -43,6 +53,9 @@ export default async function AccountSuspendedPage() {
             <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">
               Your account is currently suspended. You may submit an appeal if you believe this
               action should be reviewed.
+            </p>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Appeal window: {businessSettings.suspension_appeal_window_days} days - closes {formatDate(appealExpiresAt)}
             </p>
 
             <div className="mt-8 w-full rounded-3xl border border-rose-100 bg-rose-50 p-5 text-left">

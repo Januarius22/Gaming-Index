@@ -57,6 +57,18 @@ export async function submitSuspensionAppealAction(
     };
   }
 
+  const businessSettings = await getBusinessSettings();
+  const suspensionStartedAt = new Date(profile.banned_at ?? profile.created_at).getTime();
+  const appealExpiresAt =
+    suspensionStartedAt + businessSettings.suspension_appeal_window_days * 24 * 60 * 60 * 1000;
+
+  if (Date.now() > appealExpiresAt) {
+    return {
+      status: "error",
+      message: `Suspension appeals must be submitted within ${businessSettings.suspension_appeal_window_days} days.`
+    };
+  }
+
   if (!email || !phoneNumber || appealReason.length < 20) {
     return {
       status: "error",

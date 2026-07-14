@@ -89,6 +89,17 @@ export default async function AdminBusinessPage({
                     required
                   />
                 </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-foreground">Suspension appeal window (days)</span>
+                  <Input
+                    name="suspensionAppealWindowDays"
+                    type="number"
+                    min="1"
+                    step="1"
+                    defaultValue={settings.suspension_appeal_window_days}
+                    required
+                  />
+                </label>
               </div>
             </section>
 

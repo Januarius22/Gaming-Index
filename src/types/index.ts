@@ -186,6 +186,7 @@ export interface BusinessSettings {
   buyer_protection_hold_hours: number;
   dispute_window_hours: number;
   withdrawal_review_hours: number;
+  suspension_appeal_window_days: number;
   max_dispute_images: number;
   max_dispute_videos: number;
   max_dispute_video_seconds: number;

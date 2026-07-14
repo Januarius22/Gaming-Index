@@ -101,6 +101,7 @@ create table if not exists public.business_settings (
   buyer_protection_hold_hours integer not null default 24 check (buyer_protection_hold_hours > 0),
   dispute_window_hours integer not null default 24 check (dispute_window_hours > 0),
   withdrawal_review_hours integer not null default 24 check (withdrawal_review_hours > 0),
+  suspension_appeal_window_days integer not null default 60 check (suspension_appeal_window_days > 0),
   max_dispute_images integer not null default 4 check (max_dispute_images > 0),
   max_dispute_videos integer not null default 1 check (max_dispute_videos >= 0),
   max_dispute_video_seconds integer not null default 15 check (max_dispute_video_seconds > 0),
@@ -118,6 +119,7 @@ alter table public.business_settings add column if not exists platform_commissio
 alter table public.business_settings add column if not exists buyer_protection_hold_hours integer not null default 24;
 alter table public.business_settings add column if not exists dispute_window_hours integer not null default 24;
 alter table public.business_settings add column if not exists withdrawal_review_hours integer not null default 24;
+alter table public.business_settings add column if not exists suspension_appeal_window_days integer not null default 60;
 alter table public.business_settings add column if not exists max_dispute_images integer not null default 4;
 alter table public.business_settings add column if not exists max_dispute_videos integer not null default 1;
 alter table public.business_settings add column if not exists max_dispute_video_seconds integer not null default 15;
@@ -142,6 +144,9 @@ alter table public.business_settings add constraint business_settings_dispute_wi
 alter table public.business_settings drop constraint if exists business_settings_withdrawal_review_hours_check;
 alter table public.business_settings add constraint business_settings_withdrawal_review_hours_check
   check (withdrawal_review_hours > 0);
+alter table public.business_settings drop constraint if exists business_settings_suspension_appeal_window_days_check;
+alter table public.business_settings add constraint business_settings_suspension_appeal_window_days_check
+  check (suspension_appeal_window_days > 0);
 alter table public.business_settings drop constraint if exists business_settings_max_dispute_images_check;
 alter table public.business_settings add constraint business_settings_max_dispute_images_check
   check (max_dispute_images > 0);
@@ -1116,6 +1121,7 @@ declare
   requester_id uuid;
   requester public.profiles%rowtype;
   appeal_id uuid;
+  appeal_window_days integer;
 begin
   requester_id := auth.uid();
 
@@ -1138,6 +1144,17 @@ begin
 
   if requester.is_banned is not true then
     raise exception 'Only suspended accounts can submit an appeal.';
+  end if;
+
+  select coalesce(suspension_appeal_window_days, 60)
+  into appeal_window_days
+  from public.business_settings
+  where id = 'default';
+
+  appeal_window_days := coalesce(appeal_window_days, 60);
+
+  if now() > coalesce(requester.banned_at, requester.created_at) + make_interval(days => appeal_window_days) then
+    raise exception 'Suspension appeals must be submitted within % days.', appeal_window_days;
   end if;
 
   if trim(appeal_email) = ''

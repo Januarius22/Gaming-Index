@@ -191,6 +191,11 @@ export async function updateBusinessSettingsAction(formData: FormData) {
       "withdrawalReviewHours",
       defaults.withdrawal_review_hours
     ),
+    suspension_appeal_window_days: readPositiveNumber(
+      formData,
+      "suspensionAppealWindowDays",
+      defaults.suspension_appeal_window_days
+    ),
     max_dispute_images: readPositiveNumber(formData, "maxDisputeImages", defaults.max_dispute_images),
     max_dispute_videos: readPositiveNumber(formData, "maxDisputeVideos", defaults.max_dispute_videos),
     max_dispute_video_seconds: readPositiveNumber(
