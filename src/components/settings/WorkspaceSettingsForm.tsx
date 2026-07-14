@@ -79,6 +79,12 @@ const preferences: Preference[] = [
     workspaces: ["account", "seller", "admin"]
   },
   {
+    key: "alert_updates",
+    title: "Alerts and news",
+    detail: "Site-wide announcements published by Gaming Index.",
+    workspaces: ["account", "seller"]
+  },
+  {
     key: "marketplace_updates",
     title: "Marketplace activity",
     detail: "Listing publication, takedowns, and marketplace events.",

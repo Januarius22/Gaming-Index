@@ -21,6 +21,7 @@ const preferenceKeys = [
   "wallet_updates",
   "dispute_updates",
   "support_updates",
+  "alert_updates",
   "marketplace_updates",
   "kyc_updates",
   "admin_reviews",

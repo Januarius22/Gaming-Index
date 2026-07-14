@@ -64,6 +64,106 @@ function readPositiveNumber(formData: FormData, key: string, fallback: number) {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+type AnnouncementAudience = "all" | "buyers" | "sellers";
+
+type AnnouncementTargetProfile = {
+  id: string;
+  role: string;
+  seller_enabled: boolean;
+  is_banned: boolean;
+};
+
+type AnnouncementPreferenceRow = {
+  profile_id: string;
+  notification_preferences: Record<string, boolean> | null;
+};
+
+function profileMatchesAnnouncementAudience(
+  profile: AnnouncementTargetProfile,
+  audience: AnnouncementAudience
+) {
+  if (profile.role === "admin" || profile.is_banned) {
+    return false;
+  }
+
+  if (audience === "sellers") {
+    return profile.seller_enabled;
+  }
+
+  if (audience === "buyers") {
+    return !profile.seller_enabled;
+  }
+
+  return true;
+}
+
+async function createAnnouncementNotifications({
+  announcementId,
+  title,
+  message,
+  audience,
+  tone,
+  linkPath
+}: {
+  announcementId: string;
+  title: string;
+  message: string;
+  audience: AnnouncementAudience;
+  tone: string;
+  linkPath: string;
+}) {
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    return;
+  }
+
+  const { data: profileRows } = await supabase
+    .from("profiles")
+    .select("id, role, seller_enabled, is_banned");
+  const profiles = ((profileRows as AnnouncementTargetProfile[] | null) ?? []).filter((profile) =>
+    profileMatchesAnnouncementAudience(profile, audience)
+  );
+
+  if (profiles.length === 0) {
+    return;
+  }
+
+  const profileIds = profiles.map((profile) => profile.id);
+  const { data: preferenceRows } = await supabase
+    .from("profile_settings")
+    .select("profile_id, notification_preferences")
+    .in("profile_id", profileIds);
+  const preferencesByProfileId = new Map(
+    ((preferenceRows as AnnouncementPreferenceRow[] | null) ?? []).map((row) => [
+      row.profile_id,
+      row.notification_preferences
+    ])
+  );
+  const notifications = profiles
+    .filter((profile) => preferencesByProfileId.get(profile.id)?.alert_updates !== false)
+    .map((profile) => ({
+      profile_id: profile.id,
+      type: "alert_update",
+      title,
+      message,
+      link_path:
+        linkPath ||
+        (audience === "sellers" || (audience === "all" && profile.seller_enabled)
+          ? "/seller/dashboard"
+          : "/account/dashboard"),
+      metadata: {
+        announcement_id: announcementId,
+        announcement_audience: audience,
+        tone
+      }
+    }));
+
+  if (notifications.length > 0) {
+    await supabase.from("notifications").insert(notifications);
+  }
+}
+
 export async function updateBusinessSettingsAction(formData: FormData) {
   const adminProfile = await requireAdminProfile();
   const defaults = getDefaultBusinessSettings();
@@ -202,16 +302,20 @@ export async function createSiteAnnouncementAction(
     };
   }
 
-  const { error } = await supabase.from("site_announcements").insert({
-    title,
-    message,
-    audience,
-    tone,
-    link_path: linkPath,
-    is_active: true,
-    created_by: adminProfile.id,
-    updated_at: new Date().toISOString()
-  });
+  const { data: announcement, error } = await supabase
+    .from("site_announcements")
+    .insert({
+      title,
+      message,
+      audience,
+      tone,
+      link_path: linkPath,
+      is_active: true,
+      created_by: adminProfile.id,
+      updated_at: new Date().toISOString()
+    })
+    .select("id")
+    .single();
 
   if (error) {
     return {
@@ -220,9 +324,22 @@ export async function createSiteAnnouncementAction(
     };
   }
 
+  if (announcement?.id) {
+    await createAnnouncementNotifications({
+      announcementId: announcement.id,
+      title,
+      message,
+      audience: audience as AnnouncementAudience,
+      tone,
+      linkPath
+    });
+  }
+
   revalidatePath("/admin/announcements");
   revalidatePath("/account/dashboard");
   revalidatePath("/seller/dashboard");
+  revalidatePath("/account/notifications");
+  revalidatePath("/seller/notifications");
 
   return {
     status: "success",
