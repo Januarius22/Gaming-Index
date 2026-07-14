@@ -6,10 +6,11 @@ import { getCurrentProfile, requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrderDetail, isOrderDisputeEligible } from "@/lib/data";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
+import { inferContentType } from "@/lib/storageUploads";
 import type { ActionState } from "@/types";
 
 const DISPUTE_EVIDENCE_BUCKET = "dispute-evidence";
-const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
+const MAX_IMAGE_SIZE = 12 * 1024 * 1024;
 const MAX_VIDEO_SIZE = 25 * 1024 * 1024;
 const MAX_EVIDENCE_FILES = 5;
 const MAX_EVIDENCE_IMAGES = 4;
@@ -21,6 +22,19 @@ function safeFileName(fileName: string) {
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-+/g, "-")
     .slice(0, 90);
+}
+
+function getFileExtension(fileName: string) {
+  const segments = fileName.trim().toLowerCase().split(".");
+  return segments.length > 1 ? segments.at(-1) ?? "" : "";
+}
+
+function isEvidenceImage(file: File) {
+  return file.type.startsWith("image/") || ["jpg", "jpeg", "png", "webp", "heic", "heif"].includes(getFileExtension(file.name));
+}
+
+function isEvidenceVideo(file: File) {
+  return file.type.startsWith("video/") || ["mp4", "mov", "webm"].includes(getFileExtension(file.name));
 }
 
 function safeReturnPath(value: string, fallback: string) {
@@ -92,8 +106,8 @@ export async function openDisputeCaseAction(formData: FormData) {
     redirect("/account/disputes?notice=case-details-required");
   }
 
-  const imageCount = evidenceFiles.filter((file) => file.type.startsWith("image/")).length;
-  const videoCount = evidenceFiles.filter((file) => file.type.startsWith("video/")).length;
+  const imageCount = evidenceFiles.filter(isEvidenceImage).length;
+  const videoCount = evidenceFiles.filter(isEvidenceVideo).length;
 
   if (evidenceFiles.length === 0 || imageCount === 0) {
     redirect("/account/disputes?notice=screenshot-required");
@@ -104,8 +118,8 @@ export async function openDisputeCaseAction(formData: FormData) {
     imageCount > MAX_EVIDENCE_IMAGES ||
     videoCount > MAX_EVIDENCE_VIDEOS ||
     evidenceFiles.some((file) => {
-      const isImage = file.type.startsWith("image/");
-      const isVideo = file.type.startsWith("video/");
+      const isImage = isEvidenceImage(file);
+      const isVideo = isEvidenceVideo(file);
       return (
         (!isImage && !isVideo) ||
         (isImage && file.size > MAX_IMAGE_SIZE) ||
@@ -301,8 +315,8 @@ export async function submitDisputeMessage(formData: FormData): Promise<ActionSt
   }
 
   for (const [index, file] of files.entries()) {
-    const isImage = file.type.startsWith("image/");
-    const isVideo = file.type.startsWith("video/");
+    const isImage = isEvidenceImage(file);
+    const isVideo = isEvidenceVideo(file);
     const duration = durations[index] ?? 0;
 
     if (!isImage && !isVideo) {
@@ -330,7 +344,7 @@ export async function submitDisputeMessage(formData: FormData): Promise<ActionSt
     if (isImage && file.size > MAX_IMAGE_SIZE) {
       return {
         status: "error",
-        message: "Images must be 8MB or less."
+        message: "Images must be 12MB or less."
       };
     }
 
@@ -353,7 +367,7 @@ export async function submitDisputeMessage(formData: FormData): Promise<ActionSt
     const { error } = await supabase!.storage
       .from(DISPUTE_EVIDENCE_BUCKET)
       .upload(filePath, file, {
-        contentType: file.type || "application/octet-stream",
+        contentType: inferContentType(file),
         upsert: false
       });
 

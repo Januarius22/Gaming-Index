@@ -48,6 +48,7 @@ import type {
   SellerEnforcement,
   SidebarCounts,
   SiteFeedback,
+  SiteAnnouncement,
   SupportTicket,
   SupportTicketMessage,
   SuspensionAppeal,
@@ -280,6 +281,60 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
   } catch {
     return defaults;
   }
+}
+
+function normalizeAnnouncement(announcement: SiteAnnouncement): SiteAnnouncement {
+  return {
+    ...announcement,
+    audience: announcement.audience ?? "all",
+    tone: announcement.tone ?? "info",
+    link_path: announcement.link_path ?? "",
+    is_active: Boolean(announcement.is_active),
+    starts_at: announcement.starts_at ?? null,
+    ends_at: announcement.ends_at ?? null
+  };
+}
+
+export async function getSiteAnnouncements({ includeInactive = false } = {}) {
+  if (!hasSupabaseEnv) {
+    return [] as SiteAnnouncement[];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    let query = supabase
+      .from("site_announcements")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!includeInactive) {
+      query = query.eq("is_active", true);
+    }
+
+    const { data } = await query;
+
+    return ((data as SiteAnnouncement[] | null) ?? []).map(normalizeAnnouncement);
+  } catch {
+    return [];
+  }
+}
+
+export async function getActiveSiteAnnouncements(audience: "buyers" | "sellers") {
+  const now = Date.now();
+  const announcements = await getSiteAnnouncements();
+
+  return announcements.filter((announcement) => {
+    const audienceMatches = announcement.audience === "all" || announcement.audience === audience;
+    const hasStarted = !announcement.starts_at || new Date(announcement.starts_at).getTime() <= now;
+    const hasNotEnded = !announcement.ends_at || new Date(announcement.ends_at).getTime() > now;
+
+    return audienceMatches && hasStarted && hasNotEnded;
+  });
 }
 
 function normalizeListing(listing: Listing): Listing {

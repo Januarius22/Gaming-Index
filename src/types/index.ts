@@ -199,6 +199,23 @@ export interface BusinessSettings {
   created_at?: string;
 }
 
+export interface SiteAnnouncement {
+  id: string;
+  title: string;
+  message: string;
+  audience: "all" | "buyers" | "sellers";
+  tone: "info" | "success" | "warning" | "danger";
+  link_path: string;
+  is_active: boolean;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  created_by?: string | null;
+  closed_by?: string | null;
+  closed_at?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface Order {
   id: string;
   buyer_id?: string | null;

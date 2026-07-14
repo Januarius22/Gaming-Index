@@ -165,6 +165,43 @@ insert into public.business_settings (id)
 values ('default')
 on conflict (id) do nothing;
 
+create table if not exists public.site_announcements (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  message text not null,
+  audience text not null default 'all' check (audience in ('all', 'buyers', 'sellers')),
+  tone text not null default 'info' check (tone in ('info', 'success', 'warning', 'danger')),
+  link_path text not null default '',
+  is_active boolean not null default true,
+  starts_at timestamp with time zone,
+  ends_at timestamp with time zone,
+  created_by uuid references public.profiles(id) on delete set null,
+  closed_by uuid references public.profiles(id) on delete set null,
+  closed_at timestamp with time zone,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now()
+);
+
+alter table public.site_announcements add column if not exists title text not null default '';
+alter table public.site_announcements add column if not exists message text not null default '';
+alter table public.site_announcements add column if not exists audience text not null default 'all';
+alter table public.site_announcements add column if not exists tone text not null default 'info';
+alter table public.site_announcements add column if not exists link_path text not null default '';
+alter table public.site_announcements add column if not exists is_active boolean not null default true;
+alter table public.site_announcements add column if not exists starts_at timestamp with time zone;
+alter table public.site_announcements add column if not exists ends_at timestamp with time zone;
+alter table public.site_announcements add column if not exists created_by uuid references public.profiles(id) on delete set null;
+alter table public.site_announcements add column if not exists closed_by uuid references public.profiles(id) on delete set null;
+alter table public.site_announcements add column if not exists closed_at timestamp with time zone;
+alter table public.site_announcements add column if not exists created_at timestamp with time zone not null default now();
+alter table public.site_announcements add column if not exists updated_at timestamp with time zone not null default now();
+alter table public.site_announcements drop constraint if exists site_announcements_audience_check;
+alter table public.site_announcements add constraint site_announcements_audience_check
+  check (audience in ('all', 'buyers', 'sellers'));
+alter table public.site_announcements drop constraint if exists site_announcements_tone_check;
+alter table public.site_announcements add constraint site_announcements_tone_check
+  check (tone in ('info', 'success', 'warning', 'danger'));
+
 insert into public.currency_rates (code, name, symbol, ngn_rate, enabled)
 values
   ('NGN', 'Nigerian Naira', '₦', 1, true),
@@ -3365,6 +3402,7 @@ alter table public.notifications enable row level security;
 alter table public.seller_ratings enable row level security;
 alter table public.currency_rates enable row level security;
 alter table public.business_settings enable row level security;
+alter table public.site_announcements enable row level security;
 
 drop policy if exists "profiles readable by authenticated users" on public.profiles;
 drop policy if exists "users and admins can read profiles" on public.profiles;
@@ -4414,6 +4452,57 @@ create policy "admins can insert business settings"
 drop policy if exists "admins can update business settings" on public.business_settings;
 create policy "admins can update business settings"
   on public.business_settings
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "active announcements readable by authenticated users" on public.site_announcements;
+create policy "active announcements readable by authenticated users"
+  on public.site_announcements
+  for select
+  to authenticated
+  using (
+    is_active = true
+    or exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "admins can insert announcements" on public.site_announcements;
+create policy "admins can insert announcements"
+  on public.site_announcements
+  for insert
+  to authenticated
+  with check (
+    exists (
+      select 1
+      from public.profiles as admin_profile
+      where admin_profile.id = auth.uid()
+        and admin_profile.role = 'admin'
+    )
+  );
+
+drop policy if exists "admins can update announcements" on public.site_announcements;
+create policy "admins can update announcements"
+  on public.site_announcements
   for update
   to authenticated
   using (

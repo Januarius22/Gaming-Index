@@ -25,9 +25,9 @@ import { getNigeriaTimestamp, isValidPhoneNumber } from "@/lib/utils";
 import type { KycActionState, Listing, ListingActionState, Profile } from "@/types";
 
 const LISTING_STORAGE_BUCKET = "listing-media";
-const MAX_LISTING_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_LISTING_IMAGE_BYTES = 12 * 1024 * 1024;
 const MAX_LISTING_IMAGES = 1;
-const LISTING_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
+const LISTING_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
 const DUPLICATE_LISTING_WINDOW_MS = 10 * 60 * 1000;
 
 export type WithdrawalActionState = {

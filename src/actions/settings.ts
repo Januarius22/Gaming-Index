@@ -13,7 +13,8 @@ import { isValidPhoneNumber } from "@/lib/utils";
 import type { ActionState, Profile } from "@/types";
 
 const PROFILE_AVATARS_BUCKET = "profile-avatars";
-const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
+const MAX_AVATAR_SIZE = 8 * 1024 * 1024;
+const PROFILE_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
 
 const preferenceKeys = [
   "order_updates",
@@ -46,6 +47,11 @@ function getSafeFileName(name: string) {
     .replace(/[^a-z0-9._-]/g, "-")
     .replace(/-+/g, "-")
     .slice(0, 90);
+}
+
+function getFileExtension(fileName: string) {
+  const segments = fileName.trim().toLowerCase().split(".");
+  return segments.length > 1 ? segments.at(-1) ?? "" : "";
 }
 
 function isFormFile(value: FormDataEntryValue | null): value is File {
@@ -146,7 +152,9 @@ async function saveWorkspaceSettings({
   }
 
   if (isFormFile(avatarFile) && avatarFile.size > 0) {
-    if (!avatarFile.type.startsWith("image/")) {
+    const extension = getFileExtension(avatarFile.name);
+
+    if (!avatarFile.type.startsWith("image/") && !PROFILE_IMAGE_EXTENSIONS.has(extension)) {
       return {
         status: "error",
         message: "Profile picture must be an image."
@@ -156,7 +164,7 @@ async function saveWorkspaceSettings({
     if (avatarFile.size > MAX_AVATAR_SIZE) {
       return {
         status: "error",
-        message: "Profile picture must be 2MB or smaller."
+        message: "Profile picture must be 8MB or smaller."
       };
     }
   }

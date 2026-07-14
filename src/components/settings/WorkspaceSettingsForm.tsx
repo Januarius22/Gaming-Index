@@ -337,7 +337,7 @@ export default function WorkspaceSettingsForm({
                       <input
                         name="avatarFile"
                         type="file"
-                        accept="image/*"
+                      accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/*"
                         className="sr-only"
                         onChange={(event) =>
                           setSelectedAvatar(event.currentTarget.files?.[0] ?? null)
@@ -345,7 +345,7 @@ export default function WorkspaceSettingsForm({
                       />
                     </label>
                     <p className="mx-auto max-w-36 text-center text-xs leading-5 text-muted-foreground lg:mx-0 lg:text-left">
-                      JPG, PNG, WEBP. Max 2MB.
+                      JPG, PNG, WEBP, HEIC. Max 8MB.
                     </p>
                   </div>
 

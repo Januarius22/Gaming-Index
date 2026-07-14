@@ -320,7 +320,7 @@ export default function SellerUploadForm({
                     id="listingImage"
                     name="listingImage"
                     type="file"
-                    accept=".jpg,.jpeg,.png,.webp"
+                    accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
                     required
                     onChange={(event) =>
                       setSelectedFile(event.currentTarget.files?.[0] ?? null)
@@ -328,7 +328,7 @@ export default function SellerUploadForm({
                     className="block w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-primary-soft file:px-4 file:py-2 file:font-semibold file:text-primary"
                   />
                   <p className="text-xs leading-6 text-muted-foreground">
-                    Upload one JPG, PNG, or WEBP image only.
+                    Upload one JPG, PNG, WEBP, or HEIC image only.
                   </p>
                 </div>
               </div>

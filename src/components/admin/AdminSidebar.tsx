@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   ListOrdered,
   Landmark,
+  Megaphone,
   MessageSquareText,
   Star,
   Settings,
@@ -59,7 +60,8 @@ const navGroups = [
         { href: "/admin/disputes", label: "Disputes", icon: ShieldAlert },
         { href: "/admin/reviews", label: "Seller Reviews", icon: Star },
         { href: "/admin/support", label: "Support", icon: Headset },
-        { href: "/admin/feedback", label: "Feedback", icon: MessageSquareText }
+        { href: "/admin/feedback", label: "Feedback", icon: MessageSquareText },
+        { href: "/admin/announcements", label: "Alerts and News", icon: Megaphone }
       ]
   },
   {

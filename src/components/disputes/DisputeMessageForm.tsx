@@ -7,11 +7,12 @@ import FormMessage from "@/components/auth/FormMessage";
 import Button from "@/components/ui/Button";
 import Textarea from "@/components/ui/Textarea";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabaseClient";
+import { inferContentType } from "@/lib/storageUploads";
 const MAX_FILES = 5;
 const MAX_IMAGES = 4;
 const MAX_VIDEOS = 1;
 const MAX_VIDEO_SECONDS = 15;
-const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
+const MAX_IMAGE_SIZE = 12 * 1024 * 1024;
 const MAX_VIDEO_SIZE = 25 * 1024 * 1024;
 const DISPUTE_EVIDENCE_BUCKET = "dispute-evidence";
 
@@ -27,6 +28,19 @@ function safeEvidenceFileName(fileName: string) {
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-+/g, "-")
     .slice(0, 90);
+}
+
+function getFileExtension(fileName: string) {
+  const segments = fileName.trim().toLowerCase().split(".");
+  return segments.length > 1 ? segments.at(-1) ?? "" : "";
+}
+
+function isEvidenceImage(file: File) {
+  return file.type.startsWith("image/") || ["jpg", "jpeg", "png", "webp", "heic", "heif"].includes(getFileExtension(file.name));
+}
+
+function isEvidenceVideo(file: File) {
+  return file.type.startsWith("video/") || ["mp4", "mov", "webm"].includes(getFileExtension(file.name));
 }
 
 export default function DisputeMessageForm({
@@ -78,8 +92,8 @@ export default function DisputeMessageForm({
     let videoCount = 0;
 
     for (const file of fileArray) {
-      const isImage = file.type.startsWith("image/");
-      const isVideo = file.type.startsWith("video/");
+      const isImage = isEvidenceImage(file);
+      const isVideo = isEvidenceVideo(file);
 
       if (!isImage && !isVideo) {
         setFileError("Evidence must be images or one short video.");
@@ -106,7 +120,7 @@ export default function DisputeMessageForm({
       }
 
       if (isImage && file.size > MAX_IMAGE_SIZE) {
-        setFileError("Images must be 8MB or less.");
+        setFileError("Images must be 12MB or less.");
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
@@ -221,7 +235,7 @@ export default function DisputeMessageForm({
           const { error } = await supabase!.storage
             .from(DISPUTE_EVIDENCE_BUCKET)
             .upload(filePath, evidence.file, {
-              contentType: evidence.file.type || "application/octet-stream",
+              contentType: inferContentType(evidence.file),
               upsert: false
             });
 
@@ -316,7 +330,7 @@ export default function DisputeMessageForm({
             className="sr-only"
             type="file"
             name="evidenceFiles"
-            accept="image/*,video/*"
+            accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov,.webm,image/*,video/*"
             multiple
             onChange={(event) => {
               void checkFiles(event.currentTarget.files);

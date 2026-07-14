@@ -139,6 +139,95 @@ export async function updateBusinessSettingsAction(formData: FormData) {
   redirect("/admin/business?notice=business-settings-saved");
 }
 
+export async function createSiteAnnouncementAction(formData: FormData) {
+  const adminProfile = await requireAdminProfile();
+  const title = String(formData.get("title") ?? "").trim();
+  const message = String(formData.get("message") ?? "").trim();
+  const audience = String(formData.get("audience") ?? "all").trim();
+  const tone = String(formData.get("tone") ?? "info").trim();
+  const linkPath = String(formData.get("linkPath") ?? "").trim();
+
+  if (
+    title.length < 3 ||
+    message.length < 8 ||
+    !["all", "buyers", "sellers"].includes(audience) ||
+    !["info", "success", "warning", "danger"].includes(tone) ||
+    (linkPath && !linkPath.startsWith("/"))
+  ) {
+    redirect("/admin/announcements?notice=announcement-invalid");
+  }
+
+  if (!hasSupabaseEnv) {
+    redirect("/admin/announcements?notice=demo-announcement");
+  }
+
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    redirect("/admin/announcements?notice=announcement-failed");
+  }
+
+  const { error } = await supabase.from("site_announcements").insert({
+    title,
+    message,
+    audience,
+    tone,
+    link_path: linkPath,
+    is_active: true,
+    created_by: adminProfile.id,
+    updated_at: new Date().toISOString()
+  });
+
+  if (error) {
+    redirect(`/admin/announcements?notice=announcement-failed&error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/admin/announcements");
+  revalidatePath("/account/dashboard");
+  revalidatePath("/seller/dashboard");
+
+  redirect("/admin/announcements?notice=announcement-created");
+}
+
+export async function closeSiteAnnouncementAction(formData: FormData) {
+  const adminProfile = await requireAdminProfile();
+  const announcementId = String(formData.get("announcementId") ?? "").trim();
+
+  if (!announcementId) {
+    redirect("/admin/announcements?notice=announcement-invalid");
+  }
+
+  if (!hasSupabaseEnv) {
+    redirect("/admin/announcements?notice=demo-announcement");
+  }
+
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    redirect("/admin/announcements?notice=announcement-failed");
+  }
+
+  const { error } = await supabase
+    .from("site_announcements")
+    .update({
+      is_active: false,
+      closed_by: adminProfile.id,
+      closed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", announcementId);
+
+  if (error) {
+    redirect(`/admin/announcements?notice=announcement-failed&error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/admin/announcements");
+  revalidatePath("/account/dashboard");
+  revalidatePath("/seller/dashboard");
+
+  redirect("/admin/announcements?notice=announcement-closed");
+}
+
 export async function updateSellerReviewVisibilityAction(formData: FormData) {
   const adminProfile = await requireAdminProfile();
   const reviewId = String(formData.get("reviewId") ?? "").trim();

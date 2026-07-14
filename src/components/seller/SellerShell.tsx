@@ -4,23 +4,26 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import NotificationToastStack from "@/components/notifications/NotificationToastStack";
 import { useLiveNotifications } from "@/components/notifications/useLiveNotifications";
+import AnnouncementMarquee from "@/components/announcements/AnnouncementMarquee";
 import { usePreferenceClassName } from "@/components/settings/usePreferenceClassName";
 import SellerSidebar from "@/components/seller/SellerSidebar";
 import SellerTopbar from "@/components/seller/SellerTopbar";
 import { cn } from "@/lib/utils";
-import type { Notification, Profile, ProfileSettings, SidebarCounts } from "@/types";
+import type { Notification, Profile, ProfileSettings, SidebarCounts, SiteAnnouncement } from "@/types";
 
 export default function SellerShell({
   profile,
   sidebarCounts,
   settings,
   notifications = [],
+  announcements = [],
   children
 }: {
   profile: Profile;
   sidebarCounts: SidebarCounts;
   settings: ProfileSettings;
   notifications?: Notification[];
+  announcements?: SiteAnnouncement[];
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -136,6 +139,7 @@ export default function SellerShell({
             onCollapseToggle={toggleCollapsed}
             onMenuClick={() => setOpen(true)}
           />
+          <AnnouncementMarquee announcements={announcements} />
           <div className="flex-1 px-4 py-6 sm:px-6">{children}</div>
         </div>
       </div>
