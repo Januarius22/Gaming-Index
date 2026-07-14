@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, Megaphone } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -11,15 +14,55 @@ const toneClassNames: Record<SiteAnnouncement["tone"], string> = {
 };
 
 export default function AnnouncementMarquee({
-  announcements
+  announcements,
+  audience
 }: {
   announcements: SiteAnnouncement[];
+  audience?: "buyers" | "sellers";
 }) {
-  if (announcements.length === 0) {
+  const [liveAnnouncements, setLiveAnnouncements] = useState(announcements);
+
+  useEffect(() => {
+    setLiveAnnouncements(announcements);
+  }, [announcements]);
+
+  useEffect(() => {
+    if (!audience) {
+      return;
+    }
+
+    let cancelled = false;
+    const syncAnnouncements = async () => {
+      try {
+        const response = await fetch(`/api/announcements?audience=${audience}`, {
+          cache: "no-store"
+        });
+        const result = (await response.json()) as { announcements?: SiteAnnouncement[] };
+
+        if (!cancelled && Array.isArray(result.announcements)) {
+          setLiveAnnouncements(result.announcements);
+        }
+      } catch {
+        // Keep the current marquee if polling fails.
+      }
+    };
+    const interval = window.setInterval(() => {
+      void syncAnnouncements();
+    }, 15000);
+
+    void syncAnnouncements();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [audience]);
+
+  if (liveAnnouncements.length === 0) {
     return null;
   }
 
-  const marqueeItems = [...announcements, ...announcements];
+  const marqueeItems = [...liveAnnouncements, ...liveAnnouncements];
 
   return (
     <div className="border-b border-border/70 bg-white px-4 py-3 sm:px-6">

@@ -14,6 +14,7 @@ import { getDefaultBusinessSettings } from "@/lib/data";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import { getNigeriaTimestamp } from "@/lib/utils";
+import type { ActionState } from "@/types";
 
 export async function updateCurrencyRateAction(formData: FormData) {
   const adminProfile = await requireAdminProfile();
@@ -139,7 +140,10 @@ export async function updateBusinessSettingsAction(formData: FormData) {
   redirect("/admin/business?notice=business-settings-saved");
 }
 
-export async function createSiteAnnouncementAction(formData: FormData) {
+export async function createSiteAnnouncementAction(
+  _previousState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
   const adminProfile = await requireAdminProfile();
   const title = String(formData.get("title") ?? "").trim();
   const message = String(formData.get("message") ?? "").trim();
@@ -147,24 +151,55 @@ export async function createSiteAnnouncementAction(formData: FormData) {
   const tone = String(formData.get("tone") ?? "info").trim();
   const linkPath = String(formData.get("linkPath") ?? "").trim();
 
-  if (
-    title.length < 3 ||
-    message.length < 8 ||
-    !["all", "buyers", "sellers"].includes(audience) ||
-    !["info", "success", "warning", "danger"].includes(tone) ||
-    (linkPath && !linkPath.startsWith("/"))
-  ) {
-    redirect("/admin/announcements?notice=announcement-invalid");
+  if (title.length < 3) {
+    return {
+      status: "error",
+      message: "Add a clear title."
+    };
+  }
+
+  if (message.length < 8) {
+    return {
+      status: "error",
+      message: "Write a short announcement message."
+    };
+  }
+
+  if (!["all", "buyers", "sellers"].includes(audience)) {
+    return {
+      status: "error",
+      message: "Choose a valid audience."
+    };
+  }
+
+  if (!["info", "success", "warning", "danger"].includes(tone)) {
+    return {
+      status: "error",
+      message: "Choose a valid alert tone."
+    };
+  }
+
+  if (linkPath && !linkPath.startsWith("/")) {
+    return {
+      status: "error",
+      message: "Links must start with /. Leave it blank if there is no destination."
+    };
   }
 
   if (!hasSupabaseEnv) {
-    redirect("/admin/announcements?notice=demo-announcement");
+    return {
+      status: "error",
+      message: "Connect Supabase to publish announcements."
+    };
   }
 
   const supabase = await getSupabaseServerClient();
 
   if (!supabase) {
-    redirect("/admin/announcements?notice=announcement-failed");
+    return {
+      status: "error",
+      message: "Announcement could not be published right now."
+    };
   }
 
   const { error } = await supabase.from("site_announcements").insert({
@@ -179,32 +214,50 @@ export async function createSiteAnnouncementAction(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/admin/announcements?notice=announcement-failed&error=${encodeURIComponent(error.message)}`);
+    return {
+      status: "error",
+      message: error.message
+    };
   }
 
   revalidatePath("/admin/announcements");
   revalidatePath("/account/dashboard");
   revalidatePath("/seller/dashboard");
 
-  redirect("/admin/announcements?notice=announcement-created");
+  return {
+    status: "success",
+    message: "Announcement published."
+  };
 }
 
-export async function closeSiteAnnouncementAction(formData: FormData) {
+export async function closeSiteAnnouncementAction(
+  _previousState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
   const adminProfile = await requireAdminProfile();
   const announcementId = String(formData.get("announcementId") ?? "").trim();
 
   if (!announcementId) {
-    redirect("/admin/announcements?notice=announcement-invalid");
+    return {
+      status: "error",
+      message: "Announcement not found."
+    };
   }
 
   if (!hasSupabaseEnv) {
-    redirect("/admin/announcements?notice=demo-announcement");
+    return {
+      status: "error",
+      message: "Connect Supabase to close announcements."
+    };
   }
 
   const supabase = await getSupabaseServerClient();
 
   if (!supabase) {
-    redirect("/admin/announcements?notice=announcement-failed");
+    return {
+      status: "error",
+      message: "Announcement could not be closed right now."
+    };
   }
 
   const { error } = await supabase
@@ -218,14 +271,20 @@ export async function closeSiteAnnouncementAction(formData: FormData) {
     .eq("id", announcementId);
 
   if (error) {
-    redirect(`/admin/announcements?notice=announcement-failed&error=${encodeURIComponent(error.message)}`);
+    return {
+      status: "error",
+      message: error.message
+    };
   }
 
   revalidatePath("/admin/announcements");
   revalidatePath("/account/dashboard");
   revalidatePath("/seller/dashboard");
 
-  redirect("/admin/announcements?notice=announcement-closed");
+  return {
+    status: "success",
+    message: "Announcement closed."
+  };
 }
 
 export async function updateSellerReviewVisibilityAction(formData: FormData) {
