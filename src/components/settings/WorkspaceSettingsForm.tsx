@@ -24,6 +24,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import Select from "@/components/ui/Select";
+import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabaseClient";
+import { inferContentType, sanitizeFileName } from "@/lib/storageUploads";
 import type { ActionState, CurrencyRate, Profile, ProfileSettings } from "@/types";
 
 type Workspace = "account" | "seller" | "admin";
@@ -47,6 +49,9 @@ const initialState: ActionState = {
 };
 
 const settingsFormId = "workspace-settings-form";
+const PROFILE_AVATARS_BUCKET = "profile-avatars";
+const MAX_AVATAR_SIZE = 8 * 1024 * 1024;
+const PROFILE_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
 
 const preferences: Preference[] = [
   {
@@ -149,6 +154,15 @@ function getWorkspaceCopy(workspace: Workspace) {
   };
 }
 
+function getFileExtension(fileName: string) {
+  const segments = fileName.trim().toLowerCase().split(".");
+  return segments.length > 1 ? segments.at(-1) ?? "" : "";
+}
+
+function isAvatarFile(value: FormDataEntryValue | null): value is File {
+  return value instanceof File && value.size > 0;
+}
+
 export default function WorkspaceSettingsForm({
   profile,
   settings,
@@ -169,6 +183,7 @@ export default function WorkspaceSettingsForm({
   const [state, formAction] = useActionState(action, initialState);
   const [passwordState, passwordFormAction] = useActionState(passwordAction, initialState);
   const [selectedAvatar, setSelectedAvatar] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState("");
   const [selectedCurrency, setSelectedCurrency] = useState(settings.display_currency);
   const [selectedFontSize, setSelectedFontSize] = useState(settings.font_size_preference);
   const copy = getWorkspaceCopy(workspace);
@@ -222,10 +237,64 @@ export default function WorkspaceSettingsForm({
     setSelectedFontSize(settings.font_size_preference);
   }, [settings.display_currency, settings.font_size_preference, settings.theme_preference]);
 
+  const submitSettings = async (formData: FormData) => {
+    setUploadError("");
+    const avatarFile = formData.get("avatarFile");
+
+    if (isAvatarFile(avatarFile)) {
+      const extension = getFileExtension(avatarFile.name);
+
+      if (!avatarFile.type.startsWith("image/") && !PROFILE_IMAGE_EXTENSIONS.has(extension)) {
+        setUploadError("Profile picture must be an image.");
+        return;
+      }
+
+      if (avatarFile.size > MAX_AVATAR_SIZE) {
+        setUploadError("Profile picture must be 8MB or smaller.");
+        return;
+      }
+
+      if (!hasSupabaseEnv) {
+        setUploadError("Connect Supabase to upload a profile picture.");
+        return;
+      }
+
+      const supabase = getSupabaseBrowserClient();
+
+      if (!supabase) {
+        setUploadError("Profile picture could not be uploaded right now.");
+        return;
+      }
+
+      const safeName = sanitizeFileName(avatarFile.name || "profile-avatar.png") || "profile-avatar.png";
+      const avatarPath = `${profile.id}/${crypto.randomUUID()}-${safeName}`;
+      const { error } = await supabase.storage
+        .from(PROFILE_AVATARS_BUCKET)
+        .upload(avatarPath, avatarFile, {
+          cacheControl: "3600",
+          contentType: inferContentType(avatarFile),
+          upsert: false
+        });
+
+      if (error) {
+        setUploadError(error.message);
+        return;
+      }
+
+      const { data } = supabase.storage.from(PROFILE_AVATARS_BUCKET).getPublicUrl(avatarPath);
+      formData.set("uploadedAvatarName", avatarFile.name || safeName);
+      formData.set("uploadedAvatarPath", avatarPath);
+      formData.set("uploadedAvatarUrl", data.publicUrl);
+    }
+
+    formData.delete("avatarFile");
+    formAction(formData);
+  };
+
   return (
     <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
       <div className="space-y-6">
-        <form id={settingsFormId} action={formAction} className="space-y-6">
+        <form id={settingsFormId} action={submitSettings} className="space-y-6">
           {!showProfile ? (
             <>
               <input type="hidden" name="fullName" value={profile.full_name} />
@@ -299,8 +368,8 @@ export default function WorkspaceSettingsForm({
             </CardHeader>
             <CardContent className="space-y-5">
               <FormMessage
-                message={state.message}
-                tone={state.status === "success" ? "success" : "error"}
+                message={uploadError || state.message}
+                tone={!uploadError && state.status === "success" ? "success" : "error"}
               />
 
               {showProfile ? (

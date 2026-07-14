@@ -94,6 +94,9 @@ async function saveWorkspaceSettings({
   const twoFactorPreferenceEnabled = formData.get("twoFactorPreferenceEnabled") === "on";
   const notificationPreferences = getPreferences(formData);
   const avatarFile = formData.get("avatarFile");
+  const uploadedAvatarName = String(formData.get("uploadedAvatarName") ?? "").trim();
+  const uploadedAvatarPath = String(formData.get("uploadedAvatarPath") ?? "").trim();
+  const uploadedAvatarUrl = String(formData.get("uploadedAvatarUrl") ?? "").trim();
 
   if (fullName.length < 2) {
     return {
@@ -169,6 +172,17 @@ async function saveWorkspaceSettings({
     }
   }
 
+  if (uploadedAvatarPath) {
+    const extension = getFileExtension(uploadedAvatarName || uploadedAvatarPath);
+
+    if (!uploadedAvatarPath.startsWith(`${profile.id}/`) || !PROFILE_IMAGE_EXTENSIONS.has(extension)) {
+      return {
+        status: "error",
+        message: "Profile picture upload could not be verified."
+      };
+    }
+  }
+
   if (!hasSupabaseEnv) {
     return {
       status: "success",
@@ -186,36 +200,15 @@ async function saveWorkspaceSettings({
     };
   }
 
-  if (isFormFile(avatarFile) && avatarFile.size > 0) {
-    const safeName = getSafeFileName(avatarFile.name || "profile-avatar.png");
-    const avatarPath = `${profile.id}/${crypto.randomUUID()}-${safeName}`;
-    const { error: uploadError } = await supabase.storage
-      .from(PROFILE_AVATARS_BUCKET)
-      .upload(avatarPath, avatarFile, {
-        cacheControl: "3600",
-        contentType: avatarFile.type,
-        upsert: false
-      });
-
-    if (uploadError) {
-      return {
-        status: "error",
-        message: uploadError.message
-      };
-    }
-
+  if (uploadedAvatarPath) {
     if (profile.avatar_path) {
       await supabase.storage.from(PROFILE_AVATARS_BUCKET).remove([profile.avatar_path]);
     }
 
-    const { data: avatarPublicUrl } = supabase.storage
-      .from(PROFILE_AVATARS_BUCKET)
-      .getPublicUrl(avatarPath);
-
     avatarUpdate = {
-      avatar_name: avatarFile.name || safeName,
-      avatar_path: avatarPath,
-      avatar_url: avatarPublicUrl.publicUrl
+      avatar_name: uploadedAvatarName || getSafeFileName(uploadedAvatarPath),
+      avatar_path: uploadedAvatarPath,
+      avatar_url: uploadedAvatarUrl
     };
   }
 
