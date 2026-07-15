@@ -58,7 +58,7 @@ export default async function SuspensionAppealPage() {
         <CardContent className="space-y-6">
           <div className="rounded-3xl border border-rose-100 bg-rose-50 p-5">
             <p className="text-sm font-semibold text-rose-700">Suspension reason</p>
-            <p className="mt-3 text-sm leading-7 text-muted-foreground">
+            <p className="mt-3 text-sm leading-7 text-[#9f1239]">
               {profile.banned_reason || "No reason was provided."}
             </p>
             {profile.banned_at ? (

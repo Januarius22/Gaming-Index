@@ -64,7 +64,7 @@ export default async function AccountSuspendedPage() {
 
             <div className="mt-8 w-full rounded-3xl border border-rose-100 bg-rose-50 p-5 text-left">
               <p className="text-sm font-semibold text-rose-700">Reason from admin</p>
-              <p className="mt-3 text-sm leading-7 text-muted-foreground">
+              <p className="mt-3 text-sm leading-7 text-[#9f1239]">
                 {profile.banned_reason || "No reason was provided."}
               </p>
               {profile.banned_at ? (

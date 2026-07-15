@@ -636,10 +636,10 @@ export default function WorkspaceSettingsForm({
                       <ShieldAlert className="h-5 w-5" />
                     </span>
                     <div>
-                      <h2 className="font-heading text-lg font-semibold text-foreground">
+                      <h2 className="font-heading text-lg font-semibold text-[#881337]">
                         Account control
                       </h2>
-                      <p className="text-sm leading-6 text-muted-foreground">
+                      <p className="text-sm leading-6 text-[#9f1239]">
                         Deactivation is immediate. Permanent deletion requires admin review.
                       </p>
                     </div>

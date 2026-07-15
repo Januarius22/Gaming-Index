@@ -249,7 +249,7 @@ export default function AdminUsersTable({
             >
               <input type="hidden" name="userId" value={selectedUser.id} />
               <input type="hidden" name="returnTo" value={returnTo} />
-              <div className="rounded-3xl border border-rose-100 bg-rose-50 p-4 text-sm leading-6 text-muted-foreground">
+              <div className="rounded-3xl border border-rose-100 bg-rose-50 p-4 text-sm leading-6 text-[#9f1239]">
                 This user will still be able to sign in, but app features and seller listings will
                 be locked until an admin unbans them.
               </div>

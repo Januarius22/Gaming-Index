@@ -233,7 +233,7 @@ export default function ListingsReviewTable({
                 <p className="text-sm font-semibold uppercase tracking-[0.16em] text-rose-600">
                   Admin note
                 </p>
-                <p className="mt-3 text-sm leading-7 text-muted-foreground">
+                <p className="mt-3 text-sm leading-7 text-[#9f1239]">
                   {selectedListing.admin_note}
                 </p>
               </section>

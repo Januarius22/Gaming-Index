@@ -145,7 +145,7 @@ export default function AdminSuspendedAccountsTable({
             }}
           >
             <input type="hidden" name="userId" value={selectedAccount.id} />
-            <div className="rounded-3xl border border-rose-100 bg-rose-50 p-4 text-sm leading-6 text-muted-foreground">
+            <div className="rounded-3xl border border-rose-100 bg-rose-50 p-4 text-sm leading-6 text-[#9f1239]">
               The account will be archived into Deleted Accounts. Orders, disputes, and wallet records remain available for audit.
             </div>
             <label className="block space-y-2">
