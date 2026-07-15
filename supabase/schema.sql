@@ -20,6 +20,9 @@ create table if not exists public.profiles (
   deleted_at timestamp with time zone,
   deleted_reason text not null default '',
   deleted_by uuid references public.profiles(id) on delete set null,
+  is_deactivated boolean not null default false,
+  deactivated_at timestamp with time zone,
+  deactivation_reason text not null default '',
   created_at timestamp with time zone not null default now()
 );
 
@@ -38,6 +41,9 @@ alter table public.profiles add column if not exists is_deleted boolean not null
 alter table public.profiles add column if not exists deleted_at timestamp with time zone;
 alter table public.profiles add column if not exists deleted_reason text not null default '';
 alter table public.profiles add column if not exists deleted_by uuid references public.profiles(id) on delete set null;
+alter table public.profiles add column if not exists is_deactivated boolean not null default false;
+alter table public.profiles add column if not exists deactivated_at timestamp with time zone;
+alter table public.profiles add column if not exists deactivation_reason text not null default '';
 update public.profiles set seller_enabled = true where role = 'seller';
 update public.profiles set role = 'user' where role = 'seller';
 alter table public.profiles alter column role set default 'user';
@@ -984,6 +990,39 @@ alter table public.deleted_accounts add constraint deleted_accounts_kyc_status_c
   check (kyc_status in ('not_started', 'pending', 'approved', 'rejected'));
 create unique index if not exists deleted_accounts_profile_deleted_at_idx
   on public.deleted_accounts (profile_id, deleted_at);
+
+create table if not exists public.account_deletion_requests (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  email text not null default '',
+  username text not null default '',
+  full_name text not null default '',
+  reason text not null default '',
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'cancelled')),
+  admin_note text not null default '',
+  reviewed_by uuid references public.profiles(id) on delete set null,
+  reviewed_at timestamp with time zone,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.account_deletion_requests add column if not exists email text not null default '';
+alter table public.account_deletion_requests add column if not exists username text not null default '';
+alter table public.account_deletion_requests add column if not exists full_name text not null default '';
+alter table public.account_deletion_requests add column if not exists reason text not null default '';
+alter table public.account_deletion_requests add column if not exists status text not null default 'pending';
+alter table public.account_deletion_requests add column if not exists admin_note text not null default '';
+alter table public.account_deletion_requests add column if not exists reviewed_by uuid references public.profiles(id) on delete set null;
+alter table public.account_deletion_requests add column if not exists reviewed_at timestamp with time zone;
+alter table public.account_deletion_requests add column if not exists created_at timestamp with time zone not null default now();
+alter table public.account_deletion_requests drop constraint if exists account_deletion_requests_status_check;
+alter table public.account_deletion_requests add constraint account_deletion_requests_status_check
+  check (status in ('pending', 'approved', 'rejected', 'cancelled'));
+alter table public.account_deletion_requests drop constraint if exists account_deletion_requests_reason_check;
+alter table public.account_deletion_requests add constraint account_deletion_requests_reason_check
+  check (length(trim(reason)) >= 12);
+create unique index if not exists account_deletion_requests_one_pending_idx
+  on public.account_deletion_requests (profile_id)
+  where status = 'pending';
 
 create table if not exists public.site_feedback (
   id uuid primary key default gen_random_uuid(),
@@ -3400,6 +3439,8 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  self_deactivation_allowed boolean;
 begin
   if auth.uid() = old.id and not exists (
     select 1
@@ -3407,6 +3448,12 @@ begin
     where admin_profile.id = auth.uid()
       and admin_profile.role = 'admin'
   ) then
+    self_deactivation_allowed :=
+      old.is_deactivated is not true
+      and new.is_deactivated is true
+      and new.deactivated_at is not null
+      and trim(new.deactivation_reason) <> '';
+
     if
       new.role is distinct from old.role
       or new.kyc_status is distinct from old.kyc_status
@@ -3421,6 +3468,14 @@ begin
       or new.deleted_at is distinct from old.deleted_at
       or new.deleted_reason is distinct from old.deleted_reason
       or new.deleted_by is distinct from old.deleted_by
+      or (
+        (
+          new.is_deactivated is distinct from old.is_deactivated
+          or new.deactivated_at is distinct from old.deactivated_at
+          or new.deactivation_reason is distinct from old.deactivation_reason
+        )
+        and not self_deactivation_allowed
+      )
     then
       raise exception 'Only admins can update protected profile fields.';
     end if;
@@ -3470,6 +3525,7 @@ alter table public.wallet_transactions enable row level security;
 alter table public.withdrawal_requests enable row level security;
 alter table public.suspension_appeals enable row level security;
 alter table public.deleted_accounts enable row level security;
+alter table public.account_deletion_requests enable row level security;
 alter table public.site_feedback enable row level security;
 alter table public.support_tickets enable row level security;
 alter table public.support_ticket_messages enable row level security;
@@ -4252,6 +4308,37 @@ create policy "admins can insert deleted accounts"
 drop policy if exists "admins can update deleted accounts" on public.deleted_accounts;
 create policy "admins can update deleted accounts"
   on public.deleted_accounts
+  for update
+  to authenticated
+  using (public.current_profile_is_admin())
+  with check (public.current_profile_is_admin());
+
+drop policy if exists "users can read their own account deletion requests" on public.account_deletion_requests;
+create policy "users can read their own account deletion requests"
+  on public.account_deletion_requests
+  for select
+  to authenticated
+  using (auth.uid() = profile_id or public.current_profile_is_admin());
+
+drop policy if exists "users can submit their own account deletion requests" on public.account_deletion_requests;
+create policy "users can submit their own account deletion requests"
+  on public.account_deletion_requests
+  for insert
+  to authenticated
+  with check (
+    auth.uid() = profile_id
+    and status = 'pending'
+    and not exists (
+      select 1
+      from public.profiles as requester
+      where requester.id = auth.uid()
+        and (requester.role = 'admin' or requester.is_deleted = true or requester.is_banned = true)
+    )
+  );
+
+drop policy if exists "admins can update account deletion requests" on public.account_deletion_requests;
+create policy "admins can update account deletion requests"
+  on public.account_deletion_requests
   for update
   to authenticated
   using (public.current_profile_is_admin())

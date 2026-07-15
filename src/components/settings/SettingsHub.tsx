@@ -6,6 +6,7 @@ import {
   CreditCard,
   LockKeyhole,
   Moon,
+  ShieldAlert,
   UserRound
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -54,6 +55,13 @@ const sections = [
     title: "Payout Details",
     detail: "Saved bank details for withdrawals.",
     icon: CreditCard,
+    workspaces: ["account", "seller"] as Workspace[]
+  },
+  {
+    key: "account-control",
+    title: "Account Control",
+    detail: "Deactivate your account or request permanent deletion.",
+    icon: ShieldAlert,
     workspaces: ["account", "seller"] as Workspace[]
   }
 ];

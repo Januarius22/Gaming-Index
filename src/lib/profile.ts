@@ -27,10 +27,12 @@ export function normalizeProfile(
     seller_strikes?: unknown;
     is_banned?: unknown;
     is_deleted?: unknown;
+    is_deactivated?: unknown;
   }
 ): Profile {
   const rawIsBanned = value.is_banned as unknown;
   const rawIsDeleted = value.is_deleted as unknown;
+  const rawIsDeactivated = value.is_deactivated as unknown;
   const rawSellerStrikes = Number(value.seller_strikes ?? 0);
 
   return {
@@ -55,6 +57,9 @@ export function normalizeProfile(
     deleted_at: value.deleted_at ?? null,
     deleted_reason: value.deleted_reason ?? "",
     deleted_by: value.deleted_by ?? null,
+    is_deactivated: rawIsDeactivated === true || rawIsDeactivated === "true",
+    deactivated_at: value.deactivated_at ?? null,
+    deactivation_reason: value.deactivation_reason ?? "",
     created_at: value.created_at ?? new Date().toISOString()
   };
 }

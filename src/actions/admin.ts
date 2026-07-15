@@ -1552,6 +1552,228 @@ export async function restoreDeletedUserInlineAction(formData: FormData) {
   };
 }
 
+export async function restoreDeactivatedUserInlineAction(formData: FormData) {
+  const admin = await requireAdminProfile();
+  const userId = String(formData.get("userId") ?? "").trim();
+
+  if (!userId || userId === admin.id) {
+    return {
+      status: "error" as const,
+      message: "This account cannot be restored."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to restore accounts."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase!
+    .from("profiles")
+    .update({
+      is_deactivated: false,
+      deactivated_at: null,
+      deactivation_reason: ""
+    })
+    .eq("id", userId)
+    .neq("role", "admin");
+
+  if (error) {
+    return {
+      status: "error" as const,
+      message: error.message
+    };
+  }
+
+  await supabase!.from("notifications").insert({
+    profile_id: userId,
+    type: "account_restored",
+    title: "Account restored",
+    message: "Your account access has been restored.",
+    link_path: "/account/dashboard",
+    metadata: {
+      restored_by: admin.id
+    }
+  });
+
+  revalidatePath("/admin/users");
+  revalidatePath("/account/notifications");
+  revalidatePath("/seller/notifications");
+
+  return {
+    status: "success" as const,
+    message: "Account restored.",
+    userId
+  };
+}
+
+export async function approveDeletionRequestInlineAction(formData: FormData) {
+  const admin = await requireAdminProfile();
+  const requestId = String(formData.get("requestId") ?? "").trim();
+
+  if (!requestId) {
+    return {
+      status: "error" as const,
+      message: "Deletion request not found."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to approve deletion requests."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { data: request, error: requestError } = await supabase!
+    .from("account_deletion_requests")
+    .select("*")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (requestError || !request) {
+    return {
+      status: "error" as const,
+      message: "Deletion request not found."
+    };
+  }
+
+  if (request.status !== "pending") {
+    return {
+      status: "error" as const,
+      message: "Only pending deletion requests can be approved."
+    };
+  }
+
+  const archiveFormData = new FormData();
+  archiveFormData.set("userId", request.profile_id);
+  archiveFormData.set("deleteReason", `User requested deletion: ${request.reason}`);
+  const archiveResult = await archiveUserInlineAction(archiveFormData);
+
+  if (archiveResult.status === "error") {
+    return archiveResult;
+  }
+
+  const reviewedAt = new Date().toISOString();
+  const { error } = await supabase!
+    .from("account_deletion_requests")
+    .update({
+      status: "approved",
+      admin_note: "Account archived after user deletion request.",
+      reviewed_by: admin.id,
+      reviewed_at: reviewedAt
+    })
+    .eq("id", requestId);
+
+  if (error) {
+    return {
+      status: "error" as const,
+      message: error.message
+    };
+  }
+
+  revalidatePath("/admin/deletion-requests");
+  revalidatePath("/admin/deleted-accounts");
+  revalidatePath("/admin/users");
+
+  return {
+    status: "success" as const,
+    message: "Deletion request approved.",
+    requestId
+  };
+}
+
+export async function rejectDeletionRequestInlineAction(formData: FormData) {
+  const admin = await requireAdminProfile();
+  const requestId = String(formData.get("requestId") ?? "").trim();
+  const adminNote = String(formData.get("adminNote") ?? "").trim();
+
+  if (!requestId) {
+    return {
+      status: "error" as const,
+      message: "Deletion request not found."
+    };
+  }
+
+  if (adminNote.length < 8) {
+    return {
+      status: "error" as const,
+      message: "Add a clear rejection note."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to reject deletion requests."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { data: request, error: requestError } = await supabase!
+    .from("account_deletion_requests")
+    .select("*")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (requestError || !request) {
+    return {
+      status: "error" as const,
+      message: "Deletion request not found."
+    };
+  }
+
+  if (request.status !== "pending") {
+    return {
+      status: "error" as const,
+      message: "Only pending deletion requests can be rejected."
+    };
+  }
+
+  const reviewedAt = new Date().toISOString();
+  const { error } = await supabase!
+    .from("account_deletion_requests")
+    .update({
+      status: "rejected",
+      admin_note: adminNote,
+      reviewed_by: admin.id,
+      reviewed_at: reviewedAt
+    })
+    .eq("id", requestId);
+
+  if (error) {
+    return {
+      status: "error" as const,
+      message: error.message
+    };
+  }
+
+  await supabase!.from("notifications").insert({
+    profile_id: request.profile_id,
+    type: "account_deletion_rejected",
+    title: "Deletion request rejected",
+    message: adminNote,
+    link_path: "/account/settings/account-control",
+    metadata: {
+      request_id: requestId
+    }
+  });
+
+  revalidatePath("/admin/deletion-requests");
+  revalidatePath("/account/notifications");
+  revalidatePath("/seller/notifications");
+
+  return {
+    status: "success" as const,
+    message: "Deletion request rejected.",
+    requestId
+  };
+}
+
 export async function banUserAction(formData: FormData) {
   const returnTo = getSafeAdminUsersReturnPath(String(formData.get("returnTo") ?? "").trim());
   const result = await banUser(formData);

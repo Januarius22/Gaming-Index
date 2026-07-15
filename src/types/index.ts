@@ -45,6 +45,9 @@ export interface Profile {
   deleted_at?: string | null;
   deleted_reason?: string;
   deleted_by?: string | null;
+  is_deactivated?: boolean;
+  deactivated_at?: string | null;
+  deactivation_reason?: string;
   created_at: string;
 }
 
@@ -228,6 +231,20 @@ export interface DeletedAccount {
   restored_at?: string | null;
   restored_by?: string | null;
   snapshot: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface AccountDeletionRequest {
+  id: string;
+  profile_id: string;
+  email: string;
+  username: string;
+  full_name: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  admin_note: string;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
   created_at: string;
 }
 

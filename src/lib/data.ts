@@ -26,6 +26,7 @@ import {
   titleCase
 } from "@/lib/utils";
 import type {
+  AccountDeletionRequest,
   ActivityItem,
   AdminAnalytics,
   AdminSellerReview,
@@ -1150,7 +1151,8 @@ export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCo
       { count: releasableOrders },
       { count: openSupport },
       { count: suspendedUsers },
-      { count: deletedAccounts }
+      { count: deletedAccounts },
+      { count: deletionRequests }
     ] = await Promise.all([
       supabase
         .from("notifications")
@@ -1192,7 +1194,11 @@ export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCo
       supabase
         .from("deleted_accounts")
         .select("id", { count: "exact", head: true })
-        .is("restored_at", null)
+        .is("restored_at", null),
+      supabase
+        .from("account_deletion_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
     ]);
 
     return {
@@ -1205,7 +1211,8 @@ export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCo
       "/admin/orders": releasableOrders ?? 0,
       "/admin/support": openSupport ?? 0,
       "/admin/suspended-users": suspendedUsers ?? 0,
-      "/admin/deleted-accounts": deletedAccounts ?? 0
+      "/admin/deleted-accounts": deletedAccounts ?? 0,
+      "/admin/deletion-requests": deletionRequests ?? 0
     };
   } catch {
     return {};
@@ -3097,6 +3104,39 @@ export async function getAdminDeletedAccounts(): Promise<DeletedAccount[]> {
         account.snapshot && typeof account.snapshot === "object"
           ? account.snapshot
           : {}
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function getAdminAccountDeletionRequests(): Promise<AccountDeletionRequest[]> {
+  if (!hasSupabaseEnv) {
+    return [];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("account_deletion_requests")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    return ((data as AccountDeletionRequest[] | null) ?? []).map((request) => ({
+      ...request,
+      email: request.email ?? "",
+      username: request.username ?? "",
+      full_name: request.full_name ?? "User",
+      reason: request.reason ?? "",
+      status: request.status ?? "pending",
+      admin_note: request.admin_note ?? "",
+      reviewed_by: request.reviewed_by ?? null,
+      reviewed_at: request.reviewed_at ?? null
     }));
   } catch {
     return [];

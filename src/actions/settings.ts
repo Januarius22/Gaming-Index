@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
   getCurrentProfile,
   requireAccountProfile,
@@ -450,5 +451,244 @@ export async function changePasswordAction(
   return {
     status: "success",
     message: "Password changed."
+  };
+}
+
+async function getAccountDeletionBlockers(profile: Profile) {
+  if (!hasSupabaseEnv) {
+    return [];
+  }
+
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    return ["Account checks could not be completed."];
+  }
+
+  const [
+    { data: wallet },
+    { count: activeOrders },
+    { count: activeSellerOrders },
+    { count: openDisputes },
+    { count: pendingWithdrawals },
+    { count: activeListings },
+    { count: pendingRequests }
+  ] = await Promise.all([
+    supabase
+      .from("wallets")
+      .select("available_balance, pending_balance")
+      .eq("profile_id", profile.id)
+      .maybeSingle(),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("buyer_id", profile.id)
+      .in("status", ["pending", "processing"]),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("seller_id", profile.id)
+      .in("escrow_status", ["holding", "disputed"]),
+    supabase
+      .from("disputes")
+      .select("id", { count: "exact", head: true })
+      .or(`buyer_id.eq.${profile.id},seller_id.eq.${profile.id}`)
+      .in("status", ["pending_admin_review", "awaiting_seller_response", "under_investigation", "open", "reviewing"]),
+    supabase
+      .from("withdrawal_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("profile_id", profile.id)
+      .in("status", ["pending", "approved"]),
+    supabase
+      .from("listings")
+      .select("id", { count: "exact", head: true })
+      .eq("seller_id", profile.id)
+      .in("status", ["draft", "pending_review", "approved", "sold"]),
+    supabase
+      .from("account_deletion_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("profile_id", profile.id)
+      .eq("status", "pending")
+  ]);
+
+  const blockers: string[] = [];
+  const availableBalance = Number(wallet?.available_balance ?? 0);
+  const pendingBalance = Number(wallet?.pending_balance ?? 0);
+
+  if (availableBalance > 0 || pendingBalance > 0) {
+    blockers.push("Wallet balance must be cleared first.");
+  }
+
+  if ((activeOrders ?? 0) > 0 || (activeSellerOrders ?? 0) > 0) {
+    blockers.push("Active orders must be completed or resolved first.");
+  }
+
+  if ((openDisputes ?? 0) > 0) {
+    blockers.push("Open disputes must be resolved first.");
+  }
+
+  if ((pendingWithdrawals ?? 0) > 0) {
+    blockers.push("Pending withdrawals must be completed first.");
+  }
+
+  if ((activeListings ?? 0) > 0) {
+    blockers.push("Active seller listings must be withdrawn or resolved first.");
+  }
+
+  if ((pendingRequests ?? 0) > 0) {
+    blockers.push("You already have a pending deletion request.");
+  }
+
+  return blockers;
+}
+
+export async function deactivateAccountAction(
+  _previousState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const profile = await getCurrentProfile();
+  const confirmation = String(formData.get("confirmation") ?? "").trim();
+  const reason = String(formData.get("deactivationReason") ?? "").trim();
+
+  if (!profile || profile.role === "admin") {
+    return {
+      status: "error",
+      message: "This account cannot be deactivated here."
+    };
+  }
+
+  if (confirmation !== "DEACTIVATE") {
+    return {
+      status: "error",
+      message: "Type DEACTIVATE to confirm."
+    };
+  }
+
+  if (reason.length < 8) {
+    return {
+      status: "error",
+      message: "Add a short reason before deactivating."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "success",
+      message: "Account deactivated for this session."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase!
+    .from("profiles")
+    .update({
+      is_deactivated: true,
+      deactivated_at: new Date().toISOString(),
+      deactivation_reason: reason
+    })
+    .eq("id", profile.id)
+    .neq("role", "admin");
+
+  if (error) {
+    return {
+      status: "error",
+      message: error.message
+    };
+  }
+
+  await supabase?.auth.signOut();
+  redirect("/auth/login?notice=account-deactivated");
+}
+
+export async function requestAccountDeletionAction(
+  _previousState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const profile = await getCurrentProfile();
+  const confirmation = String(formData.get("confirmation") ?? "").trim();
+  const reason = String(formData.get("deletionReason") ?? "").trim();
+
+  if (!profile || profile.role === "admin") {
+    return {
+      status: "error",
+      message: "This account cannot request deletion here."
+    };
+  }
+
+  if (confirmation !== "DELETE MY ACCOUNT") {
+    return {
+      status: "error",
+      message: "Type DELETE MY ACCOUNT to confirm."
+    };
+  }
+
+  if (reason.length < 12) {
+    return {
+      status: "error",
+      message: "Add a clear reason for the deletion request."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "success",
+      message: "Deletion request submitted for this session."
+    };
+  }
+
+  const blockers = await getAccountDeletionBlockers(profile);
+
+  if (blockers.length > 0) {
+    return {
+      status: "error",
+      message: blockers.join(" ")
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase!.from("account_deletion_requests").insert({
+    profile_id: profile.id,
+    email: profile.email,
+    username: profile.username,
+    full_name: profile.full_name,
+    reason
+  });
+
+  if (error) {
+    return {
+      status: "error",
+      message: error.message
+    };
+  }
+
+  const { data: admins } = await supabase!
+    .from("profiles")
+    .select("id")
+    .eq("role", "admin");
+
+  const notifications = ((admins as Array<{ id: string }> | null) ?? []).map((admin) => ({
+    profile_id: admin.id,
+    type: "account_deletion_request",
+    title: "Account deletion request",
+    message: `${profile.full_name} requested account deletion.`,
+    link_path: "/admin/deletion-requests",
+    metadata: {
+      profile_id: profile.id,
+      email: profile.email
+    }
+  }));
+
+  if (notifications.length > 0) {
+    await supabase!.from("notifications").insert(notifications);
+  }
+
+  revalidatePath("/admin/deletion-requests");
+  revalidatePath("/admin/notifications");
+  revalidatePath("/account/settings/account-control");
+  revalidatePath("/seller/settings/account-control");
+
+  return {
+    status: "success",
+    message: "Deletion request submitted for admin review."
   };
 }

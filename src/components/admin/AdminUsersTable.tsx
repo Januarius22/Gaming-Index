@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { Ban, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { banUserInlineAction, unbanUserInlineAction } from "@/actions/admin";
+import { banUserInlineAction, restoreDeactivatedUserInlineAction, unbanUserInlineAction } from "@/actions/admin";
 import FormMessage from "@/components/auth/FormMessage";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -91,6 +91,41 @@ export default function AdminUsersTable({
     });
   };
 
+  const restoreDeactivatedUser = (user: Profile) => {
+    const formData = new FormData();
+    formData.set("userId", user.id);
+    setPendingUserId(user.id);
+    setFeedback(null);
+
+    startTransition(() => {
+      void (async () => {
+        const result = await restoreDeactivatedUserInlineAction(formData);
+
+        if (result.status === "success" && result.userId) {
+          setVisibleUsers((currentUsers) =>
+            currentUsers.map((currentUser) =>
+              currentUser.id === result.userId
+                ? {
+                    ...currentUser,
+                    is_deactivated: false,
+                    deactivated_at: null,
+                    deactivation_reason: ""
+                  }
+                : currentUser
+            )
+          );
+          router.refresh();
+        }
+
+        setFeedback({
+          message: result.message,
+          tone: result.status === "success" ? "success" : "error"
+        });
+        setPendingUserId(null);
+      })();
+    });
+  };
+
   return (
     <>
       <FormMessage message={feedback?.message} tone={feedback?.tone} />
@@ -124,7 +159,9 @@ export default function AdminUsersTable({
                   <td className="px-4 py-4">{formatDate(user.created_at)}</td>
                   <td className="px-4 py-4">
                     <div className="flex flex-wrap gap-2">
-                      {user.is_banned ? (
+                      {user.is_deactivated ? (
+                        <Badge variant="warning">Deactivated</Badge>
+                      ) : user.is_banned ? (
                         <Badge variant="danger">Banned</Badge>
                       ) : (
                         <Badge variant={user.seller_enabled ? "info" : "neutral"}>
@@ -132,7 +169,11 @@ export default function AdminUsersTable({
                         </Badge>
                       )}
                     </div>
-                    {user.is_banned && user.banned_reason ? (
+                    {user.is_deactivated && user.deactivation_reason ? (
+                      <p className="mt-2 max-w-xs text-xs leading-5 text-muted-foreground">
+                        {user.deactivation_reason}
+                      </p>
+                    ) : user.is_banned && user.banned_reason ? (
                       <p className="mt-2 max-w-xs text-xs leading-5 text-muted-foreground">
                         {user.banned_reason}
                       </p>
@@ -143,6 +184,18 @@ export default function AdminUsersTable({
                       <span className="text-xs font-semibold text-muted-foreground">
                         Protected
                       </span>
+                    ) : user.is_deactivated ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="gap-2"
+                        disabled={pendingUserId === user.id}
+                        onClick={() => restoreDeactivatedUser(user)}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        {pendingUserId === user.id ? "Restoring..." : "Restore"}
+                      </Button>
                     ) : user.is_banned ? (
                       <Button
                         type="button"

@@ -12,11 +12,13 @@ import {
   Mail,
   Moon,
   Phone,
+  ShieldAlert,
   ShieldCheck,
   Smartphone,
   Type,
   UserRound
 } from "lucide-react";
+import { deactivateAccountAction, requestAccountDeletionAction } from "@/actions/settings";
 import FormMessage from "@/components/auth/FormMessage";
 import SubmitButton from "@/components/auth/SubmitButton";
 import Badge from "@/components/ui/Badge";
@@ -35,7 +37,8 @@ export type SettingsSection =
   | "appearance"
   | "security"
   | "notifications"
-  | "payout";
+  | "payout"
+  | "account-control";
 
 type Preference = {
   key: string;
@@ -188,6 +191,8 @@ export default function WorkspaceSettingsForm({
 }) {
   const [state, formAction] = useActionState(action, initialState);
   const [passwordState, passwordFormAction] = useActionState(passwordAction, initialState);
+  const [deactivateState, deactivateFormAction] = useActionState(deactivateAccountAction, initialState);
+  const [deletionState, deletionFormAction] = useActionState(requestAccountDeletionAction, initialState);
   const [selectedAvatar, setSelectedAvatar] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState("");
   const [selectedCurrency, setSelectedCurrency] = useState(settings.display_currency);
@@ -212,6 +217,7 @@ export default function WorkspaceSettingsForm({
   const showSecurity = activeSection === "security";
   const showNotifications = activeSection === "notifications";
   const showPayout = activeSection === "payout" && workspace !== "admin";
+  const showAccountControl = activeSection === "account-control" && workspace !== "admin";
   const showStatusPanel = activeSection === "profile";
   const enabledCurrencyRates = currencyRates?.filter((rate) => rate.enabled) ?? [];
   const availableCurrencyRates =
@@ -356,7 +362,9 @@ export default function WorkspaceSettingsForm({
                       ? "Security"
                       : activeSection === "notifications"
                         ? "Notifications"
-                        : "Payout details"}
+                        : activeSection === "account-control"
+                          ? "Account control"
+                          : "Payout details"}
               </CardTitle>
               <CardDescription>
                 {activeSection === "profile"
@@ -368,7 +376,9 @@ export default function WorkspaceSettingsForm({
                     : activeSection === "security"
                       ? "Password and account protection preferences."
                       : activeSection === "notifications"
-                        ? "Choose the alerts that deserve your attention."
+                      ? "Choose the alerts that deserve your attention."
+                      : activeSection === "account-control"
+                        ? "Deactivate your account or request deletion review."
                         : "Saved bank details for withdrawal requests."}
               </CardDescription>
             </CardHeader>
@@ -616,6 +626,78 @@ export default function WorkspaceSettingsForm({
                   <Badge variant={settings.two_factor_preference_enabled ? "warning" : "neutral"}>
                     {settings.two_factor_preference_enabled ? "Setup requested" : "Not requested"}
                   </Badge>
+                </section>
+              ) : null}
+
+              {showAccountControl ? (
+                <section className="space-y-4 rounded-[24px] border border-rose-100 bg-rose-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-rose-700 shadow-sm">
+                      <ShieldAlert className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <h2 className="font-heading text-lg font-semibold text-foreground">
+                        Account control
+                      </h2>
+                      <p className="text-sm leading-6 text-muted-foreground">
+                        Deactivation is immediate. Permanent deletion requires admin review.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <form action={deactivateFormAction} className="space-y-3 rounded-3xl border border-rose-100 bg-white p-4">
+                      <FormMessage
+                        message={deactivateState.message}
+                        tone={deactivateState.status === "success" ? "success" : "error"}
+                      />
+                      <div>
+                        <p className="font-semibold text-foreground">Deactivate account</p>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                          Your account access will be paused until an admin restores it.
+                        </p>
+                      </div>
+                      <Input
+                        name="deactivationReason"
+                        placeholder="Reason"
+                        required
+                      />
+                      <Input
+                        name="confirmation"
+                        placeholder="Type DEACTIVATE"
+                        required
+                      />
+                      <SubmitButton variant="danger" pendingLabel="Deactivating..." className="w-full">
+                        Deactivate account
+                      </SubmitButton>
+                    </form>
+
+                    <form action={deletionFormAction} className="space-y-3 rounded-3xl border border-border bg-white p-4">
+                      <FormMessage
+                        message={deletionState.message}
+                        tone={deletionState.status === "success" ? "success" : "error"}
+                      />
+                      <div>
+                        <p className="font-semibold text-foreground">Request deletion</p>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                          Admin will check orders, disputes, withdrawals, and wallet obligations first.
+                        </p>
+                      </div>
+                      <Input
+                        name="deletionReason"
+                        placeholder="Reason"
+                        required
+                      />
+                      <Input
+                        name="confirmation"
+                        placeholder="Type DELETE MY ACCOUNT"
+                        required
+                      />
+                      <SubmitButton variant="secondary" pendingLabel="Submitting request..." className="w-full">
+                        Request deletion
+                      </SubmitButton>
+                    </form>
+                  </div>
                 </section>
               ) : null}
 

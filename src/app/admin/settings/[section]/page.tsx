@@ -9,6 +9,11 @@ import { requireAdminProfile } from "@/lib/auth";
 import { getCurrencyRates, getProfileSettings } from "@/lib/data";
 
 const sections = ["profile", "currency", "appearance", "security", "notifications"] as const;
+type AdminSettingsSection = (typeof sections)[number];
+
+function isAdminSettingsSection(section: string): section is AdminSettingsSection {
+  return (sections as readonly string[]).includes(section);
+}
 
 export default async function AdminSettingsSectionPage({
   params
@@ -17,7 +22,7 @@ export default async function AdminSettingsSectionPage({
 }) {
   const { section } = await params;
 
-  if (!sections.includes(section as Exclude<SettingsSection, "payout">)) {
+  if (!isAdminSettingsSection(section)) {
     notFound();
   }
 

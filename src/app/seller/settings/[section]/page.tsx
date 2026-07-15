@@ -8,7 +8,7 @@ import WorkspaceSettingsForm, {
 import { requireSellerProfile } from "@/lib/auth";
 import { getCurrencyRates, getProfileSettings } from "@/lib/data";
 
-const sections = ["profile", "currency", "appearance", "security", "notifications", "payout"] as const;
+const sections = ["profile", "currency", "appearance", "security", "notifications", "payout", "account-control"] as const;
 
 export default async function SellerSettingsSectionPage({
   params

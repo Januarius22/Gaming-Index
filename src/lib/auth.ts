@@ -86,7 +86,7 @@ export async function redirectIfAuthenticated() {
   const profile = await getCurrentProfile();
 
     if (profile) {
-      if (profile.is_deleted && profile.role !== "admin") {
+      if ((profile.is_deleted || profile.is_deactivated) && profile.role !== "admin") {
         redirect("/auth/login");
       }
 
@@ -109,7 +109,7 @@ export async function requireAccountProfile() {
     redirect("/admin/dashboard");
   }
 
-  if (profile.is_deleted) {
+  if (profile.is_deleted || profile.is_deactivated) {
     redirect("/auth/login");
   }
 
@@ -131,7 +131,7 @@ export async function requireSellerProfile() {
     redirect("/admin/dashboard");
   }
 
-  if (profile.is_deleted) {
+  if (profile.is_deleted || profile.is_deactivated) {
     redirect("/auth/login");
   }
 
