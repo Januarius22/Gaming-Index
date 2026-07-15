@@ -16,6 +16,10 @@ create table if not exists public.profiles (
   banned_at timestamp with time zone,
   banned_reason text not null default '',
   banned_by uuid references public.profiles(id) on delete set null,
+  is_deleted boolean not null default false,
+  deleted_at timestamp with time zone,
+  deleted_reason text not null default '',
+  deleted_by uuid references public.profiles(id) on delete set null,
   created_at timestamp with time zone not null default now()
 );
 
@@ -30,6 +34,10 @@ alter table public.profiles add column if not exists seller_restriction_reason t
 alter table public.profiles add column if not exists banned_at timestamp with time zone;
 alter table public.profiles add column if not exists banned_reason text not null default '';
 alter table public.profiles add column if not exists banned_by uuid references public.profiles(id) on delete set null;
+alter table public.profiles add column if not exists is_deleted boolean not null default false;
+alter table public.profiles add column if not exists deleted_at timestamp with time zone;
+alter table public.profiles add column if not exists deleted_reason text not null default '';
+alter table public.profiles add column if not exists deleted_by uuid references public.profiles(id) on delete set null;
 update public.profiles set seller_enabled = true where role = 'seller';
 update public.profiles set role = 'user' where role = 'seller';
 alter table public.profiles alter column role set default 'user';
@@ -931,6 +939,51 @@ alter table public.suspension_appeals add constraint suspension_appeals_status_c
 alter table public.suspension_appeals drop constraint if exists suspension_appeals_appeal_reason_check;
 alter table public.suspension_appeals add constraint suspension_appeals_appeal_reason_check
   check (length(trim(appeal_reason)) >= 20);
+
+create table if not exists public.deleted_accounts (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  full_name text not null default '',
+  username text not null default '',
+  email text not null default '',
+  role text not null default 'user' check (role in ('user', 'admin')),
+  seller_enabled boolean not null default false,
+  kyc_status text not null default 'not_started' check (kyc_status in ('not_started', 'pending', 'approved', 'rejected')),
+  banned_at timestamp with time zone,
+  banned_reason text not null default '',
+  deleted_reason text not null default '',
+  deleted_by uuid references public.profiles(id) on delete set null,
+  deleted_at timestamp with time zone not null default now(),
+  restored_at timestamp with time zone,
+  restored_by uuid references public.profiles(id) on delete set null,
+  snapshot jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now(),
+  unique (profile_id, deleted_at)
+);
+
+alter table public.deleted_accounts add column if not exists full_name text not null default '';
+alter table public.deleted_accounts add column if not exists username text not null default '';
+alter table public.deleted_accounts add column if not exists email text not null default '';
+alter table public.deleted_accounts add column if not exists role text not null default 'user';
+alter table public.deleted_accounts add column if not exists seller_enabled boolean not null default false;
+alter table public.deleted_accounts add column if not exists kyc_status text not null default 'not_started';
+alter table public.deleted_accounts add column if not exists banned_at timestamp with time zone;
+alter table public.deleted_accounts add column if not exists banned_reason text not null default '';
+alter table public.deleted_accounts add column if not exists deleted_reason text not null default '';
+alter table public.deleted_accounts add column if not exists deleted_by uuid references public.profiles(id) on delete set null;
+alter table public.deleted_accounts add column if not exists deleted_at timestamp with time zone not null default now();
+alter table public.deleted_accounts add column if not exists restored_at timestamp with time zone;
+alter table public.deleted_accounts add column if not exists restored_by uuid references public.profiles(id) on delete set null;
+alter table public.deleted_accounts add column if not exists snapshot jsonb not null default '{}'::jsonb;
+alter table public.deleted_accounts add column if not exists created_at timestamp with time zone not null default now();
+alter table public.deleted_accounts drop constraint if exists deleted_accounts_role_check;
+alter table public.deleted_accounts add constraint deleted_accounts_role_check
+  check (role in ('user', 'admin'));
+alter table public.deleted_accounts drop constraint if exists deleted_accounts_kyc_status_check;
+alter table public.deleted_accounts add constraint deleted_accounts_kyc_status_check
+  check (kyc_status in ('not_started', 'pending', 'approved', 'rejected'));
+create unique index if not exists deleted_accounts_profile_deleted_at_idx
+  on public.deleted_accounts (profile_id, deleted_at);
 
 create table if not exists public.site_feedback (
   id uuid primary key default gen_random_uuid(),
@@ -3364,6 +3417,10 @@ begin
       or new.banned_at is distinct from old.banned_at
       or new.banned_reason is distinct from old.banned_reason
       or new.banned_by is distinct from old.banned_by
+      or new.is_deleted is distinct from old.is_deleted
+      or new.deleted_at is distinct from old.deleted_at
+      or new.deleted_reason is distinct from old.deleted_reason
+      or new.deleted_by is distinct from old.deleted_by
     then
       raise exception 'Only admins can update protected profile fields.';
     end if;
@@ -3412,6 +3469,7 @@ alter table public.wallets enable row level security;
 alter table public.wallet_transactions enable row level security;
 alter table public.withdrawal_requests enable row level security;
 alter table public.suspension_appeals enable row level security;
+alter table public.deleted_accounts enable row level security;
 alter table public.site_feedback enable row level security;
 alter table public.support_tickets enable row level security;
 alter table public.support_ticket_messages enable row level security;
@@ -4173,9 +4231,31 @@ create policy "admins can update suspension appeals"
       select 1
       from public.profiles as admin_profile
       where admin_profile.id = auth.uid()
-        and admin_profile.role = 'admin'
+      and admin_profile.role = 'admin'
     )
   );
+
+drop policy if exists "admins can read deleted accounts" on public.deleted_accounts;
+create policy "admins can read deleted accounts"
+  on public.deleted_accounts
+  for select
+  to authenticated
+  using (public.current_profile_is_admin());
+
+drop policy if exists "admins can insert deleted accounts" on public.deleted_accounts;
+create policy "admins can insert deleted accounts"
+  on public.deleted_accounts
+  for insert
+  to authenticated
+  with check (public.current_profile_is_admin());
+
+drop policy if exists "admins can update deleted accounts" on public.deleted_accounts;
+create policy "admins can update deleted accounts"
+  on public.deleted_accounts
+  for update
+  to authenticated
+  using (public.current_profile_is_admin())
+  with check (public.current_profile_is_admin());
 
 drop policy if exists "users can read their own site feedback" on public.site_feedback;
 create policy "users can read their own site feedback"

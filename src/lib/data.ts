@@ -29,9 +29,11 @@ import type {
   ActivityItem,
   AdminAnalytics,
   AdminSellerReview,
+  AdminSuspendedAccount,
   AnalyticsDatum,
   BusinessSettings,
   CurrencyRate,
+  DeletedAccount,
   DashboardStat,
   Dispute,
   DisputeAttachment,
@@ -392,11 +394,11 @@ async function getSupabaseListings() {
     sellerIds.length > 0
       ? await supabase
         .from("profiles")
-          .select("id, full_name, username, avatar_url, is_banned")
+          .select("id, full_name, username, avatar_url, is_banned, is_deleted")
           .in("id", sellerIds)
-      : { data: [] as Array<{ id: string; full_name: string; username: string; avatar_url?: string; is_banned: boolean }> };
+      : { data: [] as Array<{ id: string; full_name: string; username: string; avatar_url?: string; is_banned: boolean; is_deleted?: boolean }> };
   const profileMap = new Map(
-    ((profileRows as Array<{ id: string; full_name: string; username: string; avatar_url?: string; is_banned: boolean }> | null) ?? []).map(
+    ((profileRows as Array<{ id: string; full_name: string; username: string; avatar_url?: string; is_banned: boolean; is_deleted?: boolean }> | null) ?? []).map(
       (profile) => [profile.id, profile]
     )
   );
@@ -417,7 +419,7 @@ async function getSupabaseListings() {
           sellerProfile?.username ||
           "seller",
         seller_avatar_url: sellerProfile?.avatar_url || normalizedListing.seller_avatar_url || "",
-        seller_is_banned: sellerProfile?.is_banned ?? false,
+        seller_is_banned: Boolean(sellerProfile?.is_banned || sellerProfile?.is_deleted),
         image_urls: await getSignedListingAssetUrls(
           supabase,
           Array.isArray(listing.image_paths) ? listing.image_paths : []
@@ -1146,7 +1148,9 @@ export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCo
       { count: pendingWithdrawals },
       { count: pendingListings },
       { count: releasableOrders },
-      { count: openSupport }
+      { count: openSupport },
+      { count: suspendedUsers },
+      { count: deletedAccounts }
     ] = await Promise.all([
       supabase
         .from("notifications")
@@ -1178,7 +1182,17 @@ export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCo
       supabase
         .from("support_tickets")
         .select("id", { count: "exact", head: true })
-        .in("status", ["open", "in_review"])
+        .in("status", ["open", "in_review"]),
+      supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("is_banned", true)
+        .eq("is_deleted", false)
+        .neq("role", "admin"),
+      supabase
+        .from("deleted_accounts")
+        .select("id", { count: "exact", head: true })
+        .is("restored_at", null)
     ]);
 
     return {
@@ -1189,7 +1203,9 @@ export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCo
       "/admin/withdrawals": pendingWithdrawals ?? 0,
       "/admin/listings": pendingListings ?? 0,
       "/admin/orders": releasableOrders ?? 0,
-      "/admin/support": openSupport ?? 0
+      "/admin/support": openSupport ?? 0,
+      "/admin/suspended-users": suspendedUsers ?? 0,
+      "/admin/deleted-accounts": deletedAccounts ?? 0
     };
   } catch {
     return {};
@@ -2974,11 +2990,114 @@ export async function getSellerAnalytics(profile: Profile): Promise<SellerAnalyt
 
 export async function getAdminUsers() {
   if (!hasSupabaseEnv) {
-    return getDemoProfiles();
+    return getDemoProfiles().then((profiles) => profiles.filter((profile) => !profile.is_deleted));
   }
 
   try {
-    return await getSupabaseProfiles();
+    const profiles = await getSupabaseProfiles();
+    return profiles.filter((profile) => !profile.is_deleted);
+  } catch {
+    return [];
+  }
+}
+
+export async function getAdminSuspendedAccounts(): Promise<AdminSuspendedAccount[]> {
+  const settings = await getBusinessSettings();
+  const profiles = (await getAdminUsers()).filter(
+    (profile) => profile.role !== "admin" && profile.is_banned
+  );
+
+  if (!hasSupabaseEnv) {
+    return profiles.map((profile) => {
+      const suspendedAt = profile.banned_at ?? profile.created_at;
+      const appealDeadlineAt = new Date(
+        new Date(suspendedAt).getTime() +
+          settings.suspension_appeal_window_days * 24 * 60 * 60 * 1000
+      ).toISOString();
+
+      return {
+        ...profile,
+        appeal_status: "none",
+        appeal_created_at: null,
+        appeal_deadline_at: appealDeadlineAt,
+        deletion_eligible: Date.now() > new Date(appealDeadlineAt).getTime()
+      };
+    });
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase || profiles.length === 0) {
+      return [];
+    }
+
+    const profileIds = profiles.map((profile) => profile.id);
+    const { data } = await supabase
+      .from("suspension_appeals")
+      .select("profile_id, status, created_at")
+      .in("profile_id", profileIds)
+      .order("created_at", { ascending: false });
+    const latestAppealByProfileId = new Map<
+      string,
+      { status: "pending" | "approved" | "rejected"; created_at: string }
+    >();
+
+    ((data as Array<{ profile_id: string; status: "pending" | "approved" | "rejected"; created_at: string }> | null) ?? []).forEach(
+      (appeal) => {
+        if (!latestAppealByProfileId.has(appeal.profile_id)) {
+          latestAppealByProfileId.set(appeal.profile_id, appeal);
+        }
+      }
+    );
+
+    return profiles.map((profile) => {
+      const suspendedAt = profile.banned_at ?? profile.created_at;
+      const appealDeadlineAt = new Date(
+        new Date(suspendedAt).getTime() +
+          settings.suspension_appeal_window_days * 24 * 60 * 60 * 1000
+      ).toISOString();
+      const appeal = latestAppealByProfileId.get(profile.id);
+
+      return {
+        ...profile,
+        appeal_status: appeal?.status ?? "none",
+        appeal_created_at: appeal?.created_at ?? null,
+        appeal_deadline_at: appealDeadlineAt,
+        deletion_eligible: Date.now() > new Date(appealDeadlineAt).getTime()
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function getAdminDeletedAccounts(): Promise<DeletedAccount[]> {
+  if (!hasSupabaseEnv) {
+    return [];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("deleted_accounts")
+      .select("*")
+      .is("restored_at", null)
+      .order("deleted_at", { ascending: false });
+
+    return ((data as DeletedAccount[] | null) ?? []).map((account) => ({
+      ...account,
+      seller_enabled: Boolean(account.seller_enabled),
+      snapshot:
+        account.snapshot && typeof account.snapshot === "object"
+          ? account.snapshot
+          : {}
+    }));
   } catch {
     return [];
   }

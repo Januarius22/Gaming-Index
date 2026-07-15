@@ -24,6 +24,10 @@ export default async function AccountSuspendedPage() {
     redirect("/admin/dashboard");
   }
 
+  if (profile.is_deleted) {
+    redirect("/auth/login");
+  }
+
   if (!profile.is_banned) {
     redirect(getDashboardRoute(profile.role));
   }

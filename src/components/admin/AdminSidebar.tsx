@@ -18,9 +18,11 @@ import {
   Landmark,
   Megaphone,
   MessageSquareText,
+  Archive,
   Star,
   Settings,
   ShieldAlert,
+  Trash2,
   Store,
   Users,
   UserSquare2,
@@ -51,7 +53,9 @@ const navGroups = [
     label: "Members",
     items: [
       { href: "/admin/users", label: "Users", icon: Users },
-      { href: "/admin/sellers", label: "Sellers", icon: UserSquare2 }
+      { href: "/admin/sellers", label: "Sellers", icon: UserSquare2 },
+      { href: "/admin/suspended-users", label: "Suspended Accounts", icon: Archive },
+      { href: "/admin/deleted-accounts", label: "Deleted Accounts", icon: Trash2 }
     ]
   },
   {

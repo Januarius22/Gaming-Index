@@ -1364,6 +1364,194 @@ export async function unbanUserInlineAction(formData: FormData) {
   return unbanUser(formData);
 }
 
+export async function archiveUserInlineAction(formData: FormData) {
+  const admin = await requireAdminProfile();
+  const userId = String(formData.get("userId") ?? "").trim();
+  const deleteReason = String(formData.get("deleteReason") ?? "").trim();
+  const deletedAt = new Date().toISOString();
+
+  if (!userId || userId === admin.id) {
+    return {
+      status: "error" as const,
+      message: "This account cannot be archived."
+    };
+  }
+
+  if (deleteReason.length < 8) {
+    return {
+      status: "error" as const,
+      message: "Add a clear archive reason."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to archive accounts."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { data: targetUser, error: targetError } = await supabase!
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (targetError || !targetUser) {
+    return {
+      status: "error" as const,
+      message: "User not found."
+    };
+  }
+
+  if (targetUser.role === "admin") {
+    return {
+      status: "error" as const,
+      message: "Admin accounts cannot be archived."
+    };
+  }
+
+  const { error: archiveError } = await supabase!.from("deleted_accounts").upsert({
+    profile_id: targetUser.id,
+    full_name: targetUser.full_name ?? "",
+    username: targetUser.username ?? "",
+    email: targetUser.email ?? "",
+    role: targetUser.role ?? "user",
+    seller_enabled: Boolean(targetUser.seller_enabled),
+    kyc_status: targetUser.kyc_status ?? "not_started",
+    banned_at: targetUser.banned_at ?? null,
+    banned_reason: targetUser.banned_reason ?? "",
+    deleted_reason: deleteReason,
+    deleted_by: admin.id,
+    deleted_at: deletedAt,
+    restored_at: null,
+    restored_by: null,
+    snapshot: targetUser
+  });
+
+  if (archiveError) {
+    return {
+      status: "error" as const,
+      message: archiveError.message
+    };
+  }
+
+  const { error: profileError } = await supabase!
+    .from("profiles")
+    .update({
+      is_deleted: true,
+      deleted_at: deletedAt,
+      deleted_reason: deleteReason,
+      deleted_by: admin.id,
+      is_banned: true,
+      banned_at: targetUser.banned_at ?? deletedAt,
+      banned_reason: targetUser.banned_reason || deleteReason,
+      banned_by: targetUser.banned_by ?? admin.id
+    })
+    .eq("id", userId)
+    .neq("role", "admin");
+
+  if (profileError) {
+    return {
+      status: "error" as const,
+      message: profileError.message
+    };
+  }
+
+  await supabase!
+    .from("listings")
+    .update({
+      status: "taken_down",
+      admin_note: "Seller account archived.",
+      admin_action_at: deletedAt,
+      admin_action_by: admin.id
+    })
+    .eq("seller_id", userId)
+    .in("status", ["draft", "pending_review", "approved"]);
+
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/suspended-users");
+  revalidatePath("/admin/deleted-accounts");
+  revalidatePath("/admin/sellers");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/");
+  revalidatePath("/marketplace");
+  revalidatePath("/account/marketplace");
+
+  return {
+    status: "success" as const,
+    message: "Account archived.",
+    userId
+  };
+}
+
+export async function restoreDeletedUserInlineAction(formData: FormData) {
+  const admin = await requireAdminProfile();
+  const profileId = String(formData.get("profileId") ?? "").trim();
+  const restoredAt = new Date().toISOString();
+
+  if (!profileId || profileId === admin.id) {
+    return {
+      status: "error" as const,
+      message: "This account cannot be restored."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to restore accounts."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { error: profileError } = await supabase!
+    .from("profiles")
+    .update({
+      is_deleted: false,
+      deleted_at: null,
+      deleted_reason: "",
+      deleted_by: null
+    })
+    .eq("id", profileId)
+    .neq("role", "admin");
+
+  if (profileError) {
+    return {
+      status: "error" as const,
+      message: profileError.message
+    };
+  }
+
+  const { error: archiveError } = await supabase!
+    .from("deleted_accounts")
+    .update({
+      restored_at: restoredAt,
+      restored_by: admin.id
+    })
+    .eq("profile_id", profileId)
+    .is("restored_at", null);
+
+  if (archiveError) {
+    return {
+      status: "error" as const,
+      message: archiveError.message
+    };
+  }
+
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/suspended-users");
+  revalidatePath("/admin/deleted-accounts");
+  revalidatePath("/admin/dashboard");
+
+  return {
+    status: "success" as const,
+    message: "Account restored to suspended users.",
+    userId: profileId
+  };
+}
+
 export async function banUserAction(formData: FormData) {
   const returnTo = getSafeAdminUsersReturnPath(String(formData.get("returnTo") ?? "").trim());
   const result = await banUser(formData);

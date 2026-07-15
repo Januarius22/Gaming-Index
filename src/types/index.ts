@@ -41,6 +41,10 @@ export interface Profile {
   banned_at?: string | null;
   banned_reason?: string;
   banned_by?: string | null;
+  is_deleted?: boolean;
+  deleted_at?: string | null;
+  deleted_reason?: string;
+  deleted_by?: string | null;
   created_at: string;
 }
 
@@ -198,6 +202,33 @@ export interface BusinessSettings {
   updated_by?: string | null;
   updated_at?: string;
   created_at?: string;
+}
+
+export interface AdminSuspendedAccount extends Profile {
+  appeal_status?: "none" | "pending" | "approved" | "rejected";
+  appeal_created_at?: string | null;
+  appeal_deadline_at?: string | null;
+  deletion_eligible: boolean;
+}
+
+export interface DeletedAccount {
+  id: string;
+  profile_id: string;
+  full_name: string;
+  username: string;
+  email: string;
+  role: AppRole;
+  seller_enabled: boolean;
+  kyc_status: KycStatus;
+  banned_at?: string | null;
+  banned_reason: string;
+  deleted_reason: string;
+  deleted_by?: string | null;
+  deleted_at: string;
+  restored_at?: string | null;
+  restored_by?: string | null;
+  snapshot: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface SiteAnnouncement {
