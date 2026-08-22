@@ -9,12 +9,18 @@ import {
 } from "@/components/analytics/AnalyticsPanels";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { requireSellerProfile } from "@/lib/auth";
-import { getSellerAnalytics } from "@/lib/data";
+import { getCurrencyRates, getProfileSettings, getSellerAnalytics } from "@/lib/data";
 import { formatCompactCurrency, formatDate } from "@/lib/utils";
 
 export default async function SellerAnalyticsPage() {
   const profile = await requireSellerProfile();
-  const analytics = await getSellerAnalytics(profile);
+  const [analytics, settings, currencyRates] = await Promise.all([
+    getSellerAnalytics(profile),
+    getProfileSettings(profile.id),
+    getCurrencyRates()
+  ]);
+  const formatSellerCurrency = (value: number) =>
+    formatCompactCurrency(value, settings.display_currency, currencyRates);
 
   return (
     <div className="mx-auto w-full max-w-[1540px] space-y-6 px-1 sm:px-2">
@@ -85,7 +91,7 @@ export default async function SellerAnalyticsPage() {
           <p key="title" className="font-semibold">
             {sale.title}
           </p>,
-          formatCompactCurrency(sale.amount),
+          formatSellerCurrency(sale.amount),
           formatDate(sale.created_at),
           <Link key="open" href={`/seller/orders`} className="font-semibold text-primary">
             Orders

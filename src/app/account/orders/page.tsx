@@ -7,7 +7,9 @@ import PaginationControls from "@/components/ui/PaginationControls";
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrders, getCurrencyRates, getProfileSettings } from "@/lib/data";
 import {
+  BASE_CURRENCY_CODE,
   formatCurrency,
+  formatCurrencyValue,
   formatDate,
   isPendingCheckoutActive,
   paginateItems,
@@ -38,6 +40,19 @@ export default async function AccountOrdersPage({
     pageStart,
     pageEnd
   } = paginateItems(orders, requestedPage, 10);
+  const getOrderAmountLabel = (order: (typeof orders)[number]) => {
+    const snapshotCurrency = order.buyer_display_currency ?? displayCurrency;
+
+    if (
+      order.buyer_display_amount &&
+      snapshotCurrency &&
+      snapshotCurrency !== BASE_CURRENCY_CODE
+    ) {
+      return formatCurrencyValue(order.buyer_display_amount, snapshotCurrency);
+    }
+
+    return formatCurrency(order.amount, displayCurrency, currencyRates);
+  };
 
   return (
     <Card>
@@ -94,7 +109,14 @@ export default async function AccountOrdersPage({
                     <tr key={order.id} className="border-b border-border/60">
                       <td className="px-4 py-4 font-medium text-foreground">{order.id.slice(0, 8)}</td>
                       <td className="px-4 py-4">{order.listing_title}</td>
-                      <td className="px-4 py-4">{formatCurrency(order.amount, displayCurrency, currencyRates)}</td>
+                      <td className="px-4 py-4">
+                        <div className="font-medium text-foreground">{getOrderAmountLabel(order)}</div>
+                        {displayCurrency !== BASE_CURRENCY_CODE ? (
+                          <div className="text-xs text-muted-foreground">
+                            Base: {formatCurrency(order.amount, BASE_CURRENCY_CODE, currencyRates)}
+                          </div>
+                        ) : null}
+                      </td>
                       <td className="px-4 py-4">
                         <Badge variant={statusVariant(order.status)}>{titleCase(order.status)}</Badge>
                       </td>

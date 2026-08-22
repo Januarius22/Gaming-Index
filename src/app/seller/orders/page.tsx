@@ -1,8 +1,16 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import PaginationControls from "@/components/ui/PaginationControls";
-import { getSellerOrders } from "@/lib/data";
+import { getCurrencyRates, getProfileSettings, getSellerOrders } from "@/lib/data";
 import { requireSellerProfile } from "@/lib/auth";
-import { formatCurrency, formatDate, paginateItems, parsePageParam, statusVariant, titleCase } from "@/lib/utils";
+import {
+  BASE_CURRENCY_CODE,
+  formatCurrency,
+  formatDate,
+  paginateItems,
+  parsePageParam,
+  statusVariant,
+  titleCase
+} from "@/lib/utils";
 import Badge from "@/components/ui/Badge";
 
 export default async function SellerOrdersPage({
@@ -11,8 +19,16 @@ export default async function SellerOrdersPage({
   searchParams?: Promise<{ page?: string }>;
 }) {
   const profile = await requireSellerProfile();
-  const orders = await getSellerOrders(profile);
   const params = (await searchParams) ?? {};
+  const [orders, settings, currencyRates] = await Promise.all([
+    getSellerOrders(profile),
+    getProfileSettings(profile.id),
+    getCurrencyRates()
+  ]);
+  const displayCurrency = settings.display_currency;
+  const showBaseCurrency = displayCurrency !== BASE_CURRENCY_CODE;
+  const formatDisplayCurrency = (value: number) => formatCurrency(value, displayCurrency, currencyRates);
+  const formatBaseCurrency = (value: number) => formatCurrency(value, BASE_CURRENCY_CODE, currencyRates);
   const requestedPage = parsePageParam(params.page);
   const {
     items: paginatedOrders,
@@ -67,10 +83,15 @@ export default async function SellerOrdersPage({
                     <td className="px-4 py-4">{order.listing_title}</td>
                     <td className="px-4 py-4">
                       <div className="font-medium text-foreground">
-                        {formatCurrency(order.seller_payout_amount ?? order.amount)}
+                        {formatDisplayCurrency(order.seller_payout_amount ?? order.amount)}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Sale {formatCurrency(order.amount)}
+                        Sale {formatBaseCurrency(order.amount)}
+                        {showBaseCurrency ? (
+                          <span className="block">
+                            Base payout {formatBaseCurrency(order.seller_payout_amount ?? order.amount)}
+                          </span>
+                        ) : null}
                       </div>
                     </td>
                     <td className="px-4 py-4">

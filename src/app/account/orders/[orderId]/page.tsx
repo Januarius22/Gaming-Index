@@ -11,7 +11,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrderDetail, getCurrencyRates, getProfileSettings, isOrderDisputeEligible } from "@/lib/data";
 import {
+  BASE_CURRENCY_CODE,
   formatCurrency,
+  formatCurrencyValue,
   formatDate,
   isPendingCheckoutActive,
   statusVariant,
@@ -85,7 +87,6 @@ export default async function AccountOrderDetailPage({
     getCurrencyRates()
   ]);
   const displayCurrency = settings.display_currency;
-  const formatPrice = (value: number) => formatCurrency(value, displayCurrency, currencyRates);
   const noticeState = getNoticeMessage(resolvedSearchParams.notice);
 
   if (!orderDetail) {
@@ -119,6 +120,12 @@ export default async function AccountOrderDetailPage({
   const deliveryVisible = Boolean(showDelivery && deliveryDetails && paymentConfirmed);
   const revealedDeliveryDetails = deliveryVisible ? deliveryDetails : null;
   const canOpenDispute = isOrderDisputeEligible(order);
+  const snapshotCurrency = order.buyer_display_currency ?? displayCurrency;
+  const displayAmount =
+    order.buyer_display_amount && snapshotCurrency !== BASE_CURRENCY_CODE
+      ? formatCurrencyValue(order.buyer_display_amount, snapshotCurrency)
+      : formatCurrency(order.amount, displayCurrency, currencyRates);
+  const showBaseCurrency = (snapshotCurrency || displayCurrency) !== BASE_CURRENCY_CODE;
 
   return (
     <div className="space-y-6">
@@ -144,8 +151,13 @@ export default async function AccountOrderDetailPage({
           <div className="rounded-3xl bg-surface p-5">
             <p className="text-sm text-muted-foreground">Amount</p>
             <p className="mt-2 font-heading text-3xl font-semibold text-foreground">
-              {formatPrice(order.amount)}
+              {displayAmount}
             </p>
+            {showBaseCurrency ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Base: {formatCurrency(order.amount, BASE_CURRENCY_CODE, currencyRates)}
+              </p>
+            ) : null}
           </div>
           <div className="rounded-3xl bg-surface p-5">
             <p className="text-sm text-muted-foreground">Status</p>

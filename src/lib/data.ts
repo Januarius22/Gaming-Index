@@ -2894,7 +2894,7 @@ export async function getAdminAnalytics(): Promise<AdminAnalytics> {
 }
 
 export async function getSellerAnalytics(profile: Profile): Promise<SellerAnalytics> {
-  const [listings, orders, wallet, withdrawals, disputes, ratingState, enforcements] =
+  const [listings, orders, wallet, withdrawals, disputes, ratingState, enforcements, settings, currencyRates] =
     await Promise.all([
       hasSupabaseEnv
         ? getSupabaseListings()
@@ -2904,7 +2904,9 @@ export async function getSellerAnalytics(profile: Profile): Promise<SellerAnalyt
       getSellerWithdrawalRequests(profile.id),
       getSellerDisputes(profile),
       getSellerRatingState(profile.id),
-      getSellerEnforcements(profile.id)
+      getSellerEnforcements(profile.id),
+      getProfileSettings(profile.id),
+      getCurrencyRates()
     ]);
   const sellerListings = listings.filter((listing) => listing.seller_id === profile.id);
   const sellerOrders = orders
@@ -2915,24 +2917,26 @@ export async function getSellerAnalytics(profile: Profile): Promise<SellerAnalyt
     Number(order.seller_payout_amount && order.seller_payout_amount > 0 ? order.seller_payout_amount : order.amount)
   );
   const months = getRecentMonths();
+  const formatSellerCurrency = (value: number) =>
+    formatCompactCurrency(value, settings.display_currency, currencyRates);
 
   return {
     metrics: [
       {
         label: "Total Earnings",
-        value: formatCompactCurrency(sellerRevenue),
+        value: formatSellerCurrency(sellerRevenue),
         helper: `${paidOrders.length} paid sales`,
         href: "/seller/orders"
       },
       {
         label: "Available Balance",
-        value: formatCompactCurrency(wallet.available_balance),
+        value: formatSellerCurrency(wallet.available_balance),
         helper: "Ready for withdrawal",
         href: "/seller/wallet"
       },
       {
         label: "Pending Balance",
-        value: formatCompactCurrency(wallet.pending_balance),
+        value: formatSellerCurrency(wallet.pending_balance),
         helper: "Buyer protection hold",
         href: "/seller/wallet"
       },
@@ -2988,7 +2992,7 @@ export async function getSellerAnalytics(profile: Profile): Promise<SellerAnalyt
         title: "Funds Pending",
         detail:
           wallet.pending_balance > 0
-            ? `${formatCompactCurrency(wallet.pending_balance)} still in buyer protection`
+            ? `${formatSellerCurrency(wallet.pending_balance)} still in buyer protection`
             : "No funds are currently held",
         href: "/seller/wallet"
       },

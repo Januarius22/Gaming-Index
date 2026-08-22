@@ -2,8 +2,15 @@ import Badge from "@/components/ui/Badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import PaginationControls from "@/components/ui/PaginationControls";
 import { requireSellerProfile } from "@/lib/auth";
-import { getProfileWalletTransactions } from "@/lib/data";
-import { formatCurrency, formatDate, paginateItems, parsePageParam, titleCase } from "@/lib/utils";
+import { getCurrencyRates, getProfileSettings, getProfileWalletTransactions } from "@/lib/data";
+import {
+  BASE_CURRENCY_CODE,
+  formatCurrency,
+  formatDate,
+  paginateItems,
+  parsePageParam,
+  titleCase
+} from "@/lib/utils";
 
 const bucketVariant = {
   available: "success",
@@ -21,7 +28,15 @@ export default async function SellerTransactionsPage({
   searchParams?: Promise<{ page?: string }>;
 }) {
   const profile = await requireSellerProfile();
-  const transactions = await getProfileWalletTransactions(profile.id, 50);
+  const [transactions, settings, currencyRates] = await Promise.all([
+    getProfileWalletTransactions(profile.id, 50),
+    getProfileSettings(profile.id),
+    getCurrencyRates()
+  ]);
+  const displayCurrency = settings.display_currency;
+  const showBaseCurrency = displayCurrency !== BASE_CURRENCY_CODE;
+  const formatDisplayCurrency = (value: number) => formatCurrency(value, displayCurrency, currencyRates);
+  const formatBaseCurrency = (value: number) => formatCurrency(value, BASE_CURRENCY_CODE, currencyRates);
   const params = (await searchParams) ?? {};
   const requestedPage = parsePageParam(params.page);
   const {
@@ -81,8 +96,15 @@ export default async function SellerTransactionsPage({
                     : "font-heading text-2xl font-semibold text-rose-700"
                 }
               >
-                {transaction.direction === "credit" ? "+" : "-"}
-                {formatCurrency(transaction.amount)}
+                <span>
+                  {transaction.direction === "credit" ? "+" : "-"}
+                  {formatDisplayCurrency(transaction.amount)}
+                </span>
+                {showBaseCurrency ? (
+                  <span className="block text-right text-xs font-normal text-muted-foreground">
+                    Base: {formatBaseCurrency(transaction.amount)}
+                  </span>
+                ) : null}
               </p>
             </div>
           ))

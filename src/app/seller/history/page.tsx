@@ -3,7 +3,7 @@ import SellerListingCard from "@/components/seller/SellerListingCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import PaginationControls from "@/components/ui/PaginationControls";
 import { requireSellerProfile } from "@/lib/auth";
-import { getSellerListingHistory } from "@/lib/data";
+import { getCurrencyRates, getProfileSettings, getSellerListingHistory } from "@/lib/data";
 import { paginateItems, parsePageParam } from "@/lib/utils";
 
 export default async function SellerHistoryPage({
@@ -12,7 +12,11 @@ export default async function SellerHistoryPage({
   searchParams?: Promise<{ notice?: string; error?: string; page?: string }>;
 }) {
   const profile = await requireSellerProfile();
-  const history = await getSellerListingHistory(profile);
+  const [history, settings, currencyRates] = await Promise.all([
+    getSellerListingHistory(profile),
+    getProfileSettings(profile.id),
+    getCurrencyRates()
+  ]);
   const params = (await searchParams) ?? {};
   const requestedPage = parsePageParam(params.page);
   const {
@@ -78,6 +82,8 @@ export default async function SellerHistoryPage({
                 listing={listing}
                 returnTo={currentPage > 1 ? `/seller/history?page=${currentPage}` : "/seller/history"}
                 mode="history"
+                displayCurrency={settings.display_currency}
+                currencyRates={currencyRates}
               />
             ))}
           </div>

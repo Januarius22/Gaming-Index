@@ -9,16 +9,20 @@ import {
   statusVariant,
   titleCase
 } from "@/lib/utils";
-import type { Listing } from "@/types";
+import type { CurrencyRate, Listing } from "@/types";
 
 export default function SellerListingCard({
   listing,
   returnTo = "/seller/listings",
-  mode = "active"
+  mode = "active",
+  displayCurrency,
+  currencyRates
 }: {
   listing: Listing;
   returnTo?: string;
   mode?: "active" | "history";
+  displayCurrency?: string;
+  currencyRates?: CurrencyRate[];
 }) {
   const stillVisibleInMarketplace = isListingMarketplaceVisible(listing);
 
@@ -55,7 +59,7 @@ export default function SellerListingCard({
           <div>
             <p className="text-sm text-muted-foreground">Price</p>
             <p className="font-heading text-3xl font-semibold text-foreground">
-              {formatCompactCurrency(listing.price)}
+              {formatCompactCurrency(listing.price, displayCurrency, currencyRates)}
             </p>
           </div>
           <p className="text-sm text-muted-foreground">{formatDate(listing.created_at)}</p>

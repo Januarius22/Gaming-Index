@@ -275,13 +275,22 @@ async function saveWorkspaceSettings({
 
   if (workspace === "seller") {
     revalidatePath("/seller/listings");
+    revalidatePath("/seller/history");
+    revalidatePath("/seller/orders");
+    revalidatePath("/seller/transactions");
+    revalidatePath("/seller/analytics");
+    revalidatePath("/seller/wallet");
     revalidatePath("/seller/withdrawals");
   }
 
   if (workspace === "account") {
+    revalidatePath("/account/dashboard");
     revalidatePath("/account/marketplace");
     revalidatePath("/account/cart");
     revalidatePath("/account/saved");
+    revalidatePath("/account/orders");
+    revalidatePath("/account/transactions");
+    revalidatePath("/account/wallet");
     revalidatePath("/marketplace");
     revalidatePath("/account/checkout");
     revalidatePath("/account/withdrawals");
@@ -363,8 +372,23 @@ export async function updateDisplayCurrencyPreferenceAction(currencyCode: string
   }
 
   revalidatePath("/account/marketplace");
+  revalidatePath("/account/dashboard");
   revalidatePath("/account/cart");
+  revalidatePath("/account/orders");
   revalidatePath("/account/saved");
+  revalidatePath("/account/transactions");
+  revalidatePath("/account/wallet");
+  revalidatePath("/account/withdrawals");
+  revalidatePath("/seller/dashboard");
+  revalidatePath("/seller/listings");
+  revalidatePath("/seller/history");
+  revalidatePath("/seller/orders");
+  revalidatePath("/seller/transactions");
+  revalidatePath("/seller/analytics");
+  revalidatePath("/seller/wallet");
+  revalidatePath("/seller/withdrawals");
+  revalidatePath("/marketplace");
+  revalidatePath("/");
   revalidatePath("/account/settings/currency");
   revalidatePath("/seller/settings/currency");
   revalidatePath("/admin/settings/currency");

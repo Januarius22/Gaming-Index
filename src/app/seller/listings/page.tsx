@@ -4,7 +4,7 @@ import SellerListingCard from "@/components/seller/SellerListingCard";
 import Button from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import PaginationControls from "@/components/ui/PaginationControls";
-import { getSellerListings } from "@/lib/data";
+import { getCurrencyRates, getProfileSettings, getSellerListings } from "@/lib/data";
 import { requireSellerProfile } from "@/lib/auth";
 import { paginateItems, parsePageParam } from "@/lib/utils";
 
@@ -14,7 +14,11 @@ export default async function SellerListingsPage({
   searchParams?: Promise<{ listing?: string; notice?: string; error?: string; page?: string }>;
 }) {
   const profile = await requireSellerProfile();
-  const listings = await getSellerListings(profile);
+  const [listings, settings, currencyRates] = await Promise.all([
+    getSellerListings(profile),
+    getProfileSettings(profile.id),
+    getCurrencyRates()
+  ]);
   const params = (await searchParams) ?? {};
   const requestedPage = parsePageParam(params.page);
   const {
@@ -82,6 +86,8 @@ export default async function SellerListingsPage({
             listing={listing}
             returnTo={currentPage > 1 ? `/seller/listings?page=${currentPage}` : "/seller/listings"}
             mode="active"
+            displayCurrency={settings.display_currency}
+            currencyRates={currencyRates}
           />
         ))}
       </div>

@@ -12,8 +12,8 @@ import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { requireSellerProfile } from "@/lib/auth";
-import { getProfileWallet, getSellerWithdrawalRequests } from "@/lib/data";
-import { cn, formatCurrency, formatDate, titleCase } from "@/lib/utils";
+import { getCurrencyRates, getProfileSettings, getProfileWallet, getSellerWithdrawalRequests } from "@/lib/data";
+import { BASE_CURRENCY_CODE, cn, formatCurrency, formatDate, titleCase } from "@/lib/utils";
 
 const statusVariant = {
   paid: "success",
@@ -25,11 +25,17 @@ const statusVariant = {
 
 export default async function SellerWalletPage() {
   const profile = await requireSellerProfile();
-  const [wallet, withdrawalRequests] = await Promise.all([
+  const [wallet, withdrawalRequests, settings, currencyRates] = await Promise.all([
     getProfileWallet(profile.id),
-    getSellerWithdrawalRequests(profile.id)
+    getSellerWithdrawalRequests(profile.id),
+    getProfileSettings(profile.id),
+    getCurrencyRates()
   ]);
   const latestWithdrawal = withdrawalRequests[0];
+  const displayCurrency = settings.display_currency;
+  const showBaseCurrency = displayCurrency !== BASE_CURRENCY_CODE;
+  const formatDisplayCurrency = (value: number) => formatCurrency(value, displayCurrency, currencyRates);
+  const formatBaseCurrency = (value: number) => formatCurrency(value, BASE_CURRENCY_CODE, currencyRates);
 
   const summaryCards = [
     {
@@ -95,8 +101,13 @@ export default async function SellerWalletPage() {
                     </div>
                   </div>
                   <p className="mt-4 break-words font-heading text-3xl font-semibold">
-                    {formatCurrency(card.value)}
+                    {formatDisplayCurrency(card.value)}
                   </p>
+                  {showBaseCurrency ? (
+                    <p className={cn("mt-1 text-xs", card.featured ? "text-blue-100" : "text-muted-foreground")}>
+                      Base: {formatBaseCurrency(card.value)}
+                    </p>
+                  ) : null}
                   <p className={cn("mt-2 text-sm leading-6", card.featured ? "text-blue-100" : "text-muted-foreground")}>
                     {card.helper}
                   </p>
@@ -155,8 +166,13 @@ export default async function SellerWalletPage() {
             <div className="rounded-[22px] bg-surface p-4 text-sm">
               <div className="flex items-center justify-between gap-4">
                 <span className="text-muted-foreground">Lifetime earned</span>
-                <span className="font-semibold text-foreground">
-                  {formatCurrency(wallet.total_earned)}
+                <span className="text-right font-semibold text-foreground">
+                  {formatDisplayCurrency(wallet.total_earned)}
+                  {showBaseCurrency ? (
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      Base: {formatBaseCurrency(wallet.total_earned)}
+                    </span>
+                  ) : null}
                 </span>
               </div>
             </div>
@@ -181,8 +197,13 @@ export default async function SellerWalletPage() {
             <div className="flex flex-col gap-3 rounded-[22px] bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <p className="font-semibold text-foreground">
-                  {formatCurrency(latestWithdrawal.amount)}
+                  {formatDisplayCurrency(latestWithdrawal.amount)}
                 </p>
+                {showBaseCurrency ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Base: {formatBaseCurrency(latestWithdrawal.amount)}
+                  </p>
+                ) : null}
                 <p className="mt-1 text-sm text-muted-foreground">
                   {latestWithdrawal.bank_name} on {formatDate(latestWithdrawal.created_at)}
                 </p>
