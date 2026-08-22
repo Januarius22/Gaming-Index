@@ -8,7 +8,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Textarea from "@/components/ui/Textarea";
-import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
+import { BASE_CURRENCY_CODE, formatCurrency, formatCurrencyValue, formatDate, titleCase } from "@/lib/utils";
 import type { Dispute, DisputeStatus } from "@/types";
 
 const statusVariant = {
@@ -21,6 +21,16 @@ const statusVariant = {
   open: "danger",
   reviewing: "warning"
 } as const;
+
+function getBuyerSnapshotLabel(dispute: Dispute) {
+  const displayCurrency = (dispute.buyer_display_currency ?? BASE_CURRENCY_CODE).toUpperCase();
+
+  if (displayCurrency === BASE_CURRENCY_CODE || !dispute.buyer_display_amount) {
+    return "";
+  }
+
+  return formatCurrencyValue(dispute.buyer_display_amount, displayCurrency);
+}
 
 export default function AdminDisputesTable({ disputes }: { disputes: Dispute[] }) {
   const [, startTransition] = useTransition();
@@ -107,6 +117,7 @@ export default function AdminDisputesTable({ disputes }: { disputes: Dispute[] }
                   dispute.status === "rejected" ||
                   dispute.status === "refunded";
                 const isSubmitting = pendingId === dispute.id;
+                const buyerSnapshotLabel = getBuyerSnapshotLabel(dispute);
 
                 return (
                   <tr key={dispute.id} className="border-b border-border/60 align-top">
@@ -115,6 +126,17 @@ export default function AdminDisputesTable({ disputes }: { disputes: Dispute[] }
                       <div className="mt-1 text-xs text-muted-foreground">
                         {dispute.listing_title || "Order"} - {formatCurrency(dispute.amount ?? 0)}
                       </div>
+                      <div className="mt-1 text-xs text-muted-foreground">Official NGN</div>
+                      {buyerSnapshotLabel ? (
+                        <div className="mt-2 rounded-2xl bg-surface px-3 py-2 text-xs text-muted-foreground">
+                          Buyer saw <span className="font-semibold text-foreground">{buyerSnapshotLabel}</span>
+                        </div>
+                      ) : null}
+                      {dispute.seller_payout_amount ? (
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          Payout: {formatCurrency(dispute.seller_payout_amount)}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-4 py-4">
                       <div className="font-medium text-foreground">{dispute.buyer_name || "Buyer"}</div>

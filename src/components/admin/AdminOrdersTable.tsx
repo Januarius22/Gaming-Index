@@ -7,7 +7,14 @@ import { releaseSellerFundsInlineAction } from "@/actions/admin";
 import FormMessage from "@/components/auth/FormMessage";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
-import { formatCurrency, formatDate, statusVariant, titleCase } from "@/lib/utils";
+import {
+  BASE_CURRENCY_CODE,
+  formatCurrency,
+  formatCurrencyValue,
+  formatDate,
+  statusVariant,
+  titleCase
+} from "@/lib/utils";
 import type { Order } from "@/types";
 
 type BadgeVariant = ComponentProps<typeof Badge>["variant"];
@@ -26,6 +33,16 @@ function getEscrowVariant(status: NonNullable<Order["escrow_status"]>): BadgeVar
   }
 
   return "neutral";
+}
+
+function getBuyerSnapshotLabel(order: Order) {
+  const displayCurrency = (order.buyer_display_currency ?? BASE_CURRENCY_CODE).toUpperCase();
+
+  if (displayCurrency === BASE_CURRENCY_CODE || !order.buyer_display_amount) {
+    return "";
+  }
+
+  return formatCurrencyValue(order.buyer_display_amount, displayCurrency);
 }
 
 export default function AdminOrdersTable({
@@ -91,7 +108,7 @@ export default function AdminOrdersTable({
               <th className="px-4 py-3 font-medium">Order ID</th>
               <th className="px-4 py-3 font-medium">Buyer</th>
               <th className="px-4 py-3 font-medium">Game Account</th>
-              <th className="px-4 py-3 font-medium">Amount</th>
+              <th className="px-4 py-3 font-medium">Official Amount</th>
               <th className="px-4 py-3 font-medium">Platform Fee</th>
               <th className="px-4 py-3 font-medium">Seller Payout</th>
               <th className="px-4 py-3 font-medium">Status</th>
@@ -115,6 +132,7 @@ export default function AdminOrdersTable({
                   (order.status === "processing" || order.status === "completed") &&
                   escrowStatus === "holding";
                 const isReleasing = pendingOrderId === order.id;
+                const buyerSnapshotLabel = getBuyerSnapshotLabel(order);
 
                 return (
                   <tr key={order.id} className="border-b border-border/60">
@@ -124,12 +142,32 @@ export default function AdminOrdersTable({
                       <div className="text-xs text-muted-foreground">{order.buyer_email}</div>
                     </td>
                     <td className="px-4 py-4">{order.listing_title}</td>
-                    <td className="px-4 py-4">{formatCurrency(order.amount)}</td>
                     <td className="px-4 py-4">
-                      {formatCurrency(order.platform_fee_amount ?? 0)}
+                      <div className="font-semibold text-foreground">{formatCurrency(order.amount)}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">Official NGN</div>
+                      {buyerSnapshotLabel ? (
+                        <div className="mt-2 rounded-2xl bg-surface px-3 py-2 text-xs text-muted-foreground">
+                          Buyer saw <span className="font-semibold text-foreground">{buyerSnapshotLabel}</span>
+                          {order.exchange_rate_snapshot ? (
+                            <span className="block">
+                              Snapshot rate: 1 {order.buyer_display_currency} ={" "}
+                              {formatCurrencyValue(order.exchange_rate_snapshot, BASE_CURRENCY_CODE)}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-4 py-4">
-                      {formatCurrency(order.seller_payout_amount ?? order.amount)}
+                      <div className="font-medium text-foreground">
+                        {formatCurrency(order.platform_fee_amount ?? 0)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Official NGN</div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="font-medium text-foreground">
+                        {formatCurrency(order.seller_payout_amount ?? order.amount)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Official NGN</div>
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap gap-2">

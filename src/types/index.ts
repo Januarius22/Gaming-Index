@@ -327,6 +327,12 @@ export interface Dispute {
   seller_name?: string;
   seller_username?: string;
   amount?: number;
+  base_currency?: string;
+  buyer_display_currency?: string;
+  buyer_display_amount?: number;
+  exchange_rate_snapshot?: number;
+  platform_fee_amount?: number;
+  seller_payout_amount?: number;
 }
 
 export interface DisputeAttachment {

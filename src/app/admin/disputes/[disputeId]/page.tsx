@@ -17,7 +17,7 @@ import Button from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { requireAdminProfile } from "@/lib/auth";
 import { getDisputeCase } from "@/lib/data";
-import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
+import { BASE_CURRENCY_CODE, formatCurrency, formatCurrencyValue, formatDate, titleCase } from "@/lib/utils";
 
 const statusVariant = {
   pending_admin_review: "warning",
@@ -78,6 +78,11 @@ export default async function AdminDisputeCasePage({
   }
 
   const sellerProfile = caseData.sellerProfile;
+  const buyerDisplayCurrency = (caseData.order?.buyer_display_currency ?? BASE_CURRENCY_CODE).toUpperCase();
+  const buyerDisplayAmount =
+    caseData.order?.buyer_display_amount && buyerDisplayCurrency !== BASE_CURRENCY_CODE
+      ? formatCurrencyValue(caseData.order.buyer_display_amount, buyerDisplayCurrency)
+      : "";
 
   return (
     <div className="space-y-6">
@@ -118,13 +123,46 @@ export default async function AdminDisputeCasePage({
             <div>
               <CardTitle>Case Summary</CardTitle>
               <CardDescription>
-                {caseData.order ? `${formatCurrency(caseData.order.amount)} - ${formatDate(caseData.order.created_at)}` : "Order case"}
+                {caseData.order
+                  ? `${formatCurrency(caseData.order.amount)} official NGN - ${formatDate(caseData.order.created_at)}`
+                  : "Order case"}
               </CardDescription>
             </div>
             <Badge variant={statusVariant[caseData.dispute.status]}>{titleCase(caseData.dispute.status)}</Badge>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-7 text-muted-foreground">
             <p>{caseData.dispute.details}</p>
+            {caseData.order ? (
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-border bg-surface p-4">
+                  <p className="font-semibold text-foreground">Official order amount</p>
+                  <p>{formatCurrency(caseData.order.amount)}</p>
+                  <p className="text-xs">Settlement currency: NGN</p>
+                </div>
+                <div className="rounded-2xl border border-border bg-surface p-4">
+                  <p className="font-semibold text-foreground">Platform fee</p>
+                  <p>{formatCurrency(caseData.order.platform_fee_amount ?? 0)}</p>
+                  <p className="text-xs">Deducted before seller payout</p>
+                </div>
+                <div className="rounded-2xl border border-border bg-surface p-4">
+                  <p className="font-semibold text-foreground">Seller payout</p>
+                  <p>{formatCurrency(caseData.order.seller_payout_amount ?? caseData.order.amount)}</p>
+                  <p className="text-xs">Official NGN wallet movement</p>
+                </div>
+                {buyerDisplayAmount ? (
+                  <div className="rounded-2xl border border-border bg-surface p-4 sm:col-span-3">
+                    <p className="font-semibold text-foreground">Buyer display snapshot</p>
+                    <p>{buyerDisplayAmount}</p>
+                    {caseData.order.exchange_rate_snapshot ? (
+                      <p className="text-xs">
+                        Snapshot rate: 1 {buyerDisplayCurrency} ={" "}
+                        {formatCurrencyValue(caseData.order.exchange_rate_snapshot, BASE_CURRENCY_CODE)}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-border bg-surface p-4">
                 <p className="font-semibold text-foreground">Buyer</p>

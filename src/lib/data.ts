@@ -1653,7 +1653,13 @@ function normalizeDispute(
     buyer_email: buyer?.email ?? order?.buyer_email ?? dispute.buyer_email ?? "",
     seller_name: seller?.full_name ?? dispute.seller_name ?? "",
     seller_username: seller?.username ?? dispute.seller_username ?? "",
-    amount: Number(order?.amount ?? dispute.amount ?? 0)
+    amount: Number(order?.amount ?? dispute.amount ?? 0),
+    base_currency: order?.base_currency ?? dispute.base_currency ?? "NGN",
+    buyer_display_currency: order?.buyer_display_currency ?? dispute.buyer_display_currency ?? "NGN",
+    buyer_display_amount: Number(order?.buyer_display_amount ?? dispute.buyer_display_amount ?? 0),
+    exchange_rate_snapshot: Number(order?.exchange_rate_snapshot ?? dispute.exchange_rate_snapshot ?? 1),
+    platform_fee_amount: Number(order?.platform_fee_amount ?? dispute.platform_fee_amount ?? 0),
+    seller_payout_amount: Number(order?.seller_payout_amount ?? dispute.seller_payout_amount ?? 0)
   };
 }
 
