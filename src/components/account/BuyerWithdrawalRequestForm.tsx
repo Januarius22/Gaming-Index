@@ -5,7 +5,7 @@ import { requestBuyerWithdrawalAction } from "@/actions/account";
 import FormMessage from "@/components/auth/FormMessage";
 import SubmitButton from "@/components/auth/SubmitButton";
 import Input from "@/components/ui/Input";
-import { formatCurrency } from "@/lib/utils";
+import { BASE_CURRENCY_CODE, formatCurrency } from "@/lib/utils";
 import type { ActionState, CurrencyRate, ProfileSettings } from "@/types";
 
 const initialState: ActionState = {
@@ -37,7 +37,7 @@ export default function BuyerWithdrawalRequestForm({
       />
       <div className="space-y-2">
         <label htmlFor="amount" className="text-sm font-semibold text-foreground">
-          Amount
+          Amount (NGN)
         </label>
         <Input
           id="amount"
@@ -59,8 +59,13 @@ export default function BuyerWithdrawalRequestForm({
         />
         <input type="hidden" name="amount" value={rawAmount} />
         <p className="text-xs font-medium text-muted-foreground">
-          Available balance: {formatCurrency(availableBalance, displayCurrency, currencyRates)}
+          Available balance: {formatCurrency(availableBalance, BASE_CURRENCY_CODE, currencyRates)}
         </p>
+        {displayCurrency !== BASE_CURRENCY_CODE ? (
+          <p className="text-xs text-muted-foreground">
+            Display estimate: {formatCurrency(availableBalance, displayCurrency, currencyRates)}
+          </p>
+        ) : null}
       </div>
       <div className="space-y-2">
         <label htmlFor="bankName" className="text-sm font-semibold text-foreground">

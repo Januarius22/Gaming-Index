@@ -208,10 +208,16 @@ async function createPendingOrderForListing({
     return null;
   }
 
+  const officialAmount = Number(amount);
+
+  if (!Number.isFinite(officialAmount) || officialAmount <= 0) {
+    return null;
+  }
+
   const businessSettings = await getBusinessSettings();
   const platformFeeRate = businessSettings.platform_commission_rate;
-  const platformFeeAmount = calculatePlatformFee(amount, platformFeeRate);
-  const sellerPayoutAmount = calculateSellerPayout(amount, platformFeeRate);
+  const platformFeeAmount = calculatePlatformFee(officialAmount, platformFeeRate);
+  const sellerPayoutAmount = calculateSellerPayout(officialAmount, platformFeeRate);
 
   if (!hasSupabaseEnv) {
     return addDemoOrder({
@@ -222,7 +228,7 @@ async function createPendingOrderForListing({
       seller_id: sellerId,
       listing_id: listingId,
       listing_title: listingTitle,
-      amount,
+      amount: officialAmount,
       platform_fee_rate: platformFeeRate,
       platform_fee_amount: platformFeeAmount,
       seller_payout_amount: sellerPayoutAmount,
@@ -253,7 +259,7 @@ async function createPendingOrderForListing({
       seller_id: sellerId,
       listing_id: listingId,
       listing_title: listingTitle,
-      amount,
+      amount: officialAmount,
       platform_fee_rate: platformFeeRate,
       platform_fee_amount: platformFeeAmount,
       seller_payout_amount: sellerPayoutAmount,

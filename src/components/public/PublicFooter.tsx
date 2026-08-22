@@ -51,6 +51,7 @@ export default function PublicFooter() {
               <Link href="/privacy-policy">Privacy Policy</Link>
               <Link href="/terms">Terms &amp; Conditions</Link>
               <Link href="/disclaimer">Disclaimer</Link>
+              <Link href="/404">4040</Link>
             </div>
           </div>
         </div>

@@ -8,7 +8,7 @@ import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrderDetail, getCurrencyRates, getProfileSettings } from "@/lib/data";
-import { formatCurrency } from "@/lib/utils";
+import { BASE_CURRENCY_CODE, formatCurrency } from "@/lib/utils";
 
 export default async function PurchaseSuccessPage({
   params
@@ -29,6 +29,7 @@ export default async function PurchaseSuccessPage({
 
   const { order, listing, paymentConfirmed, deliveryAvailable } = orderDetail;
   const displayCurrency = settings.display_currency;
+  const showDisplayEstimate = displayCurrency !== BASE_CURRENCY_CODE;
 
   if (!paymentConfirmed) {
     redirect(`/account/checkout/${order.id}`);
@@ -67,8 +68,13 @@ export default async function PurchaseSuccessPage({
             <div className="rounded-3xl bg-surface p-4">
               <p className="text-sm text-muted-foreground">Amount paid</p>
               <p className="mt-2 font-heading text-2xl font-semibold text-foreground">
-                {formatCurrency(order.amount, displayCurrency, currencyRates)}
+                {formatCurrency(order.amount, BASE_CURRENCY_CODE, currencyRates)}
               </p>
+              {showDisplayEstimate ? (
+                <p className="mt-1 text-xs font-medium text-muted-foreground">
+                  Display estimate: {formatCurrency(order.amount, displayCurrency, currencyRates)}
+                </p>
+              ) : null}
             </div>
             <div className="rounded-3xl bg-surface p-4">
               <p className="text-sm text-muted-foreground">Seller</p>

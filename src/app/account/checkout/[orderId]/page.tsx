@@ -12,6 +12,7 @@ import Input from "@/components/ui/Input";
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrderDetail, getCurrencyRates, getProfileSettings } from "@/lib/data";
 import {
+  BASE_CURRENCY_CODE,
   formatCurrency,
   formatDate,
   isPendingCheckoutActive,
@@ -68,6 +69,8 @@ export default async function AccountCheckoutPage({
   ]);
   const displayCurrency = settings.display_currency;
   const formatPrice = (value: number) => formatCurrency(value, displayCurrency, currencyRates);
+  const formatOfficialPrice = (value: number) => formatCurrency(value, BASE_CURRENCY_CODE, currencyRates);
+  const showDisplayEstimate = displayCurrency !== BASE_CURRENCY_CODE;
   const noticeState = getNoticeMessage(resolvedSearchParams.notice);
 
   if (!orderDetail) {
@@ -175,8 +178,13 @@ export default async function AccountCheckoutPage({
                 <div className="min-w-0 sm:text-right">
                   <p className="text-muted-foreground">Price</p>
                   <p className="mt-1 break-words font-heading text-2xl font-semibold text-foreground">
-                    {formatPrice(order.amount)}
+                    {formatOfficialPrice(order.amount)}
                   </p>
+                  {showDisplayEstimate ? (
+                    <p className="mt-1 text-xs font-medium text-muted-foreground">
+                      Estimate: {formatPrice(order.amount)}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="min-w-0">
                   <p className="text-muted-foreground">Order created</p>
@@ -304,8 +312,13 @@ export default async function AccountCheckoutPage({
                       <div>
                         <p className="text-sm text-muted-foreground">Amount payable</p>
                         <p className="mt-2 font-heading text-4xl font-semibold text-foreground">
-                          {formatPrice(order.amount)}
+                          {formatOfficialPrice(order.amount)}
                         </p>
+                        {showDisplayEstimate ? (
+                          <p className="mt-2 text-sm font-medium text-muted-foreground">
+                            Estimated display value: {formatPrice(order.amount)}
+                          </p>
+                        ) : null}
                       </div>
                       <div className="rounded-2xl bg-white p-3 text-primary shadow-sm">
                         <CreditCard className="h-5 w-5" />
@@ -323,8 +336,8 @@ export default async function AccountCheckoutPage({
                       ))}
                     </div>
                     <p className="text-xs leading-6 text-muted-foreground">
-                      By continuing, you confirm that you reviewed the listing details and understand
-                      that third-party platform rules may affect account transfers.
+                      Gaming Index settles this checkout in NGN. Other currencies are display
+                      estimates only.
                     </p>
                   </div>
 

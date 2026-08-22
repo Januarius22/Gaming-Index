@@ -335,6 +335,8 @@ create table if not exists public.listings (
   created_at timestamp with time zone not null default now()
 );
 
+alter table public.listings drop constraint if exists listings_price_positive_check;
+alter table public.listings add constraint listings_price_positive_check check (price > 0) not valid;
 alter table public.listings add column if not exists image_names jsonb not null default '[]'::jsonb;
 alter table public.listings add column if not exists image_paths jsonb not null default '[]'::jsonb;
 alter table public.listings add column if not exists seller_name text not null default '';
@@ -451,6 +453,8 @@ alter table public.orders add column if not exists escrow_status text not null d
 alter table public.orders add column if not exists seller_hold_expires_at timestamp with time zone;
 alter table public.orders add column if not exists seller_released_at timestamp with time zone;
 alter table public.orders add column if not exists seller_released_by uuid references public.profiles(id) on delete set null;
+alter table public.orders drop constraint if exists orders_amount_positive_check;
+alter table public.orders add constraint orders_amount_positive_check check (amount > 0) not valid;
 alter table public.orders drop constraint if exists orders_payment_status_check;
 alter table public.orders add constraint orders_payment_status_check
   check (payment_status in ('pending', 'successful', 'failed'));
@@ -487,6 +491,16 @@ where payment_status <> 'successful'
     platform_fee_amount = 0
     or seller_payout_amount = 0
   );
+update public.orders as order_row
+set
+  amount = listing.price,
+  platform_fee_amount = round(listing.price * coalesce(nullif(order_row.platform_fee_rate, 0), 0.07), 2),
+  seller_payout_amount = listing.price - round(listing.price * coalesce(nullif(order_row.platform_fee_rate, 0), 0.07), 2)
+from public.listings as listing
+where order_row.listing_id = listing.id
+  and order_row.status = 'pending'
+  and order_row.payment_status = 'pending'
+  and order_row.amount is distinct from listing.price;
 update public.orders as order_row
 set buyer_id = profile.id
 from public.profiles as profile
@@ -2749,6 +2763,7 @@ as $$
 declare
   checkout_order public.orders%rowtype;
   checkout_listing public.listings%rowtype;
+  checkout_amount numeric(18, 2);
   checkout_platform_fee_rate numeric(5, 4);
   checkout_platform_fee_amount numeric(18, 2);
   checkout_seller_payout_amount numeric(18, 2);
@@ -2812,11 +2827,12 @@ begin
     ),
     0.07
   );
-  checkout_platform_fee_amount := round(checkout_order.amount * checkout_platform_fee_rate, 2);
-  checkout_seller_payout_amount := checkout_order.amount - checkout_platform_fee_amount;
+  checkout_amount := checkout_listing.price;
+  checkout_platform_fee_amount := round(checkout_amount * checkout_platform_fee_rate, 2);
+  checkout_seller_payout_amount := checkout_amount - checkout_platform_fee_amount;
 
-  if checkout_seller_payout_amount <= 0 then
-    raise exception 'Seller payout amount is invalid for this checkout.';
+  if checkout_amount <= 0 or checkout_seller_payout_amount <= 0 then
+    raise exception 'Checkout amount is invalid.';
   end if;
 
   update public.listings
@@ -2828,6 +2844,9 @@ begin
 
   update public.orders
   set
+    amount = checkout_amount,
+    seller_id = checkout_listing.seller_id,
+    listing_title = checkout_listing.title,
     buyer_phone = trim(buyer_phone_number),
     platform_fee_rate = checkout_platform_fee_rate,
     platform_fee_amount = checkout_platform_fee_amount,

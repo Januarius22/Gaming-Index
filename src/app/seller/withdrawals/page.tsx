@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import WithdrawalRequestForm from "@/components/seller/WithdrawalRequestForm";
 import { requireSellerProfile } from "@/lib/auth";
 import { getCurrencyRates, getProfileSettings, getProfileWallet, getSellerWithdrawalRequests } from "@/lib/data";
-import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
+import { BASE_CURRENCY_CODE, formatCurrency, formatDate, titleCase } from "@/lib/utils";
 
 const statusVariant = {
   paid: "success",
@@ -22,6 +22,7 @@ export default async function SellerWithdrawalsPage() {
     getCurrencyRates()
   ]);
   const displayCurrency = settings.display_currency;
+  const showDisplayEstimate = displayCurrency !== BASE_CURRENCY_CODE;
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(300px,0.45fr)]">
@@ -48,14 +49,24 @@ export default async function SellerWithdrawalsPage() {
           <div className="rounded-[22px] bg-primary-dark p-4 text-white">
             <p className="text-sm text-blue-100">Available now</p>
             <p className="mt-3 break-words font-heading text-3xl font-semibold">
-              {formatCurrency(wallet.available_balance, displayCurrency, currencyRates)}
+              {formatCurrency(wallet.available_balance, BASE_CURRENCY_CODE, currencyRates)}
             </p>
+            {showDisplayEstimate ? (
+              <p className="mt-2 text-xs font-medium text-blue-100">
+                Estimate: {formatCurrency(wallet.available_balance, displayCurrency, currencyRates)}
+              </p>
+            ) : null}
           </div>
           <div className="rounded-[22px] bg-surface p-4">
             <p className="text-sm text-muted-foreground">Pending release</p>
             <p className="mt-3 break-words font-heading text-2xl font-semibold text-foreground">
-              {formatCurrency(wallet.pending_balance, displayCurrency, currencyRates)}
+              {formatCurrency(wallet.pending_balance, BASE_CURRENCY_CODE, currencyRates)}
             </p>
+            {showDisplayEstimate ? (
+              <p className="mt-2 text-xs font-medium text-muted-foreground">
+                Estimate: {formatCurrency(wallet.pending_balance, displayCurrency, currencyRates)}
+              </p>
+            ) : null}
           </div>
         </CardContent>
       </Card>
@@ -77,7 +88,12 @@ export default async function SellerWithdrawalsPage() {
                 className="flex flex-col gap-3 rounded-[22px] bg-surface p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
-                  <p className="font-semibold text-foreground">{formatCurrency(request.amount, displayCurrency, currencyRates)}</p>
+                  <p className="font-semibold text-foreground">{formatCurrency(request.amount, BASE_CURRENCY_CODE, currencyRates)}</p>
+                  {showDisplayEstimate ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Estimate: {formatCurrency(request.amount, displayCurrency, currencyRates)}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-sm text-muted-foreground">
                     {request.bank_name || "Bank not provided"} on {formatDate(request.created_at)}
                   </p>
