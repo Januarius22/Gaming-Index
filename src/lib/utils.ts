@@ -47,7 +47,7 @@ export const defaultCurrencyRates: CurrencyRate[] = [
   }
 ];
 
-function getCurrencyLocale(currencyCode: string) {
+export function getCurrencyLocale(currencyCode: string) {
   if (currencyCode === "NGN") {
     return "en-NG";
   }
@@ -61,6 +61,16 @@ function getCurrencyLocale(currencyCode: string) {
   }
 
   return "en-US";
+}
+
+export function formatCurrencyValue(value: number, currencyCode = BASE_CURRENCY_CODE) {
+  const normalizedCode = currencyCode.toUpperCase();
+
+  return new Intl.NumberFormat(getCurrencyLocale(normalizedCode), {
+    style: "currency",
+    currency: normalizedCode,
+    maximumFractionDigits: normalizedCode === BASE_CURRENCY_CODE ? 0 : 2
+  }).format(value);
 }
 
 export function getCurrencyRate(currencyCode: string, rates = defaultCurrencyRates) {

@@ -535,6 +535,16 @@ async function getSupabaseOrders() {
 
 function normalizeOrder(order: Order, listingTitle?: string | null): Order {
   const amount = Number(order.amount ?? 0);
+  const baseCurrency = (order.base_currency || "NGN").toUpperCase();
+  const buyerDisplayCurrency = (order.buyer_display_currency || baseCurrency).toUpperCase();
+  const exchangeRateSnapshot = Number(order.exchange_rate_snapshot || 1);
+  const buyerDisplayAmount = Number(
+    order.buyer_display_amount && order.buyer_display_amount > 0
+      ? order.buyer_display_amount
+      : buyerDisplayCurrency === baseCurrency
+        ? amount
+        : amount / Math.max(exchangeRateSnapshot, 1)
+  );
   const platformFeeRate = Number(order.platform_fee_rate ?? PLATFORM_COMMISSION_RATE);
   const platformFeeAmount = Number(
     order.platform_fee_amount && order.platform_fee_amount > 0
@@ -550,6 +560,10 @@ function normalizeOrder(order: Order, listingTitle?: string | null): Order {
   return {
     ...order,
     amount,
+    base_currency: baseCurrency,
+    buyer_display_currency: buyerDisplayCurrency,
+    buyer_display_amount: buyerDisplayAmount,
+    exchange_rate_snapshot: exchangeRateSnapshot,
     platform_fee_rate: platformFeeRate,
     platform_fee_amount: platformFeeAmount,
     seller_payout_amount: sellerPayoutAmount,

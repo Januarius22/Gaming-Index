@@ -421,6 +421,10 @@ create table if not exists public.orders (
   listing_id uuid not null references public.listings(id) on delete cascade,
   listing_title text not null default '',
   amount numeric not null,
+  base_currency text not null default 'NGN',
+  buyer_display_currency text not null default 'NGN',
+  buyer_display_amount numeric(18, 2) not null default 0,
+  exchange_rate_snapshot numeric(18, 6) not null default 1,
   platform_fee_rate numeric(5, 4) not null default 0.07,
   platform_fee_amount numeric(18, 2) not null default 0,
   seller_payout_amount numeric(18, 2) not null default 0,
@@ -439,6 +443,10 @@ create table if not exists public.orders (
 alter table public.orders add column if not exists buyer_id uuid references public.profiles(id) on delete cascade;
 alter table public.orders add column if not exists buyer_phone text not null default '';
 alter table public.orders add column if not exists listing_title text not null default '';
+alter table public.orders add column if not exists base_currency text not null default 'NGN';
+alter table public.orders add column if not exists buyer_display_currency text not null default 'NGN';
+alter table public.orders add column if not exists buyer_display_amount numeric(18, 2) not null default 0;
+alter table public.orders add column if not exists exchange_rate_snapshot numeric(18, 6) not null default 1;
 alter table public.orders add column if not exists platform_fee_rate numeric(5, 4) not null default 0.07;
 alter table public.orders add column if not exists platform_fee_amount numeric(18, 2) not null default 0;
 alter table public.orders add column if not exists seller_payout_amount numeric(18, 2) not null default 0;
@@ -455,6 +463,17 @@ alter table public.orders add column if not exists seller_released_at timestamp 
 alter table public.orders add column if not exists seller_released_by uuid references public.profiles(id) on delete set null;
 alter table public.orders drop constraint if exists orders_amount_positive_check;
 alter table public.orders add constraint orders_amount_positive_check check (amount > 0) not valid;
+alter table public.orders drop constraint if exists orders_base_currency_check;
+alter table public.orders add constraint orders_base_currency_check check (base_currency = 'NGN');
+alter table public.orders drop constraint if exists orders_buyer_display_currency_check;
+alter table public.orders add constraint orders_buyer_display_currency_check
+  check (buyer_display_currency ~ '^[A-Z]{3}$');
+alter table public.orders drop constraint if exists orders_buyer_display_amount_check;
+alter table public.orders add constraint orders_buyer_display_amount_check
+  check (buyer_display_amount >= 0);
+alter table public.orders drop constraint if exists orders_exchange_rate_snapshot_check;
+alter table public.orders add constraint orders_exchange_rate_snapshot_check
+  check (exchange_rate_snapshot > 0);
 alter table public.orders drop constraint if exists orders_payment_status_check;
 alter table public.orders add constraint orders_payment_status_check
   check (payment_status in ('pending', 'successful', 'failed'));
@@ -475,6 +494,28 @@ alter table public.orders add constraint orders_buyer_not_seller_check
   check (buyer_id is null or buyer_id <> seller_id) not valid;
 update public.orders
 set
+  base_currency = 'NGN',
+  buyer_display_currency = coalesce(nullif(upper(buyer_display_currency), ''), 'NGN'),
+  exchange_rate_snapshot = case
+    when coalesce(exchange_rate_snapshot, 0) <= 0 then 1
+    else exchange_rate_snapshot
+  end,
+  buyer_display_amount = case
+    when coalesce(buyer_display_amount, 0) <= 0 then amount
+    else buyer_display_amount
+  end;
+update public.orders
+set
+  base_currency = 'NGN',
+  buyer_display_currency = coalesce(nullif(upper(buyer_display_currency), ''), 'NGN'),
+  exchange_rate_snapshot = case
+    when coalesce(exchange_rate_snapshot, 0) <= 0 then 1
+    else exchange_rate_snapshot
+  end,
+  buyer_display_amount = case
+    when coalesce(buyer_display_amount, 0) <= 0 then amount
+    else buyer_display_amount
+  end,
   platform_fee_rate = 0,
   platform_fee_amount = 0,
   seller_payout_amount = amount
@@ -2764,6 +2805,8 @@ declare
   checkout_order public.orders%rowtype;
   checkout_listing public.listings%rowtype;
   checkout_amount numeric(18, 2);
+  checkout_exchange_rate numeric(18, 6);
+  checkout_display_amount numeric(18, 2);
   checkout_platform_fee_rate numeric(5, 4);
   checkout_platform_fee_amount numeric(18, 2);
   checkout_seller_payout_amount numeric(18, 2);
@@ -2828,6 +2871,24 @@ begin
     0.07
   );
   checkout_amount := checkout_listing.price;
+  checkout_exchange_rate := case
+    when coalesce(upper(checkout_order.buyer_display_currency), 'NGN') = 'NGN' then 1
+    when coalesce(checkout_order.exchange_rate_snapshot, 0) > 0 then checkout_order.exchange_rate_snapshot
+    else coalesce(
+      (
+        select nullif(ngn_rate, 0)
+        from public.currency_rates
+        where code = upper(checkout_order.buyer_display_currency)
+          and enabled = true
+        limit 1
+      ),
+      1
+    )
+  end;
+  checkout_display_amount := case
+    when coalesce(upper(checkout_order.buyer_display_currency), 'NGN') = 'NGN' then checkout_amount
+    else round(checkout_amount / checkout_exchange_rate, 2)
+  end;
   checkout_platform_fee_amount := round(checkout_amount * checkout_platform_fee_rate, 2);
   checkout_seller_payout_amount := checkout_amount - checkout_platform_fee_amount;
 
@@ -2845,6 +2906,10 @@ begin
   update public.orders
   set
     amount = checkout_amount,
+    base_currency = 'NGN',
+    buyer_display_currency = coalesce(nullif(upper(checkout_order.buyer_display_currency), ''), 'NGN'),
+    buyer_display_amount = checkout_display_amount,
+    exchange_rate_snapshot = checkout_exchange_rate,
     seller_id = checkout_listing.seller_id,
     listing_title = checkout_listing.title,
     buyer_phone = trim(buyer_phone_number),

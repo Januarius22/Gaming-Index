@@ -14,6 +14,7 @@ import { getBuyerOrderDetail, getCurrencyRates, getProfileSettings } from "@/lib
 import {
   BASE_CURRENCY_CODE,
   formatCurrency,
+  formatCurrencyValue,
   formatDate,
   isPendingCheckoutActive,
   statusVariant,
@@ -68,9 +69,13 @@ export default async function AccountCheckoutPage({
     getCurrencyRates()
   ]);
   const displayCurrency = settings.display_currency;
-  const formatPrice = (value: number) => formatCurrency(value, displayCurrency, currencyRates);
   const formatOfficialPrice = (value: number) => formatCurrency(value, BASE_CURRENCY_CODE, currencyRates);
-  const showDisplayEstimate = displayCurrency !== BASE_CURRENCY_CODE;
+  const snapshotCurrency = orderDetail?.order.buyer_display_currency ?? displayCurrency;
+  const snapshotDisplayAmount = Number(orderDetail?.order.buyer_display_amount ?? 0);
+  const showDisplayEstimate = snapshotCurrency !== BASE_CURRENCY_CODE && snapshotDisplayAmount > 0;
+  const snapshotDisplayPrice = showDisplayEstimate
+    ? formatCurrencyValue(snapshotDisplayAmount, snapshotCurrency)
+    : "";
   const noticeState = getNoticeMessage(resolvedSearchParams.notice);
 
   if (!orderDetail) {
@@ -182,7 +187,7 @@ export default async function AccountCheckoutPage({
                   </p>
                   {showDisplayEstimate ? (
                     <p className="mt-1 text-xs font-medium text-muted-foreground">
-                      Estimate: {formatPrice(order.amount)}
+                      Buyer display snapshot: {snapshotDisplayPrice}
                     </p>
                   ) : null}
                 </div>
@@ -316,7 +321,7 @@ export default async function AccountCheckoutPage({
                         </p>
                         {showDisplayEstimate ? (
                           <p className="mt-2 text-sm font-medium text-muted-foreground">
-                            Estimated display value: {formatPrice(order.amount)}
+                            Buyer display snapshot: {snapshotDisplayPrice}
                           </p>
                         ) : null}
                       </div>

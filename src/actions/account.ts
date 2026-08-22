@@ -13,7 +13,9 @@ import {
   getBusinessSettings,
   getBuyerOrderDetail,
   getBuyerOrders,
-  getMarketplaceListingById
+  getCurrencyRates,
+  getMarketplaceListingById,
+  getProfileSettings
 } from "@/lib/data";
 import {
   addDemoOrder,
@@ -25,8 +27,11 @@ import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import {
   getPendingCheckoutExpiresAt,
+  BASE_CURRENCY_CODE,
   calculatePlatformFee,
   calculateSellerPayout,
+  convertNgnToDisplayCurrency,
+  getCurrencyRate,
   getNigeriaTimestamp,
   isOrderPaymentConfirmed,
   isPendingCheckoutActive,
@@ -214,10 +219,19 @@ async function createPendingOrderForListing({
     return null;
   }
 
-  const businessSettings = await getBusinessSettings();
+  const [businessSettings, buyerSettings, currencyRates] = await Promise.all([
+    getBusinessSettings(),
+    getProfileSettings(buyerId),
+    getCurrencyRates()
+  ]);
   const platformFeeRate = businessSettings.platform_commission_rate;
   const platformFeeAmount = calculatePlatformFee(officialAmount, platformFeeRate);
   const sellerPayoutAmount = calculateSellerPayout(officialAmount, platformFeeRate);
+  const displayRate = getCurrencyRate(buyerSettings.display_currency, currencyRates);
+  const displayCurrency = displayRate.code || BASE_CURRENCY_CODE;
+  const displayAmount =
+    Math.round(convertNgnToDisplayCurrency(officialAmount, displayCurrency, currencyRates) * 100) / 100;
+  const exchangeRateSnapshot = displayCurrency === BASE_CURRENCY_CODE ? 1 : displayRate.ngn_rate;
 
   if (!hasSupabaseEnv) {
     return addDemoOrder({
@@ -229,6 +243,10 @@ async function createPendingOrderForListing({
       listing_id: listingId,
       listing_title: listingTitle,
       amount: officialAmount,
+      base_currency: BASE_CURRENCY_CODE,
+      buyer_display_currency: displayCurrency,
+      buyer_display_amount: displayAmount,
+      exchange_rate_snapshot: exchangeRateSnapshot,
       platform_fee_rate: platformFeeRate,
       platform_fee_amount: platformFeeAmount,
       seller_payout_amount: sellerPayoutAmount,
@@ -260,6 +278,10 @@ async function createPendingOrderForListing({
       listing_id: listingId,
       listing_title: listingTitle,
       amount: officialAmount,
+      base_currency: BASE_CURRENCY_CODE,
+      buyer_display_currency: displayCurrency,
+      buyer_display_amount: displayAmount,
+      exchange_rate_snapshot: exchangeRateSnapshot,
       platform_fee_rate: platformFeeRate,
       platform_fee_amount: platformFeeAmount,
       seller_payout_amount: sellerPayoutAmount,

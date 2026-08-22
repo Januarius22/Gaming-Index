@@ -8,7 +8,7 @@ import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrderDetail, getCurrencyRates, getProfileSettings } from "@/lib/data";
-import { BASE_CURRENCY_CODE, formatCurrency } from "@/lib/utils";
+import { BASE_CURRENCY_CODE, formatCurrency, formatCurrencyValue } from "@/lib/utils";
 
 export default async function PurchaseSuccessPage({
   params
@@ -29,7 +29,9 @@ export default async function PurchaseSuccessPage({
 
   const { order, listing, paymentConfirmed, deliveryAvailable } = orderDetail;
   const displayCurrency = settings.display_currency;
-  const showDisplayEstimate = displayCurrency !== BASE_CURRENCY_CODE;
+  const snapshotCurrency = order.buyer_display_currency ?? displayCurrency;
+  const snapshotDisplayAmount = Number(order.buyer_display_amount ?? 0);
+  const showDisplayEstimate = snapshotCurrency !== BASE_CURRENCY_CODE && snapshotDisplayAmount > 0;
 
   if (!paymentConfirmed) {
     redirect(`/account/checkout/${order.id}`);
@@ -72,7 +74,7 @@ export default async function PurchaseSuccessPage({
               </p>
               {showDisplayEstimate ? (
                 <p className="mt-1 text-xs font-medium text-muted-foreground">
-                  Display estimate: {formatCurrency(order.amount, displayCurrency, currencyRates)}
+                  Buyer display snapshot: {formatCurrencyValue(snapshotDisplayAmount, snapshotCurrency)}
                 </p>
               ) : null}
             </div>

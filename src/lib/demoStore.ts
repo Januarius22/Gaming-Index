@@ -407,6 +407,10 @@ export async function addDemoOrder(
     listing_id: order.listing_id,
     listing_title: order.listing_title,
     amount: order.amount,
+    base_currency: order.base_currency ?? "NGN",
+    buyer_display_currency: order.buyer_display_currency ?? "NGN",
+    buyer_display_amount: order.buyer_display_amount ?? order.amount,
+    exchange_rate_snapshot: order.exchange_rate_snapshot ?? 1,
     platform_fee_rate: order.platform_fee_rate ?? PLATFORM_COMMISSION_RATE,
     platform_fee_amount:
       order.platform_fee_amount ?? calculatePlatformFee(order.amount, order.platform_fee_rate ?? PLATFORM_COMMISSION_RATE),
