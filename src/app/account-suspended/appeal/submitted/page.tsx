@@ -3,7 +3,7 @@ import { CheckCircle2 } from "lucide-react";
 import LogoutConfirmButton from "@/components/auth/LogoutConfirmButton";
 import Badge from "@/components/ui/Badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
-import { getCurrentProfile, getDashboardRoute } from "@/lib/auth";
+import { getCurrentProfile, getDashboardRoute, signOutServerSession } from "@/lib/auth";
 
 export default async function SuspensionAppealSubmittedPage() {
   const profile = await getCurrentProfile();
@@ -14,6 +14,11 @@ export default async function SuspensionAppealSubmittedPage() {
 
   if (profile.role === "admin") {
     redirect("/admin/dashboard");
+  }
+
+  if (profile.is_deleted || profile.is_deactivated) {
+    await signOutServerSession();
+    redirect("/auth/login");
   }
 
   if (!profile.is_banned) {

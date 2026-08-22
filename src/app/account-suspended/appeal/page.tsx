@@ -5,7 +5,7 @@ import SuspensionAppealForm from "@/components/account/SuspensionAppealForm";
 import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
-import { getCurrentProfile, getDashboardRoute } from "@/lib/auth";
+import { getCurrentProfile, getDashboardRoute, signOutServerSession } from "@/lib/auth";
 import { getBusinessSettings } from "@/lib/data";
 import { formatDate } from "@/lib/utils";
 
@@ -24,6 +24,12 @@ export default async function SuspensionAppealPage() {
   }
 
   if (profile.is_deleted) {
+    await signOutServerSession();
+    redirect("/auth/login");
+  }
+
+  if (profile.is_deactivated) {
+    await signOutServerSession();
     redirect("/auth/login");
   }
 

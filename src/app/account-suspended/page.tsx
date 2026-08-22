@@ -6,7 +6,7 @@ import SubmitButton from "@/components/auth/SubmitButton";
 import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
-import { getCurrentProfile, getDashboardRoute } from "@/lib/auth";
+import { getCurrentProfile, getDashboardRoute, signOutServerSession } from "@/lib/auth";
 import { getBusinessSettings } from "@/lib/data";
 import { formatDate } from "@/lib/utils";
 
@@ -25,6 +25,12 @@ export default async function AccountSuspendedPage() {
   }
 
   if (profile.is_deleted) {
+    await signOutServerSession();
+    redirect("/auth/login");
+  }
+
+  if (profile.is_deactivated) {
+    await signOutServerSession();
     redirect("/auth/login");
   }
 

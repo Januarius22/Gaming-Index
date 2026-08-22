@@ -85,14 +85,15 @@ export function getDashboardRoute(role: AppRole) {
 export async function redirectIfAuthenticated() {
   const profile = await getCurrentProfile();
 
-    if (profile) {
-      if ((profile.is_deleted || profile.is_deactivated) && profile.role !== "admin") {
-        redirect("/auth/login");
-      }
+  if (profile) {
+    if ((profile.is_deleted || profile.is_deactivated) && profile.role !== "admin") {
+      await signOutServerSession();
+      return;
+    }
 
-      if (profile.is_banned && profile.role !== "admin") {
-        redirect("/account-suspended");
-      }
+    if (profile.is_banned && profile.role !== "admin") {
+      redirect("/account-suspended");
+    }
 
     redirect(getDashboardRoute(profile.role));
   }
