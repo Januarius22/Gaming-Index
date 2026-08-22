@@ -19,6 +19,11 @@ function getNoticeMessage(notice?: string) {
       return { message: "Listing saved for later.", tone: "success" as const };
     case "listing-unsaved":
       return { message: "Listing removed from your saved list.", tone: "success" as const };
+    case "account-limited":
+      return {
+        message: "Your account is currently limited. Checkout is unavailable while our team reviews your account.",
+        tone: "error" as const
+      };
     case "listing-remove-failed":
     case "listing-save-failed":
       return { message: "We could not update your saved list right now.", tone: "error" as const };

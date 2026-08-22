@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSellerProfile } from "@/lib/auth";
+import { ACCOUNT_LIMITED_MESSAGE, isAccountLimited } from "@/lib/accountLimits";
 import {
   addDemoKycSubmission,
   addDemoListingDeliveryDetails,
@@ -54,7 +55,14 @@ export async function requestWithdrawalAction(
   _previousState: WithdrawalActionState,
   formData: FormData
 ): Promise<WithdrawalActionState> {
-  await requireSellerProfile();
+  const seller = await requireSellerProfile();
+
+  if (isAccountLimited(seller)) {
+    return {
+      status: "error",
+      message: ACCOUNT_LIMITED_MESSAGE
+    };
+  }
 
   const amount = Number(String(formData.get("amount") ?? "").replace(/,/g, "").trim());
   const bankName = String(formData.get("bankName") ?? "").trim();
@@ -640,6 +648,13 @@ export async function saveListingSubmission({
     return {
       status: "error",
       message: "Your account is suspended. Seller features are unavailable."
+    };
+  }
+
+  if (isAccountLimited(seller)) {
+    return {
+      status: "error",
+      message: ACCOUNT_LIMITED_MESSAGE
     };
   }
 

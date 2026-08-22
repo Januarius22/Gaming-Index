@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentProfile, requireAccountProfile } from "@/lib/auth";
 import {
+  ACCOUNT_LIMITED_MESSAGE,
+  getAccountLimitedRedirect,
+  isAccountLimited
+} from "@/lib/accountLimits";
+import {
   removeCartListingId,
   removeSavedListingId,
   toggleCartListingId,
@@ -396,6 +401,13 @@ export async function unlockSellerAccessAction(
   void formData;
   const profile = await requireAccountProfile();
 
+  if (isAccountLimited(profile)) {
+    return {
+      status: "error",
+      message: ACCOUNT_LIMITED_MESSAGE
+    };
+  }
+
   if (profile.seller_enabled) {
     redirect("/seller/dashboard");
   }
@@ -541,6 +553,10 @@ export async function buyNowAction(formData: FormData) {
   const listingId = String(formData.get("listingId") ?? "").trim();
   const returnTo = getSafeReturnPath(String(formData.get("returnTo") ?? ""));
 
+  if (isAccountLimited(profile)) {
+    redirect(getAccountLimitedRedirect(returnTo));
+  }
+
   if (!listingId) {
     redirect(getRedirectWithNotice(returnTo, "buy-now-failed"));
   }
@@ -652,10 +668,17 @@ export async function submitOrderDisputeAction(
   _previousState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  await requireAccountProfile();
+  const profile = await requireAccountProfile();
   const orderId = String(formData.get("orderId") ?? "").trim();
   const reason = String(formData.get("reason") ?? "").trim();
   const details = String(formData.get("details") ?? "").trim();
+
+  if (isAccountLimited(profile)) {
+    return {
+      status: "error",
+      message: ACCOUNT_LIMITED_MESSAGE
+    };
+  }
 
   if (!orderId || !reason || details.length < 20) {
     return {
@@ -710,7 +733,14 @@ export async function requestBuyerWithdrawalAction(
   _previousState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  await requireAccountProfile();
+  const profile = await requireAccountProfile();
+
+  if (isAccountLimited(profile)) {
+    return {
+      status: "error",
+      message: ACCOUNT_LIMITED_MESSAGE
+    };
+  }
 
   const amount = Number(String(formData.get("amount") ?? "").replace(/,/g, "").trim());
   const bankName = String(formData.get("bankName") ?? "").trim();
@@ -778,6 +808,10 @@ export async function completeCheckoutAction(formData: FormData) {
 
   if (!orderId) {
     redirect("/account/orders");
+  }
+
+  if (isAccountLimited(profile)) {
+    redirect(getCheckoutPath(orderId, "account-limited"));
   }
 
   const orderDetail = await getBuyerOrderDetail(profile, orderId);

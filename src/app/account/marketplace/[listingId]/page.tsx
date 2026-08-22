@@ -32,6 +32,11 @@ function getNoticeMessage(notice?: string) {
         message: "We could not start checkout for that listing right now.",
         tone: "error" as const
       };
+    case "account-limited":
+      return {
+        message: "Your account is currently limited. Checkout is unavailable while our team reviews your account.",
+        tone: "error" as const
+      };
     case "listing-saved":
       return { message: "Listing saved for later.", tone: "success" as const };
     case "listing-unsaved":

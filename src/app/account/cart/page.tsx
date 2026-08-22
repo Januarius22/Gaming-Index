@@ -25,6 +25,11 @@ function getNoticeMessage(notice?: string) {
   switch (notice) {
     case "buy-now-failed":
       return { message: "We could not start checkout for that listing right now.", tone: "error" as const };
+    case "account-limited":
+      return {
+        message: "Your account is currently limited. Checkout is unavailable while our team reviews your account.",
+        tone: "error" as const
+      };
     case "checkout-resumed":
       return { message: "Checkout resumed for that account.", tone: "success" as const };
     case "cart-added":

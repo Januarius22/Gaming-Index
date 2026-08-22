@@ -43,6 +43,11 @@ function getNoticeMessage(notice?: string) {
         message: "This checkout is no longer available for the current listing state.",
         tone: "error" as const
       };
+    case "account-limited":
+      return {
+        message: "Your account is currently limited. Payment is unavailable while our team reviews your account.",
+        tone: "error" as const
+      };
     default:
       return {
         message: "",

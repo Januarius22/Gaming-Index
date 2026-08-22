@@ -23,6 +23,10 @@ export default function DisputeNotice({
     return <FormMessage message="Select a reason and add a clear description." tone="error" />;
   }
 
+  if (notice === "account-limited") {
+    return <FormMessage message="Your account is currently limited. New disputes are unavailable while our team reviews your account." tone="error" />;
+  }
+
   if (notice === "screenshot-required") {
     return <FormMessage message="At least one screenshot is required to open a dispute." tone="error" />;
   }

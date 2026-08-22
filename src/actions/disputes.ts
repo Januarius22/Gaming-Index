@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentProfile, requireAccountProfile } from "@/lib/auth";
+import { isAccountLimited } from "@/lib/accountLimits";
 import { getBuyerOrderDetail, isOrderDisputeEligible } from "@/lib/data";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
@@ -86,6 +87,10 @@ export async function openDisputeCaseAction(formData: FormData) {
 
   if (!orderId) {
     redirect("/account/disputes?notice=invalid-order");
+  }
+
+  if (isAccountLimited(profile)) {
+    redirect("/account/disputes?notice=account-limited");
   }
 
   if (!hasSupabaseEnv) {
