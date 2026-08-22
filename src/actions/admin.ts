@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminProfile } from "@/lib/auth";
+import { getAccountDeletionBlockers } from "@/lib/accountDeletion";
 import {
   getDemoListings,
   getDemoProfileById,
@@ -1833,6 +1834,18 @@ export async function approveDeletionRequestInlineAction(formData: FormData) {
     return {
       status: "error" as const,
       message: "Only pending deletion requests can be approved."
+    };
+  }
+
+  const blockers = await getAccountDeletionBlockers(
+    { id: request.profile_id },
+    { includePendingDeletionRequest: false }
+  );
+
+  if (blockers.length > 0) {
+    return {
+      status: "error" as const,
+      message: `Resolve these before approval: ${blockers.join(" ")}`
     };
   }
 

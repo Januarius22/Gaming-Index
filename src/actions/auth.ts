@@ -140,14 +140,16 @@ export async function loginAction(
       .eq("id", user?.id ?? "")
       .maybeSingle();
 
-    if ((profile?.is_deleted || profile?.is_deactivated) && profile.role !== "admin") {
+    if (profile?.is_deleted && profile.role !== "admin") {
       await signOutServerSession();
       return {
         status: "error",
-        message: profile.is_deleted
-          ? "This account is no longer available."
-          : "This account is deactivated. Contact support if you need it restored."
+        message: "This account is no longer available."
       };
+    }
+
+    if (profile?.is_deactivated && profile.role !== "admin") {
+      redirect("/account-deactivated");
     }
 
     if (profile?.is_banned && profile.role !== "admin") {
@@ -180,16 +182,19 @@ export async function loginAction(
     redirect("/account-suspended");
   }
 
-  if ((profile.is_deleted || profile.is_deactivated) && profile.role !== "admin") {
+  if (profile.is_deleted && profile.role !== "admin") {
     return {
       status: "error",
-      message: profile.is_deleted
-        ? "This account is no longer available."
-        : "This account is deactivated. Contact support if you need it restored."
+      message: "This account is no longer available."
     };
   }
 
   await setDemoSession(profile.id);
+
+  if (profile.is_deactivated && profile.role !== "admin") {
+    redirect("/account-deactivated");
+  }
+
   redirect(getDashboardRoute(profile.role));
 }
 

@@ -30,8 +30,7 @@ export default async function AccountSuspendedPage() {
   }
 
   if (profile.is_deactivated) {
-    await signOutServerSession();
-    redirect("/auth/login");
+    redirect("/account-deactivated");
   }
 
   if (!profile.is_banned) {

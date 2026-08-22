@@ -86,9 +86,13 @@ export async function redirectIfAuthenticated() {
   const profile = await getCurrentProfile();
 
   if (profile) {
-    if ((profile.is_deleted || profile.is_deactivated) && profile.role !== "admin") {
+    if (profile.is_deleted && profile.role !== "admin") {
       await signOutServerSession();
       return;
+    }
+
+    if (profile.is_deactivated && profile.role !== "admin") {
+      redirect("/account-deactivated");
     }
 
     if (profile.is_banned && profile.role !== "admin") {
@@ -110,8 +114,12 @@ export async function requireAccountProfile() {
     redirect("/admin/dashboard");
   }
 
-  if (profile.is_deleted || profile.is_deactivated) {
+  if (profile.is_deleted) {
     redirect("/auth/login");
+  }
+
+  if (profile.is_deactivated) {
+    redirect("/account-deactivated");
   }
 
   if (profile.is_banned) {
@@ -132,8 +140,12 @@ export async function requireSellerProfile() {
     redirect("/admin/dashboard");
   }
 
-  if (profile.is_deleted || profile.is_deactivated) {
+  if (profile.is_deleted) {
     redirect("/auth/login");
+  }
+
+  if (profile.is_deactivated) {
+    redirect("/account-deactivated");
   }
 
   if (profile.is_banned) {

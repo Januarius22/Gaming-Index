@@ -16,9 +16,13 @@ export default async function SuspensionAppealSubmittedPage() {
     redirect("/admin/dashboard");
   }
 
-  if (profile.is_deleted || profile.is_deactivated) {
+  if (profile.is_deleted) {
     await signOutServerSession();
     redirect("/auth/login");
+  }
+
+  if (profile.is_deactivated) {
+    redirect("/account-deactivated");
   }
 
   if (!profile.is_banned) {

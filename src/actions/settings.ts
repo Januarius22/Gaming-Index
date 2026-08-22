@@ -8,6 +8,7 @@ import {
   requireAdminProfile,
   requireSellerProfile
 } from "@/lib/auth";
+import { hasPendingAccountDeletionRequest } from "@/lib/accountDeletion";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import { isValidPhoneNumber } from "@/lib/utils";
@@ -478,94 +479,6 @@ export async function changePasswordAction(
   };
 }
 
-async function getAccountDeletionBlockers(profile: Profile) {
-  if (!hasSupabaseEnv) {
-    return [];
-  }
-
-  const supabase = await getSupabaseServerClient();
-
-  if (!supabase) {
-    return ["Account checks could not be completed."];
-  }
-
-  const [
-    { data: wallet },
-    { count: activeOrders },
-    { count: activeSellerOrders },
-    { count: openDisputes },
-    { count: pendingWithdrawals },
-    { count: activeListings },
-    { count: pendingRequests }
-  ] = await Promise.all([
-    supabase
-      .from("wallets")
-      .select("available_balance, pending_balance")
-      .eq("profile_id", profile.id)
-      .maybeSingle(),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("buyer_id", profile.id)
-      .in("status", ["pending", "processing"]),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("seller_id", profile.id)
-      .in("escrow_status", ["holding", "disputed"]),
-    supabase
-      .from("disputes")
-      .select("id", { count: "exact", head: true })
-      .or(`buyer_id.eq.${profile.id},seller_id.eq.${profile.id}`)
-      .in("status", ["pending_admin_review", "awaiting_seller_response", "under_investigation", "open", "reviewing"]),
-    supabase
-      .from("withdrawal_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("profile_id", profile.id)
-      .in("status", ["pending", "approved"]),
-    supabase
-      .from("listings")
-      .select("id", { count: "exact", head: true })
-      .eq("seller_id", profile.id)
-      .in("status", ["draft", "pending_review", "approved", "sold"]),
-    supabase
-      .from("account_deletion_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("profile_id", profile.id)
-      .eq("status", "pending")
-  ]);
-
-  const blockers: string[] = [];
-  const availableBalance = Number(wallet?.available_balance ?? 0);
-  const pendingBalance = Number(wallet?.pending_balance ?? 0);
-
-  if (availableBalance > 0 || pendingBalance > 0) {
-    blockers.push("Wallet balance must be cleared first.");
-  }
-
-  if ((activeOrders ?? 0) > 0 || (activeSellerOrders ?? 0) > 0) {
-    blockers.push("Active orders must be completed or resolved first.");
-  }
-
-  if ((openDisputes ?? 0) > 0) {
-    blockers.push("Open disputes must be resolved first.");
-  }
-
-  if ((pendingWithdrawals ?? 0) > 0) {
-    blockers.push("Pending withdrawals must be completed first.");
-  }
-
-  if ((activeListings ?? 0) > 0) {
-    blockers.push("Active seller listings must be withdrawn or resolved first.");
-  }
-
-  if ((pendingRequests ?? 0) > 0) {
-    blockers.push("You already have a pending deletion request.");
-  }
-
-  return blockers;
-}
-
 export async function deactivateAccountAction(
   _previousState: ActionState,
   formData: FormData
@@ -624,8 +537,53 @@ export async function deactivateAccountAction(
     };
   }
 
-  await supabase?.auth.signOut();
-  redirect("/auth/login?notice=account-deactivated");
+  revalidatePath("/account-deactivated");
+  redirect("/account-deactivated");
+}
+
+export async function requestAccountReactivationAction(formData: FormData) {
+  const profile = await getCurrentProfile();
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  if (!profile || profile.role === "admin" || !profile.is_deactivated) {
+    redirect("/auth/login");
+  }
+
+  if (!hasSupabaseEnv) {
+    redirect("/account-deactivated?notice=reactivation-requested");
+  }
+
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    redirect("/account-deactivated?notice=reactivation-failed");
+  }
+
+  const { data: admins } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("role", "admin");
+
+  const notifications = ((admins as Array<{ id: string }> | null) ?? []).map((admin) => ({
+    profile_id: admin.id,
+    type: "account_reactivation_request",
+    title: "Account reactivation request",
+    message: `${profile.full_name} requested account reactivation.`,
+    link_path: "/admin/users?status=deactivated",
+    metadata: {
+      profile_id: profile.id,
+      email: profile.email,
+      reason
+    }
+  }));
+
+  if (notifications.length > 0) {
+    await supabase.from("notifications").insert(notifications);
+  }
+
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/notifications");
+  redirect("/account-deactivated?notice=reactivation-requested");
 }
 
 export async function requestAccountDeletionAction(
@@ -664,12 +622,12 @@ export async function requestAccountDeletionAction(
     };
   }
 
-  const blockers = await getAccountDeletionBlockers(profile);
+  const hasPendingRequest = await hasPendingAccountDeletionRequest(profile.id);
 
-  if (blockers.length > 0) {
+  if (hasPendingRequest) {
     return {
       status: "error",
-      message: blockers.join(" ")
+      message: "You already have a pending deletion request."
     };
   }
 

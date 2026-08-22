@@ -22,9 +22,11 @@ const statusVariant: Record<AccountDeletionRequest["status"], "warning" | "succe
 };
 
 export default function AdminDeletionRequestsTable({
-  requests
+  requests,
+  blockersByRequestId = {}
 }: {
   requests: AccountDeletionRequest[];
+  blockersByRequestId?: Record<string, string[]>;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -106,6 +108,7 @@ export default function AdminDeletionRequestsTable({
             ) : (
               visibleRequests.map((request) => {
                 const isPending = request.status === "pending";
+                const blockers = blockersByRequestId[request.id] ?? [];
 
                 return (
                   <tr key={request.id} className="border-b border-border/60 align-top">
@@ -121,6 +124,16 @@ export default function AdminDeletionRequestsTable({
                         <p className="mt-2 max-w-md text-xs leading-5 text-muted-foreground">
                           Admin note: {request.admin_note}
                         </p>
+                      ) : null}
+                      {isPending && blockers.length > 0 ? (
+                        <div className="mt-3 max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+                          <p className="font-semibold">Approval blockers</p>
+                          <ul className="mt-1 space-y-1">
+                            {blockers.map((blocker) => (
+                              <li key={blocker}>{blocker}</li>
+                            ))}
+                          </ul>
+                        </div>
                       ) : null}
                     </td>
                     <td className="px-4 py-4">

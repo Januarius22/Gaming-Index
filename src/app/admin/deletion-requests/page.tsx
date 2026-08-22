@@ -1,6 +1,7 @@
 import AdminDeletionRequestsTable from "@/components/admin/AdminDeletionRequestsTable";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import PaginationControls from "@/components/ui/PaginationControls";
+import { getAccountDeletionBlockers } from "@/lib/accountDeletion";
 import { getAdminAccountDeletionRequests } from "@/lib/data";
 import { paginateItems, parsePageParam } from "@/lib/utils";
 
@@ -22,6 +23,16 @@ export default async function AdminDeletionRequestsPage({
     pageStart,
     pageEnd
   } = paginateItems(requests, requestedPage, 10);
+  const blockerEntries = await Promise.all(
+    paginatedRequests.map(async (request) => [
+      request.id,
+      await getAccountDeletionBlockers(
+        { id: request.profile_id },
+        { includePendingDeletionRequest: false }
+      )
+    ] as const)
+  );
+  const blockersByRequestId = Object.fromEntries(blockerEntries);
 
   return (
     <Card>
@@ -42,7 +53,10 @@ export default async function AdminDeletionRequestsPage({
             totalPages={totalPages}
           />
         </div>
-        <AdminDeletionRequestsTable requests={paginatedRequests} />
+        <AdminDeletionRequestsTable
+          requests={paginatedRequests}
+          blockersByRequestId={blockersByRequestId}
+        />
       </CardContent>
     </Card>
   );
