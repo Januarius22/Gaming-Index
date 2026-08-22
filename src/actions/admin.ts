@@ -14,7 +14,18 @@ import { getDefaultBusinessSettings } from "@/lib/data";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import { getNigeriaTimestamp } from "@/lib/utils";
-import type { ActionState } from "@/types";
+import type { AccountStatus, ActionState } from "@/types";
+
+const editableAccountStatusValues = new Set<AccountStatus>([
+  "active",
+  "under_review",
+  "limited"
+]);
+
+function readEditableAccountStatus(value: FormDataEntryValue | null): AccountStatus | null {
+  const status = String(value ?? "").trim() as AccountStatus;
+  return editableAccountStatusValues.has(status) ? status : null;
+}
 
 export async function updateCurrencyRateAction(formData: FormData) {
   const adminProfile = await requireAdminProfile();
@@ -1270,7 +1281,11 @@ async function banUser(formData: FormData): Promise<AdminActionResult & { userId
         is_banned: true,
         banned_at: bannedAt,
         banned_reason: banReason,
-        banned_by: admin.id
+        banned_by: admin.id,
+        account_status: "suspended",
+        account_status_reason: banReason,
+        account_status_updated_at: bannedAt,
+        account_status_updated_by: admin.id
       })
       .eq("id", userId)
       .neq("role", "admin");
@@ -1302,7 +1317,11 @@ async function banUser(formData: FormData): Promise<AdminActionResult & { userId
       is_banned: true,
       banned_at: bannedAt,
       banned_reason: banReason,
-      banned_by: admin.id
+      banned_by: admin.id,
+      account_status: "suspended",
+      account_status_reason: banReason,
+      account_status_updated_at: bannedAt,
+      account_status_updated_by: admin.id
     });
   }
 
@@ -1342,7 +1361,11 @@ async function unbanUser(formData: FormData): Promise<AdminActionResult & { user
         is_banned: false,
         banned_at: null,
         banned_reason: "",
-        banned_by: null
+        banned_by: null,
+        account_status: "active",
+        account_status_reason: "",
+        account_status_updated_at: new Date().toISOString(),
+        account_status_updated_by: admin.id
       })
       .eq("id", userId)
       .neq("role", "admin");
@@ -1374,7 +1397,11 @@ async function unbanUser(formData: FormData): Promise<AdminActionResult & { user
       is_banned: false,
       banned_at: null,
       banned_reason: "",
-      banned_by: null
+      banned_by: null,
+      account_status: "active",
+      account_status_reason: "",
+      account_status_updated_at: new Date().toISOString(),
+      account_status_updated_by: admin.id
     });
   }
 
@@ -1400,6 +1427,116 @@ export async function banUserInlineAction(formData: FormData) {
 
 export async function unbanUserInlineAction(formData: FormData) {
   return unbanUser(formData);
+}
+
+export async function updateAccountStatusInlineAction(formData: FormData) {
+  const admin = await requireAdminProfile();
+  const userId = String(formData.get("userId") ?? "").trim();
+  const status = readEditableAccountStatus(formData.get("accountStatus"));
+  const reason = String(formData.get("accountStatusReason") ?? "").trim();
+  const updatedAt = new Date().toISOString();
+
+  if (!userId || userId === admin.id || !status) {
+    return {
+      status: "error" as const,
+      message: "This account status cannot be updated."
+    };
+  }
+
+  if ((status === "under_review" || status === "limited") && reason.length < 6) {
+    return {
+      status: "error" as const,
+      message: "Add a short reason for this account status."
+    };
+  }
+
+  if (hasSupabaseEnv) {
+    const supabase = await getSupabaseServerClient();
+    const { data: targetUser, error: targetError } = await supabase!
+      .from("profiles")
+      .select("id, role, is_banned, is_deleted, is_deactivated")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (targetError || !targetUser) {
+      return {
+        status: "error" as const,
+        message: "User not found."
+      };
+    }
+
+    if (
+      targetUser.role === "admin" ||
+      targetUser.is_banned ||
+      targetUser.is_deleted ||
+      targetUser.is_deactivated
+    ) {
+      return {
+        status: "error" as const,
+        message: "Use the dedicated restore or suspension action for this account."
+      };
+    }
+
+    const { error } = await supabase!
+      .from("profiles")
+      .update({
+        account_status: status,
+        account_status_reason: status === "active" ? "" : reason,
+        account_status_updated_at: updatedAt,
+        account_status_updated_by: admin.id
+      })
+      .eq("id", userId)
+      .neq("role", "admin");
+
+    if (error) {
+      return {
+        status: "error" as const,
+        message: error.message
+      };
+    }
+  } else {
+    const targetUser = await getDemoProfileById(userId);
+
+    if (!targetUser) {
+      return {
+        status: "error" as const,
+        message: "User not found."
+      };
+    }
+
+    if (
+      targetUser.role === "admin" ||
+      targetUser.is_banned ||
+      targetUser.is_deleted ||
+      targetUser.is_deactivated
+    ) {
+      return {
+        status: "error" as const,
+        message: "Use the dedicated restore or suspension action for this account."
+      };
+    }
+
+    await updateDemoProfile(userId, {
+      account_status: status,
+      account_status_reason: status === "active" ? "" : reason,
+      account_status_updated_at: updatedAt,
+      account_status_updated_by: admin.id
+    });
+  }
+
+  revalidatePath("/admin/users");
+  revalidatePath("/account/dashboard");
+  revalidatePath("/account/settings");
+  revalidatePath("/seller/dashboard");
+  revalidatePath("/seller/settings");
+
+  return {
+    status: "success" as const,
+    message: "Account status updated.",
+    userId,
+    accountStatus: status,
+    accountStatusReason: status === "active" ? "" : reason
+  };
 }
 
 export async function archiveUserInlineAction(formData: FormData) {
@@ -1485,7 +1622,11 @@ export async function archiveUserInlineAction(formData: FormData) {
       is_banned: true,
       banned_at: targetUser.banned_at ?? deletedAt,
       banned_reason: targetUser.banned_reason || deleteReason,
-      banned_by: targetUser.banned_by ?? admin.id
+      banned_by: targetUser.banned_by ?? admin.id,
+      account_status: "deleted",
+      account_status_reason: deleteReason,
+      account_status_updated_at: deletedAt,
+      account_status_updated_by: admin.id
     })
     .eq("id", userId)
     .neq("role", "admin");
@@ -1550,7 +1691,11 @@ export async function restoreDeletedUserInlineAction(formData: FormData) {
       is_deleted: false,
       deleted_at: null,
       deleted_reason: "",
-      deleted_by: null
+      deleted_by: null,
+      account_status: "suspended",
+      account_status_reason: "Restored from deleted accounts.",
+      account_status_updated_at: restoredAt,
+      account_status_updated_by: admin.id
     })
     .eq("id", profileId)
     .neq("role", "admin");
@@ -1614,7 +1759,11 @@ export async function restoreDeactivatedUserInlineAction(formData: FormData) {
     .update({
       is_deactivated: false,
       deactivated_at: null,
-      deactivation_reason: ""
+      deactivation_reason: "",
+      account_status: "active",
+      account_status_reason: "",
+      account_status_updated_at: new Date().toISOString(),
+      account_status_updated_by: admin.id
     })
     .eq("id", userId)
     .neq("role", "admin");

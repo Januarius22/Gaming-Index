@@ -1,4 +1,4 @@
-import type { AppRole, KycStatus, Profile } from "@/types";
+import type { AccountStatus, AppRole, KycStatus, Profile } from "@/types";
 
 export function normalizeRole(value: unknown): AppRole {
   return value === "admin" ? "admin" : "user";
@@ -19,11 +19,26 @@ export function normalizeSellerEnabled(value: unknown, legacyRole?: unknown) {
   return value === true || value === "true" || legacyRole === "seller";
 }
 
+export function normalizeAccountStatus(value: unknown): AccountStatus {
+  switch (value) {
+    case "under_review":
+    case "limited":
+    case "suspended":
+    case "deactivated":
+    case "pending_deletion":
+    case "deleted":
+      return value;
+    default:
+      return "active";
+  }
+}
+
 export function normalizeProfile(
   value: Partial<Profile> & {
     role?: unknown;
     seller_enabled?: unknown;
     kyc_status?: unknown;
+    account_status?: unknown;
     seller_strikes?: unknown;
     is_banned?: unknown;
     is_deleted?: unknown;
@@ -49,6 +64,10 @@ export function normalizeProfile(
     seller_strikes: Number.isFinite(rawSellerStrikes) ? rawSellerStrikes : 0,
     seller_restricted_until: value.seller_restricted_until ?? null,
     seller_restriction_reason: value.seller_restriction_reason ?? "",
+    account_status: normalizeAccountStatus(value.account_status),
+    account_status_reason: value.account_status_reason ?? "",
+    account_status_updated_at: value.account_status_updated_at ?? null,
+    account_status_updated_by: value.account_status_updated_by ?? null,
     is_banned: rawIsBanned === true || rawIsBanned === "true",
     banned_at: value.banned_at ?? null,
     banned_reason: value.banned_reason ?? "",

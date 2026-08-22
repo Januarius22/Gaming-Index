@@ -1,6 +1,14 @@
 export type AppRole = "user" | "admin";
 
 export type KycStatus = "not_started" | "pending" | "approved" | "rejected";
+export type AccountStatus =
+  | "active"
+  | "under_review"
+  | "limited"
+  | "suspended"
+  | "deactivated"
+  | "pending_deletion"
+  | "deleted";
 
 export type ListingStatus =
   | "draft"
@@ -37,6 +45,10 @@ export interface Profile {
   seller_strikes?: number;
   seller_restricted_until?: string | null;
   seller_restriction_reason?: string;
+  account_status?: AccountStatus;
+  account_status_reason?: string;
+  account_status_updated_at?: string | null;
+  account_status_updated_by?: string | null;
   is_banned: boolean;
   banned_at?: string | null;
   banned_reason?: string;

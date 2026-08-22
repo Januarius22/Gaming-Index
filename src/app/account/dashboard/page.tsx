@@ -1,5 +1,6 @@
 import Link from "next/link";
 import AccountStatsCards from "@/components/account/AccountStatsCards";
+import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import {
   Card,
@@ -9,12 +10,14 @@ import {
   CardTitle
 } from "@/components/ui/Card";
 import { requireAccountProfile } from "@/lib/auth";
+import { getEffectiveAccountStatus } from "@/lib/accountStatus";
 import { getAccountDashboardStats } from "@/lib/data";
 import { titleCase } from "@/lib/utils";
 
 export default async function AccountDashboardPage() {
   const profile = await requireAccountProfile();
   const stats = await getAccountDashboardStats(profile);
+  const accountStatus = getEffectiveAccountStatus(profile);
 
   return (
     <div className="space-y-6">
@@ -92,6 +95,15 @@ export default async function AccountDashboardPage() {
               <span className="text-muted-foreground">Email</span>
               <span className="font-semibold text-foreground">{profile.email}</span>
             </div>
+            <div className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3">
+              <span className="text-muted-foreground">Account Status</span>
+              <Badge variant={accountStatus.variant}>{accountStatus.label}</Badge>
+            </div>
+            {accountStatus.reason ? (
+              <div className="rounded-2xl bg-surface px-4 py-3 text-sm leading-6 text-muted-foreground">
+                {accountStatus.reason}
+              </div>
+            ) : null}
             <div className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3">
               <span className="text-muted-foreground">Seller Access</span>
               <span className="font-semibold text-foreground">

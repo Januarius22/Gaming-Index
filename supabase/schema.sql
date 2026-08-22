@@ -13,6 +13,10 @@ create table if not exists public.profiles (
   seller_strikes integer not null default 0 check (seller_strikes >= 0),
   seller_restricted_until timestamp with time zone,
   seller_restriction_reason text not null default '',
+  account_status text not null default 'active' check (account_status in ('active', 'under_review', 'limited', 'suspended', 'deactivated', 'pending_deletion', 'deleted')),
+  account_status_reason text not null default '',
+  account_status_updated_at timestamp with time zone,
+  account_status_updated_by uuid references public.profiles(id) on delete set null,
   banned_at timestamp with time zone,
   banned_reason text not null default '',
   banned_by uuid references public.profiles(id) on delete set null,
@@ -34,6 +38,13 @@ alter table public.profiles add column if not exists is_banned boolean not null 
 alter table public.profiles add column if not exists seller_strikes integer not null default 0;
 alter table public.profiles add column if not exists seller_restricted_until timestamp with time zone;
 alter table public.profiles add column if not exists seller_restriction_reason text not null default '';
+alter table public.profiles add column if not exists account_status text not null default 'active';
+alter table public.profiles add column if not exists account_status_reason text not null default '';
+alter table public.profiles add column if not exists account_status_updated_at timestamp with time zone;
+alter table public.profiles add column if not exists account_status_updated_by uuid references public.profiles(id) on delete set null;
+alter table public.profiles drop constraint if exists profiles_account_status_check;
+alter table public.profiles add constraint profiles_account_status_check
+  check (account_status in ('active', 'under_review', 'limited', 'suspended', 'deactivated', 'pending_deletion', 'deleted'));
 alter table public.profiles add column if not exists banned_at timestamp with time zone;
 alter table public.profiles add column if not exists banned_reason text not null default '';
 alter table public.profiles add column if not exists banned_by uuid references public.profiles(id) on delete set null;
@@ -3605,6 +3616,7 @@ set search_path = public
 as $$
 declare
   self_deactivation_allowed boolean;
+  self_status_update_allowed boolean;
 begin
   if auth.uid() = old.id and not exists (
     select 1
@@ -3618,12 +3630,35 @@ begin
       and new.deactivated_at is not null
       and trim(new.deactivation_reason) <> '';
 
+    self_status_update_allowed :=
+      (
+        self_deactivation_allowed
+        and new.account_status = 'deactivated'
+        and trim(new.account_status_reason) <> ''
+        and new.account_status_updated_by = auth.uid()
+      )
+      or (
+        old.account_status is distinct from 'pending_deletion'
+        and new.account_status = 'pending_deletion'
+        and trim(new.account_status_reason) <> ''
+        and new.account_status_updated_by = auth.uid()
+      );
+
     if
       new.role is distinct from old.role
       or new.kyc_status is distinct from old.kyc_status
       or new.seller_strikes is distinct from old.seller_strikes
       or new.seller_restricted_until is distinct from old.seller_restricted_until
       or new.seller_restriction_reason is distinct from old.seller_restriction_reason
+      or (
+        (
+          new.account_status is distinct from old.account_status
+          or new.account_status_reason is distinct from old.account_status_reason
+          or new.account_status_updated_at is distinct from old.account_status_updated_at
+          or new.account_status_updated_by is distinct from old.account_status_updated_by
+        )
+        and not self_status_update_allowed
+      )
       or new.is_banned is distinct from old.is_banned
       or new.banned_at is distinct from old.banned_at
       or new.banned_reason is distinct from old.banned_reason

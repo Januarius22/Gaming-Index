@@ -4,8 +4,10 @@ import NotificationList from "@/components/notifications/NotificationList";
 import SellerEnforcementNoticeModal from "@/components/seller/SellerEnforcementNoticeModal";
 import KycReviewNoticeModal from "@/components/seller/KycReviewNoticeModal";
 import SellerStatsCards from "@/components/seller/SellerStatsCards";
+import Badge from "@/components/ui/Badge";
 import Button, { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { getEffectiveAccountStatus } from "@/lib/accountStatus";
 import {
   getLatestSellerKycSubmission,
   getLatestSellerEnforcement,
@@ -29,6 +31,7 @@ export default async function SellerDashboardPage({
   ]);
   const params = (await searchParams) ?? {};
   const uploadUnlocked = canUploadAccounts(profile.kyc_status, profile);
+  const accountStatus = getEffectiveAccountStatus(profile);
   const kycHeading =
     profile.kyc_status === "pending" ? "Pending review" : titleCase(profile.kyc_status);
   const kycDescription =
@@ -148,6 +151,15 @@ export default async function SellerDashboardPage({
               <span className="text-muted-foreground">Email</span>
               <span className="font-semibold text-foreground">{profile.email}</span>
             </div>
+            <div className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3">
+              <span className="text-muted-foreground">Account Status</span>
+              <Badge variant={accountStatus.variant}>{accountStatus.label}</Badge>
+            </div>
+            {accountStatus.reason ? (
+              <div className="rounded-2xl bg-surface px-4 py-3 text-sm leading-6 text-muted-foreground">
+                {accountStatus.reason}
+              </div>
+            ) : null}
             <div className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3">
               <span className="text-muted-foreground">Seller Access</span>
               <span className="font-semibold text-foreground">

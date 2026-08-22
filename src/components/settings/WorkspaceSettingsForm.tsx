@@ -26,6 +26,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import Select from "@/components/ui/Select";
+import { getEffectiveAccountStatus } from "@/lib/accountStatus";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabaseClient";
 import { inferContentType, sanitizeFileName } from "@/lib/storageUploads";
 import type { ActionState, CurrencyRate, Profile, ProfileSettings } from "@/types";
@@ -234,6 +235,7 @@ export default function WorkspaceSettingsForm({
           }
         ];
   const [selectedTheme, setSelectedTheme] = useState(settings.theme_preference);
+  const accountStatus = getEffectiveAccountStatus(profile);
 
   useEffect(() => {
     return () => {
@@ -761,10 +763,15 @@ export default function WorkspaceSettingsForm({
                 <ShieldCheck className="h-4 w-4 text-primary" />
                 Account
               </span>
-              <Badge variant={statusVariant(!profile.is_banned)}>
-                {profile.is_banned ? "Suspended" : "Active"}
+              <Badge variant={accountStatus.variant}>
+                {accountStatus.label}
               </Badge>
             </div>
+            {accountStatus.reason ? (
+              <div className="rounded-2xl bg-surface px-4 py-3 text-sm leading-6 text-muted-foreground">
+                {accountStatus.reason}
+              </div>
+            ) : null}
             {workspace === "seller" ? (
               <>
                 <div className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3">

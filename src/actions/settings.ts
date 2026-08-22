@@ -608,7 +608,11 @@ export async function deactivateAccountAction(
     .update({
       is_deactivated: true,
       deactivated_at: new Date().toISOString(),
-      deactivation_reason: reason
+      deactivation_reason: reason,
+      account_status: "deactivated",
+      account_status_reason: reason,
+      account_status_updated_at: new Date().toISOString(),
+      account_status_updated_by: profile.id
     })
     .eq("id", profile.id)
     .neq("role", "admin");
@@ -684,6 +688,16 @@ export async function requestAccountDeletionAction(
       message: error.message
     };
   }
+
+  await supabase!
+    .from("profiles")
+    .update({
+      account_status: "pending_deletion",
+      account_status_reason: reason,
+      account_status_updated_at: new Date().toISOString(),
+      account_status_updated_by: profile.id
+    })
+    .eq("id", profile.id);
 
   const { data: admins } = await supabase!
     .from("profiles")
