@@ -36,6 +36,10 @@ import { cn } from "@/lib/utils";
 import type { Profile, SidebarCounts } from "@/types";
 
 const dashboardItem = { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard };
+const priorityItems = [
+  dashboardItem,
+  { href: "/admin/notifications", label: "Notifications", icon: Bell }
+];
 const navGroups = [
   {
     label: "Insights",
@@ -83,7 +87,6 @@ const navGroups = [
   {
     label: "Account",
     items: [
-      { href: "/admin/notifications", label: "Notifications", icon: Bell },
       { href: "/admin/help", label: "Help", icon: BookOpen },
       { href: "/admin/faq", label: "FAQs", icon: CircleHelp },
       { href: "/admin/settings", label: "Settings", icon: Settings }
@@ -169,7 +172,7 @@ export default function AdminSidebar({
           collapsedDesktop ? "px-3" : "px-4"
         )}
       >
-        {[dashboardItem].map((item) => {
+        {priorityItems.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href;
           return (

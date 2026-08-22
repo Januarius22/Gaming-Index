@@ -31,6 +31,10 @@ import { cn } from "@/lib/utils";
 import type { Profile, SidebarCounts } from "@/types";
 
 const dashboardItem = { href: "/seller/dashboard", label: "Dashboard", icon: LayoutDashboard };
+const priorityItems = [
+  dashboardItem,
+  { href: "/seller/notifications", label: "Notifications", icon: Bell }
+];
 const navGroups = [
   {
     label: "Insights",
@@ -66,7 +70,6 @@ const navGroups = [
   {
       label: "Account",
       items: [
-        { href: "/seller/notifications", label: "Notifications", icon: Bell },
         { href: "/seller/support", label: "Support", icon: LifeBuoy },
         { href: "/seller/help", label: "Help", icon: BookOpen },
         { href: "/seller/faq", label: "FAQs", icon: CircleHelp },
@@ -158,7 +161,7 @@ export default function SellerSidebar({
           collapsedDesktop ? "px-3" : "px-4"
         )}
       >
-        {[dashboardItem].map((item) => {
+        {priorityItems.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href;
           return (

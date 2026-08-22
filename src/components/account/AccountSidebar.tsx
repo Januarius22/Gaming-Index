@@ -44,6 +44,10 @@ export default function AccountSidebar({
   const pathname = usePathname();
   const collapsedDesktop = collapsed && !mobile;
   const dashboardItem = { href: "/account/dashboard", label: "Dashboard", icon: LayoutDashboard };
+  const priorityItems = [
+    dashboardItem,
+    { href: "/account/notifications", label: "Notifications", icon: Bell }
+  ];
   const navGroups = [
     {
       label: "Explore",
@@ -76,7 +80,6 @@ export default function AccountSidebar({
     {
       label: "Account",
       items: [
-        { href: "/account/notifications", label: "Notifications", icon: Bell },
         { href: "/account/support", label: "Support", icon: LifeBuoy },
         { href: "/account/help", label: "Help", icon: BookOpen },
         { href: "/account/faq", label: "FAQs", icon: CircleHelp },
@@ -160,7 +163,7 @@ export default function AccountSidebar({
           collapsedDesktop ? "px-3" : "px-4"
         )}
       >
-        {[dashboardItem].map((item) => {
+        {priorityItems.map((item) => {
           const Icon = item.icon;
           const active =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
