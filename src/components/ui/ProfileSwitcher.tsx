@@ -1,13 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import {
+  BarChart3,
   ChevronDown,
+  CircleDollarSign,
   LayoutDashboard,
+  ListOrdered,
   Settings,
   ShieldCheck,
+  ShieldAlert,
+  SlidersHorizontal,
   Store
 } from "lucide-react";
 import LogoutConfirmButton from "@/components/auth/LogoutConfirmButton";
@@ -36,6 +42,7 @@ export default function ProfileSwitcher({
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!open) {
@@ -96,6 +103,58 @@ export default function ProfileSwitcher({
           </div>
 
           <div className="mt-2 grid gap-1">
+            {workspace === "admin" ? (
+              <>
+                <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Admin dashboards
+                </p>
+                <SwitcherLink
+                  href="/admin/dashboard"
+                  active={pathname === "/admin/dashboard"}
+                  icon={<ShieldCheck className="h-4 w-4" />}
+                  label="Operations dashboard"
+                  onClick={() => setOpen(false)}
+                />
+                <SwitcherLink
+                  href="/admin/analytics"
+                  active={pathname === "/admin/analytics"}
+                  icon={<BarChart3 className="h-4 w-4" />}
+                  label="Analytics"
+                  onClick={() => setOpen(false)}
+                />
+                <SwitcherLink
+                  href="/admin/orders"
+                  active={pathname === "/admin/orders"}
+                  icon={<ListOrdered className="h-4 w-4" />}
+                  label="Orders"
+                  onClick={() => setOpen(false)}
+                />
+                <SwitcherLink
+                  href="/admin/disputes"
+                  active={pathname.startsWith("/admin/disputes")}
+                  icon={<ShieldAlert className="h-4 w-4" />}
+                  label="Disputes"
+                  onClick={() => setOpen(false)}
+                />
+                <SwitcherLink
+                  href="/admin/currencies"
+                  active={pathname === "/admin/currencies"}
+                  icon={<CircleDollarSign className="h-4 w-4" />}
+                  label="Currency rates"
+                  onClick={() => setOpen(false)}
+                />
+                <SwitcherLink
+                  href="/admin/business"
+                  active={pathname === "/admin/business"}
+                  icon={<SlidersHorizontal className="h-4 w-4" />}
+                  label="Business settings"
+                  onClick={() => setOpen(false)}
+                />
+                <p className="border-t border-border px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Workspaces
+                </p>
+              </>
+            ) : null}
             <SwitcherLink
               href="/account/dashboard"
               active={workspace === "account"}
@@ -110,10 +169,10 @@ export default function ProfileSwitcher({
               label={sellerLabel}
               onClick={() => setOpen(false)}
             />
-            {profile.role === "admin" ? (
+            {profile.role === "admin" && workspace !== "admin" ? (
               <SwitcherLink
                 href="/admin/dashboard"
-                active={workspace === "admin"}
+                active={false}
                 icon={<ShieldCheck className="h-4 w-4" />}
                 label="Admin dashboard"
                 onClick={() => setOpen(false)}
