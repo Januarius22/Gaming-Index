@@ -67,7 +67,7 @@ export default async function AccountDeactivatedPage({
             </Badge>
 
             <h1 className="mt-5 font-heading text-3xl font-semibold text-foreground">
-              Your account is paused
+              Account temporarily disabled
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">
               Your workspace is inactive for now. You can request reactivation within 30 days.
