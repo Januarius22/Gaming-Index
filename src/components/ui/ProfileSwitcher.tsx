@@ -162,13 +162,15 @@ export default function ProfileSwitcher({
               label="Account dashboard"
               onClick={() => setOpen(false)}
             />
-            <SwitcherLink
-              href={sellerHref}
-              active={workspace === "seller"}
-              icon={<Store className="h-4 w-4" />}
-              label={sellerLabel}
-              onClick={() => setOpen(false)}
-            />
+            {workspace === "admin" ? null : (
+              <SwitcherLink
+                href={sellerHref}
+                active={workspace === "seller"}
+                icon={<Store className="h-4 w-4" />}
+                label={sellerLabel}
+                onClick={() => setOpen(false)}
+              />
+            )}
             {profile.role === "admin" && workspace !== "admin" ? (
               <SwitcherLink
                 href="/admin/dashboard"
