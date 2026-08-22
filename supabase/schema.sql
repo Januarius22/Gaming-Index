@@ -109,6 +109,23 @@ create table if not exists public.currency_rates (
   created_at timestamp with time zone not null default now()
 );
 
+alter table public.currency_rates add column if not exists name text not null default '';
+alter table public.currency_rates add column if not exists symbol text not null default '';
+alter table public.currency_rates add column if not exists ngn_rate numeric(18, 6) not null default 1;
+alter table public.currency_rates add column if not exists enabled boolean not null default true;
+alter table public.currency_rates add column if not exists updated_by uuid references public.profiles(id) on delete set null;
+alter table public.currency_rates add column if not exists updated_at timestamp with time zone not null default now();
+alter table public.currency_rates add column if not exists created_at timestamp with time zone not null default now();
+alter table public.currency_rates drop constraint if exists currency_rates_code_check;
+alter table public.currency_rates add constraint currency_rates_code_check
+  check (code ~ '^[A-Z]{3}$');
+alter table public.currency_rates drop constraint if exists currency_rates_ngn_rate_check;
+alter table public.currency_rates add constraint currency_rates_ngn_rate_check
+  check (ngn_rate > 0);
+alter table public.currency_rates drop constraint if exists currency_rates_ngn_base_check;
+alter table public.currency_rates add constraint currency_rates_ngn_base_check
+  check (code <> 'NGN' or ngn_rate = 1);
+
 create table if not exists public.business_settings (
   id text primary key default 'default' check (id = 'default'),
   platform_commission_rate numeric(5, 4) not null default 0.07 check (platform_commission_rate >= 0 and platform_commission_rate <= 0.5),
@@ -146,6 +163,12 @@ alter table public.business_settings add column if not exists updated_by uuid re
 alter table public.business_settings add column if not exists updated_at timestamp with time zone not null default now();
 alter table public.business_settings add column if not exists created_at timestamp with time zone not null default now();
 alter table public.business_settings alter column platform_commission_rate set default 0.07;
+update public.business_settings
+set
+  platform_commission_rate = 0.07,
+  updated_at = now()
+where id = 'default'
+  and platform_commission_rate = 0.15;
 alter table public.business_settings drop constraint if exists business_settings_platform_commission_rate_check;
 alter table public.business_settings add constraint business_settings_platform_commission_rate_check
   check (platform_commission_rate >= 0 and platform_commission_rate <= 0.5);
@@ -228,6 +251,15 @@ values
   ('GBP', 'British Pound', '£', 1900, true),
   ('EUR', 'Euro', '€', 1650, true)
 on conflict (code) do nothing;
+
+update public.currency_rates
+set
+  name = 'Nigerian Naira',
+  symbol = 'NGN',
+  ngn_rate = 1,
+  enabled = true,
+  updated_at = now()
+where code = 'NGN';
 
 create table if not exists public.kyc_submissions (
   id uuid primary key default gen_random_uuid(),
@@ -516,12 +548,45 @@ set
     when coalesce(buyer_display_amount, 0) <= 0 then amount
     else buyer_display_amount
   end,
-  platform_fee_rate = 0,
-  platform_fee_amount = 0,
-  seller_payout_amount = amount
+  platform_fee_rate = coalesce(
+    nullif(platform_fee_rate, 0),
+    (
+      select coalesce(platform_commission_rate, 0.07)
+      from public.business_settings
+      where id = 'default'
+    ),
+    0.07
+  ),
+  platform_fee_amount = round(
+    amount * coalesce(
+      nullif(platform_fee_rate, 0),
+      (
+        select coalesce(platform_commission_rate, 0.07)
+        from public.business_settings
+        where id = 'default'
+      ),
+      0.07
+    ),
+    2
+  ),
+  seller_payout_amount = amount - round(
+    amount * coalesce(
+      nullif(platform_fee_rate, 0),
+      (
+        select coalesce(platform_commission_rate, 0.07)
+        from public.business_settings
+        where id = 'default'
+      ),
+      0.07
+    ),
+    2
+  )
 where payment_status = 'successful'
-  and platform_fee_amount = 0
-  and seller_payout_amount = 0;
+  and (
+    platform_fee_amount = 0
+    or seller_payout_amount = 0
+    or seller_payout_amount >= amount
+  );
 update public.orders
 set
   platform_fee_rate = coalesce(nullif(platform_fee_rate, 0), 0.07),
@@ -535,6 +600,12 @@ where payment_status <> 'successful'
 update public.orders as order_row
 set
   amount = listing.price,
+  base_currency = 'NGN',
+  buyer_display_currency = coalesce(nullif(upper(order_row.buyer_display_currency), ''), 'NGN'),
+  buyer_display_amount = case
+    when coalesce(upper(order_row.buyer_display_currency), 'NGN') = 'NGN' then listing.price
+    else round(listing.price / greatest(coalesce(order_row.exchange_rate_snapshot, 1), 0.000001), 2)
+  end,
   platform_fee_amount = round(listing.price * coalesce(nullif(order_row.platform_fee_rate, 0), 0.07), 2),
   seller_payout_amount = listing.price - round(listing.price * coalesce(nullif(order_row.platform_fee_rate, 0), 0.07), 2)
 from public.listings as listing
@@ -2628,6 +2699,7 @@ as $$
 declare
   paid_order public.orders%rowtype;
   hold_expires_at timestamp with time zone;
+  hold_hours integer;
   seller_earning_amount numeric;
 begin
   select *
@@ -2660,7 +2732,15 @@ begin
     raise exception 'Only the buyer or an admin can record this order escrow.';
   end if;
 
-  hold_expires_at := coalesce(paid_order.paid_at, now()) + interval '24 hours';
+  hold_hours := coalesce(
+    (
+      select buyer_protection_hold_hours
+      from public.business_settings
+      where id = 'default'
+    ),
+    24
+  );
+  hold_expires_at := coalesce(paid_order.paid_at, now()) + make_interval(hours => hold_hours);
   seller_earning_amount := coalesce(
     nullif(paid_order.seller_payout_amount, 0),
     paid_order.amount - coalesce(paid_order.platform_fee_amount, 0),
