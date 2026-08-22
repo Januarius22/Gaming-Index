@@ -260,6 +260,20 @@ export interface AccountDeletionRequest {
   created_at: string;
 }
 
+export interface AccountReactivationRequest {
+  id: string;
+  profile_id: string;
+  email: string;
+  username: string;
+  full_name: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  admin_note: string;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
+}
+
 export interface SiteAnnouncement {
   id: string;
   title: string;

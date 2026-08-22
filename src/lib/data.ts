@@ -27,6 +27,7 @@ import {
 } from "@/lib/utils";
 import type {
   AccountDeletionRequest,
+  AccountReactivationRequest,
   ActivityItem,
   AdminAnalytics,
   AdminSellerReview,
@@ -1166,7 +1167,8 @@ export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCo
       { count: openSupport },
       { count: suspendedUsers },
       { count: deletedAccounts },
-      { count: deletionRequests }
+      { count: deletionRequests },
+      { count: reactivationRequests }
     ] = await Promise.all([
       supabase
         .from("notifications")
@@ -1212,6 +1214,10 @@ export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCo
       supabase
         .from("account_deletion_requests")
         .select("id", { count: "exact", head: true })
+        .eq("status", "pending"),
+      supabase
+        .from("account_reactivation_requests")
+        .select("id", { count: "exact", head: true })
         .eq("status", "pending")
     ]);
 
@@ -1226,7 +1232,8 @@ export async function getAdminSidebarCounts(profile: Profile): Promise<SidebarCo
       "/admin/support": openSupport ?? 0,
       "/admin/suspended-users": suspendedUsers ?? 0,
       "/admin/deleted-accounts": deletedAccounts ?? 0,
-      "/admin/deletion-requests": deletionRequests ?? 0
+      "/admin/deletion-requests": deletionRequests ?? 0,
+      "/admin/reactivation-requests": reactivationRequests ?? 0
     };
   } catch {
     return {};
@@ -3152,6 +3159,39 @@ export async function getAdminAccountDeletionRequests(): Promise<AccountDeletion
       .order("created_at", { ascending: false });
 
     return ((data as AccountDeletionRequest[] | null) ?? []).map((request) => ({
+      ...request,
+      email: request.email ?? "",
+      username: request.username ?? "",
+      full_name: request.full_name ?? "User",
+      reason: request.reason ?? "",
+      status: request.status ?? "pending",
+      admin_note: request.admin_note ?? "",
+      reviewed_by: request.reviewed_by ?? null,
+      reviewed_at: request.reviewed_at ?? null
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function getAdminAccountReactivationRequests(): Promise<AccountReactivationRequest[]> {
+  if (!hasSupabaseEnv) {
+    return [];
+  }
+
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    if (!supabase) {
+      return [];
+    }
+
+    const { data } = await supabase
+      .from("account_reactivation_requests")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    return ((data as AccountReactivationRequest[] | null) ?? []).map((request) => ({
       ...request,
       email: request.email ?? "",
       username: request.username ?? "",

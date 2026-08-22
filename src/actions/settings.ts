@@ -559,6 +559,28 @@ export async function requestAccountReactivationAction(formData: FormData) {
     redirect("/account-deactivated?notice=reactivation-failed");
   }
 
+  const { count: pendingRequests } = await supabase
+    .from("account_reactivation_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("profile_id", profile.id)
+    .eq("status", "pending");
+
+  if ((pendingRequests ?? 0) > 0) {
+    redirect("/account-deactivated?notice=reactivation-requested");
+  }
+
+  const { error: requestError } = await supabase.from("account_reactivation_requests").insert({
+    profile_id: profile.id,
+    email: profile.email,
+    username: profile.username,
+    full_name: profile.full_name,
+    reason: reason || "User requested reactivation from deactivated account notice."
+  });
+
+  if (requestError) {
+    redirect("/account-deactivated?notice=reactivation-failed");
+  }
+
   const { data: admins } = await supabase
     .from("profiles")
     .select("id")
@@ -569,7 +591,7 @@ export async function requestAccountReactivationAction(formData: FormData) {
     type: "account_reactivation_request",
     title: "Account reactivation request",
     message: `${profile.full_name} requested account reactivation.`,
-    link_path: "/admin/users?status=deactivated",
+    link_path: "/admin/reactivation-requests",
     metadata: {
       profile_id: profile.id,
       email: profile.email,
@@ -582,6 +604,7 @@ export async function requestAccountReactivationAction(formData: FormData) {
   }
 
   revalidatePath("/admin/users");
+  revalidatePath("/admin/reactivation-requests");
   revalidatePath("/admin/notifications");
   redirect("/account-deactivated?notice=reactivation-requested");
 }

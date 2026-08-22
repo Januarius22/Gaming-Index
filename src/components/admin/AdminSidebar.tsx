@@ -19,6 +19,7 @@ import {
   Megaphone,
   MessageSquareText,
   Archive,
+  RotateCcw,
   Star,
   Settings,
   ShieldAlert,
@@ -55,6 +56,7 @@ const navGroups = [
       { href: "/admin/users", label: "Users", icon: Users },
       { href: "/admin/sellers", label: "Sellers", icon: UserSquare2 },
       { href: "/admin/deletion-requests", label: "Deletion Requests", icon: ShieldAlert },
+      { href: "/admin/reactivation-requests", label: "Reactivation Requests", icon: RotateCcw },
       { href: "/admin/suspended-users", label: "Suspended Accounts", icon: Archive },
       { href: "/admin/deleted-accounts", label: "Deleted Accounts", icon: Trash2 }
     ]

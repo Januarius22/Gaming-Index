@@ -1798,6 +1798,167 @@ export async function restoreDeactivatedUserInlineAction(formData: FormData) {
   };
 }
 
+export async function approveReactivationRequestInlineAction(formData: FormData) {
+  const admin = await requireAdminProfile();
+  const requestId = String(formData.get("requestId") ?? "").trim();
+
+  if (!requestId) {
+    return {
+      status: "error" as const,
+      message: "Reactivation request not found."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to approve reactivation requests."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { data: request, error: requestError } = await supabase!
+    .from("account_reactivation_requests")
+    .select("*")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (requestError || !request) {
+    return {
+      status: "error" as const,
+      message: "Reactivation request not found."
+    };
+  }
+
+  if (request.status !== "pending") {
+    return {
+      status: "error" as const,
+      message: "Only pending reactivation requests can be approved."
+    };
+  }
+
+  const restoreFormData = new FormData();
+  restoreFormData.set("userId", request.profile_id);
+  const restoreResult = await restoreDeactivatedUserInlineAction(restoreFormData);
+
+  if (restoreResult.status === "error") {
+    return restoreResult;
+  }
+
+  const reviewedAt = new Date().toISOString();
+  const { error } = await supabase!
+    .from("account_reactivation_requests")
+    .update({
+      status: "approved",
+      admin_note: "Account restored after reactivation request.",
+      reviewed_by: admin.id,
+      reviewed_at: reviewedAt
+    })
+    .eq("id", requestId);
+
+  if (error) {
+    return {
+      status: "error" as const,
+      message: error.message
+    };
+  }
+
+  revalidatePath("/admin/reactivation-requests");
+  revalidatePath("/admin/users");
+
+  return {
+    status: "success" as const,
+    message: "Reactivation request approved.",
+    requestId
+  };
+}
+
+export async function rejectReactivationRequestInlineAction(formData: FormData) {
+  const admin = await requireAdminProfile();
+  const requestId = String(formData.get("requestId") ?? "").trim();
+  const adminNote = String(formData.get("adminNote") ?? "").trim();
+
+  if (!requestId) {
+    return {
+      status: "error" as const,
+      message: "Reactivation request not found."
+    };
+  }
+
+  if (adminNote.length < 8) {
+    return {
+      status: "error" as const,
+      message: "Add a clear rejection note."
+    };
+  }
+
+  if (!hasSupabaseEnv) {
+    return {
+      status: "error" as const,
+      message: "Connect Supabase to reject reactivation requests."
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { data: request, error: requestError } = await supabase!
+    .from("account_reactivation_requests")
+    .select("*")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (requestError || !request) {
+    return {
+      status: "error" as const,
+      message: "Reactivation request not found."
+    };
+  }
+
+  if (request.status !== "pending") {
+    return {
+      status: "error" as const,
+      message: "Only pending reactivation requests can be rejected."
+    };
+  }
+
+  const reviewedAt = new Date().toISOString();
+  const { error } = await supabase!
+    .from("account_reactivation_requests")
+    .update({
+      status: "rejected",
+      admin_note: adminNote,
+      reviewed_by: admin.id,
+      reviewed_at: reviewedAt
+    })
+    .eq("id", requestId);
+
+  if (error) {
+    return {
+      status: "error" as const,
+      message: error.message
+    };
+  }
+
+  await supabase!.from("notifications").insert({
+    profile_id: request.profile_id,
+    type: "account_reactivation_rejected",
+    title: "Reactivation request rejected",
+    message: adminNote,
+    link_path: "/account-deactivated",
+    metadata: {
+      request_id: requestId
+    }
+  });
+
+  revalidatePath("/admin/reactivation-requests");
+  revalidatePath("/account-deactivated");
+
+  return {
+    status: "success" as const,
+    message: "Reactivation request rejected.",
+    requestId
+  };
+}
+
 export async function approveDeletionRequestInlineAction(formData: FormData) {
   const admin = await requireAdminProfile();
   const requestId = String(formData.get("requestId") ?? "").trim();

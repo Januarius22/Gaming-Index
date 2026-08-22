@@ -1161,6 +1161,36 @@ create unique index if not exists account_deletion_requests_one_pending_idx
   on public.account_deletion_requests (profile_id)
   where status = 'pending';
 
+create table if not exists public.account_reactivation_requests (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  email text not null default '',
+  username text not null default '',
+  full_name text not null default '',
+  reason text not null default '',
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'cancelled')),
+  admin_note text not null default '',
+  reviewed_by uuid references public.profiles(id) on delete set null,
+  reviewed_at timestamp with time zone,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.account_reactivation_requests add column if not exists email text not null default '';
+alter table public.account_reactivation_requests add column if not exists username text not null default '';
+alter table public.account_reactivation_requests add column if not exists full_name text not null default '';
+alter table public.account_reactivation_requests add column if not exists reason text not null default '';
+alter table public.account_reactivation_requests add column if not exists status text not null default 'pending';
+alter table public.account_reactivation_requests add column if not exists admin_note text not null default '';
+alter table public.account_reactivation_requests add column if not exists reviewed_by uuid references public.profiles(id) on delete set null;
+alter table public.account_reactivation_requests add column if not exists reviewed_at timestamp with time zone;
+alter table public.account_reactivation_requests add column if not exists created_at timestamp with time zone not null default now();
+alter table public.account_reactivation_requests drop constraint if exists account_reactivation_requests_status_check;
+alter table public.account_reactivation_requests add constraint account_reactivation_requests_status_check
+  check (status in ('pending', 'approved', 'rejected', 'cancelled'));
+create unique index if not exists account_reactivation_requests_one_pending_idx
+  on public.account_reactivation_requests (profile_id)
+  where status = 'pending';
+
 create table if not exists public.site_feedback (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.profiles(id) on delete cascade,
@@ -3725,6 +3755,7 @@ alter table public.withdrawal_requests enable row level security;
 alter table public.suspension_appeals enable row level security;
 alter table public.deleted_accounts enable row level security;
 alter table public.account_deletion_requests enable row level security;
+alter table public.account_reactivation_requests enable row level security;
 alter table public.site_feedback enable row level security;
 alter table public.support_tickets enable row level security;
 alter table public.support_ticket_messages enable row level security;
@@ -4538,6 +4569,40 @@ create policy "users can submit their own account deletion requests"
 drop policy if exists "admins can update account deletion requests" on public.account_deletion_requests;
 create policy "admins can update account deletion requests"
   on public.account_deletion_requests
+  for update
+  to authenticated
+  using (public.current_profile_is_admin())
+  with check (public.current_profile_is_admin());
+
+drop policy if exists "users can read their own account reactivation requests" on public.account_reactivation_requests;
+create policy "users can read their own account reactivation requests"
+  on public.account_reactivation_requests
+  for select
+  to authenticated
+  using (auth.uid() = profile_id or public.current_profile_is_admin());
+
+drop policy if exists "users can submit their own account reactivation requests" on public.account_reactivation_requests;
+create policy "users can submit their own account reactivation requests"
+  on public.account_reactivation_requests
+  for insert
+  to authenticated
+  with check (
+    auth.uid() = profile_id
+    and status = 'pending'
+    and exists (
+      select 1
+      from public.profiles as requester
+      where requester.id = auth.uid()
+        and requester.is_deactivated = true
+        and requester.is_deleted = false
+        and requester.is_banned = false
+        and requester.role <> 'admin'
+    )
+  );
+
+drop policy if exists "admins can update account reactivation requests" on public.account_reactivation_requests;
+create policy "admins can update account reactivation requests"
+  on public.account_reactivation_requests
   for update
   to authenticated
   using (public.current_profile_is_admin())
