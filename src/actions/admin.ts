@@ -53,15 +53,46 @@ export async function updateCurrencyRateAction(formData: FormData) {
   }
 
   revalidatePath("/admin/currencies");
-  revalidatePath("/account/settings/appearance");
-  revalidatePath("/seller/settings/appearance");
-  revalidatePath("/admin/settings/appearance");
+  revalidatePath("/");
+  revalidatePath("/marketplace");
+  revalidatePath("/account/dashboard");
+  revalidatePath("/account/marketplace");
+  revalidatePath("/account/cart");
+  revalidatePath("/account/orders");
+  revalidatePath("/account/saved");
+  revalidatePath("/account/transactions");
+  revalidatePath("/account/wallet");
+  revalidatePath("/account/withdrawals");
+  revalidatePath("/seller/dashboard");
+  revalidatePath("/seller/analytics");
+  revalidatePath("/seller/history");
+  revalidatePath("/seller/listings");
+  revalidatePath("/seller/orders");
+  revalidatePath("/seller/transactions");
+  revalidatePath("/seller/wallet");
+  revalidatePath("/seller/withdrawals");
+  revalidatePath("/account/settings/currency");
+  revalidatePath("/seller/settings/currency");
+  revalidatePath("/admin/settings/currency");
   redirect("/admin/currencies?notice=rate-saved");
 }
 
 function readPositiveNumber(formData: FormData, key: string, fallback: number) {
   const value = Number(String(formData.get(key) ?? "").trim());
   return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function readNonNegativeNumber(formData: FormData, key: string, fallback: number) {
+  const value = Number(String(formData.get(key) ?? "").trim());
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function readPositiveInteger(formData: FormData, key: string, fallback: number) {
+  return Math.floor(readPositiveNumber(formData, key, fallback));
+}
+
+function readNonNegativeInteger(formData: FormData, key: string, fallback: number) {
+  return Math.floor(readNonNegativeNumber(formData, key, fallback));
 }
 
 type AnnouncementAudience = "all" | "buyers" | "sellers";
@@ -167,7 +198,7 @@ async function createAnnouncementNotifications({
 export async function updateBusinessSettingsAction(formData: FormData) {
   const adminProfile = await requireAdminProfile();
   const defaults = getDefaultBusinessSettings();
-  const commissionPercent = readPositiveNumber(
+  const commissionPercent = readNonNegativeNumber(
     formData,
     "platformCommissionPercent",
     defaults.platform_commission_rate * 100
@@ -176,44 +207,44 @@ export async function updateBusinessSettingsAction(formData: FormData) {
   const settings = {
     id: "default",
     platform_commission_rate: platformCommissionRate,
-    buyer_protection_hold_hours: readPositiveNumber(
+    buyer_protection_hold_hours: readPositiveInteger(
       formData,
       "buyerProtectionHoldHours",
       defaults.buyer_protection_hold_hours
     ),
-    dispute_window_hours: readPositiveNumber(
+    dispute_window_hours: readPositiveInteger(
       formData,
       "disputeWindowHours",
       defaults.dispute_window_hours
     ),
-    withdrawal_review_hours: readPositiveNumber(
+    withdrawal_review_hours: readPositiveInteger(
       formData,
       "withdrawalReviewHours",
       defaults.withdrawal_review_hours
     ),
-    suspension_appeal_window_days: readPositiveNumber(
+    suspension_appeal_window_days: readPositiveInteger(
       formData,
       "suspensionAppealWindowDays",
       defaults.suspension_appeal_window_days
     ),
-    max_dispute_images: readPositiveNumber(formData, "maxDisputeImages", defaults.max_dispute_images),
-    max_dispute_videos: readPositiveNumber(formData, "maxDisputeVideos", defaults.max_dispute_videos),
-    max_dispute_video_seconds: readPositiveNumber(
+    max_dispute_images: readPositiveInteger(formData, "maxDisputeImages", defaults.max_dispute_images),
+    max_dispute_videos: readNonNegativeInteger(formData, "maxDisputeVideos", defaults.max_dispute_videos),
+    max_dispute_video_seconds: readPositiveInteger(
       formData,
       "maxDisputeVideoSeconds",
       defaults.max_dispute_video_seconds
     ),
-    max_dispute_image_size_mb: readPositiveNumber(
+    max_dispute_image_size_mb: readPositiveInteger(
       formData,
       "maxDisputeImageSizeMb",
       defaults.max_dispute_image_size_mb
     ),
-    max_dispute_video_size_mb: readPositiveNumber(
+    max_dispute_video_size_mb: readPositiveInteger(
       formData,
       "maxDisputeVideoSizeMb",
       defaults.max_dispute_video_size_mb
     ),
-    max_listing_images: readPositiveNumber(formData, "maxListingImages", defaults.max_listing_images),
+    max_listing_images: readPositiveInteger(formData, "maxListingImages", defaults.max_listing_images),
     auto_release_enabled: formData.get("autoReleaseEnabled") === "on",
     partial_refund_enabled: formData.get("partialRefundEnabled") === "on",
     updated_by: adminProfile.id,
@@ -239,8 +270,15 @@ export async function updateBusinessSettingsAction(formData: FormData) {
   revalidatePath("/admin/business");
   revalidatePath("/admin/analytics");
   revalidatePath("/admin/orders");
+  revalidatePath("/account-suspended");
+  revalidatePath("/account-suspended/appeal");
+  revalidatePath("/account/cart");
+  revalidatePath("/account/checkout");
+  revalidatePath("/account/disputes");
+  revalidatePath("/account/orders");
   revalidatePath("/seller/analytics");
   revalidatePath("/seller/dashboard");
+  revalidatePath("/seller/disputes");
 
   redirect("/admin/business?notice=business-settings-saved");
 }

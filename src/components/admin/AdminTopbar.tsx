@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, PanelLeftClose, PanelLeftOpen, ShieldCheck } from "lucide-react";
+import { Bell, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import AnimatedMenuButton from "@/components/ui/AnimatedMenuButton";
 import Button from "@/components/ui/Button";
-import ProfileAvatar from "@/components/ui/ProfileAvatar";
+import ProfileSwitcher from "@/components/ui/ProfileSwitcher";
 import type { Profile } from "@/types";
 
 export default function AdminTopbar({
@@ -53,11 +53,7 @@ export default function AdminTopbar({
             </span>
             <span>Notifications</span>
           </Link>
-          <div className="flex items-center gap-3 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground">
-            <ProfileAvatar profile={profile} className="h-8 w-8" />
-            <ShieldCheck className="h-4 w-4 text-primary" />
-            {profile.full_name}
-          </div>
+          <ProfileSwitcher profile={profile} workspace="admin" showName />
         </div>
       </div>
     </div>
