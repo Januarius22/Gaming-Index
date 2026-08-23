@@ -1,6 +1,7 @@
 import KycRequiredCard from "@/components/seller/KycRequiredCard";
 import SellerRestrictedCard from "@/components/seller/SellerRestrictedCard";
 import SellerUploadForm from "@/components/seller/SellerUploadForm";
+import { isAccountLimited } from "@/lib/accountLimits";
 import { canUploadAccounts, isSellerRestrictionActive, requireSellerProfile } from "@/lib/auth";
 
 export default async function SellerUploadPage({
@@ -24,5 +25,11 @@ export default async function SellerUploadPage({
     return <KycRequiredCard status={profile.kyc_status} />;
   }
 
-  return <SellerUploadForm feedbackMessage={params.error ?? ""} />;
+  return (
+    <SellerUploadForm
+      sellerId={profile.id}
+      accountLimited={isAccountLimited(profile)}
+      feedbackMessage={params.error ?? ""}
+    />
+  );
 }

@@ -3,12 +3,12 @@ import { cn } from "@/lib/utils";
 
 const buttonVariants = {
   primary:
-    "bg-primary !text-white visited:!text-white hover:!text-white shadow-[0_12px_30px_-14px_rgba(0,87,255,0.7)] hover:bg-primary-dark",
+    "bg-primary !text-white visited:!text-white hover:!text-white shadow-[0_14px_34px_-14px_rgba(0,87,255,0.82)] hover:bg-primary-dark hover:shadow-[0_18px_42px_-16px_rgba(0,87,255,0.92)]",
   secondary:
-    "bg-white text-primary border border-border hover:bg-primary-soft",
+    "bg-white text-primary border border-border hover:border-primary/30 hover:bg-primary-soft hover:shadow-[0_14px_34px_-22px_rgba(0,87,255,0.45)]",
   ghost: "bg-transparent text-foreground hover:bg-primary-soft/70",
-  subtle: "bg-primary-soft text-primary-dark hover:bg-primary-soft/80",
-  danger: "bg-danger !text-white visited:!text-white hover:!text-white hover:bg-danger/90"
+  subtle: "bg-primary-soft text-primary-dark hover:bg-primary-soft/80 hover:shadow-[0_14px_34px_-24px_rgba(0,87,255,0.38)]",
+  danger: "bg-danger !text-white visited:!text-white hover:!text-white hover:bg-danger/90 hover:shadow-[0_18px_42px_-18px_rgba(220,38,38,0.78)]"
 } as const;
 
 const buttonSizes = {
@@ -33,7 +33,7 @@ export const buttonClassName = ({
   className?: string;
 }) =>
   cn(
-    "inline-flex cursor-pointer items-center justify-center rounded-xl font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-60",
+    "gi-game-button inline-flex cursor-pointer items-center justify-center rounded-xl font-semibold transition duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100",
     buttonVariants[variant],
     buttonSizes[size],
     className

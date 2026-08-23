@@ -1,4 +1,3 @@
-import { Sparkles, Sword, Trophy, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Listing } from "@/types";
 
@@ -112,15 +111,6 @@ export default function ListingPhotoGrid({
   const theme = getVisualTheme(listing.game);
   const labels = getPanelLabels(listing.game);
   const uploadedImages = (listing.image_urls ?? []).filter(Boolean).slice(0, 1);
-  const Icon =
-    listing.game === "eFootball"
-      ? Trophy
-      : listing.game === "Fortnite"
-        ? Sparkles
-        : listing.game === "Free Fire" || listing.game === "Roblox"
-          ? UserRound
-          : Sword;
-
   if (size !== "guide" && uploadedImages.length > 0) {
     const imageUrl = uploadedImages[0];
 
@@ -144,13 +134,9 @@ export default function ListingPhotoGrid({
           </div>
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex min-w-0 items-center justify-between gap-2 p-3 sm:gap-3 sm:p-4">
+        <div className="pointer-events-none absolute inset-x-0 top-0 flex min-w-0 items-center justify-start gap-2 p-3 sm:gap-3 sm:p-4">
           <span className="inline-flex min-w-0 max-w-[48%] truncate rounded-full border border-white/16 bg-black/40 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/92 backdrop-blur-md sm:text-[11px] sm:tracking-[0.22em]">
             {listing.game}
-          </span>
-          <span className="inline-flex min-w-0 max-w-[52%] items-center gap-1.5 rounded-full border border-white/16 bg-black/40 px-3 py-1 text-[10px] font-medium text-white/88 backdrop-blur-md sm:gap-2 sm:text-[11px]">
-            <Icon className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">Seller grid image</span>
           </span>
         </div>
       </div>
@@ -175,10 +161,6 @@ export default function ListingPhotoGrid({
         <div className="mb-3 flex items-center justify-between gap-3">
           <span className="inline-flex rounded-full border border-white/16 bg-black/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/92 backdrop-blur-md sm:text-[11px]">
             {listing.game}
-          </span>
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/16 bg-black/20 px-3 py-1 text-[10px] font-medium text-white/88 backdrop-blur-md sm:text-[11px]">
-            <Icon className="h-3.5 w-3.5" />
-            Account preview
           </span>
         </div>
 

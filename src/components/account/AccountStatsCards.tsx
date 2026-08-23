@@ -13,13 +13,19 @@ export default function AccountStatsCards({ stats }: { stats: DashboardStat[] })
         const Icon = icons[index] ?? Compass;
 
         const content = (
-          <Card className={cn("h-full transition", stat.href && "hover:-translate-y-0.5 hover:shadow-lg")}>
+          <Card
+            className={cn(
+              "gi-game-card gi-stat-card h-full transition duration-300",
+              stat.href &&
+                "hover:-translate-y-1 hover:border-primary/35 hover:shadow-[0_28px_70px_-42px_rgba(0,87,255,0.55)]"
+            )}
+          >
             <CardHeader className="flex flex-row items-start justify-between gap-4 pb-3">
               <div>
                 <CardTitle className="text-lg">{stat.label}</CardTitle>
                 <p className="mt-2 text-sm text-muted-foreground">{stat.helper}</p>
               </div>
-              <div className="rounded-2xl bg-primary-soft p-3 text-primary">
+              <div className="gi-glow-orbit shrink-0 rounded-2xl bg-primary-soft p-3 text-primary ring-1 ring-primary/10">
                 <Icon className="h-5 w-5" />
               </div>
             </CardHeader>
@@ -27,13 +33,15 @@ export default function AccountStatsCards({ stats }: { stats: DashboardStat[] })
               <p className="font-heading text-4xl font-semibold text-foreground">
                 {stat.value}
               </p>
-              {stat.href ? <ArrowRight className="h-5 w-5 text-muted-foreground" /> : null}
+              {stat.href ? (
+                <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1 group-hover:text-primary" />
+              ) : null}
             </CardContent>
           </Card>
         );
 
         return stat.href ? (
-          <Link key={stat.label} href={stat.href} className="block h-full">
+          <Link key={stat.label} href={stat.href} className="group block h-full">
             {content}
           </Link>
         ) : (

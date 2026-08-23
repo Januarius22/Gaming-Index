@@ -148,7 +148,7 @@ export default function AccountShell({
               onMenuClick={() => setOpen(true)}
             />
             <AnnouncementMarquee announcements={announcements} audience="buyers" />
-            <div className="flex-1 px-4 py-6 sm:px-6">{children}</div>
+            <div className="gi-dashboard-canvas flex-1 px-4 py-6 sm:px-6">{children}</div>
           </div>
         </div>
       </div>

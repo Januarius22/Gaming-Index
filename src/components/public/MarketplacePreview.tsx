@@ -72,6 +72,39 @@ function SellerIdentityChip({ listing }: { listing: Listing }) {
   );
 }
 
+function getListingAccent(listing: Listing) {
+  if (listing.status === "sold") {
+    return {
+      strip: "from-rose-500 via-red-500 to-orange-400",
+      label: "Archived",
+      dot: "bg-rose-500"
+    };
+  }
+
+  if (listing.seller_tag === "top_seller") {
+    return {
+      strip: "from-amber-300 via-yellow-500 to-orange-400",
+      label: "Elite",
+      dot: "bg-amber-400"
+    };
+  }
+
+  return {
+    strip: "from-cyan-300 via-primary to-blue-700",
+    label: "Live",
+    dot: "bg-cyan-400"
+  };
+}
+
+function getTrustScore(listing: Listing) {
+  const rating = listing.seller_rating ?? 0;
+  const reviews = listing.seller_reviews ?? 0;
+  const ratingScore = Math.min(70, Math.round((rating / 5) * 70));
+  const reviewScore = Math.min(30, reviews * 6);
+
+  return Math.max(18, Math.min(100, ratingScore + reviewScore));
+}
+
 export default function MarketplacePreview({
   listings,
   title = "Featured marketplace listings",
@@ -327,7 +360,7 @@ export default function MarketplacePreview({
         ) : null}
 
         {enableSearch ? (
-          <div className="rounded-[28px] border border-border/70 bg-white p-4 shadow-[0_18px_50px_-40px_rgba(6,43,99,0.35)] sm:p-5">
+          <div className="gi-game-card rounded-[28px] border border-border/70 bg-white p-4 shadow-[0_18px_50px_-40px_rgba(6,43,99,0.35)] sm:p-5">
             <div className="mb-4 flex flex-col gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold text-foreground">Display currency</p>
@@ -455,8 +488,10 @@ export default function MarketplacePreview({
                   const isSold = listing.status === "sold";
                   const isSaving = pendingSavedListingIds.includes(listing.id);
                   const isUpdatingCart = pendingCartListingIds.includes(listing.id);
+                  const accent = getListingAccent(listing);
+                  const trustScore = getTrustScore(listing);
                   const actionButtonBase =
-                    "inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-2xl border transition duration-200 disabled:cursor-not-allowed disabled:opacity-60";
+                    "gi-game-button inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-2xl border transition duration-200 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100";
                   const cartButtonClassName = cn(
                     actionButtonBase,
                     isInCart
@@ -472,35 +507,45 @@ export default function MarketplacePreview({
 
                   if (context === "account") {
                     return (
-                      <Card className="group flex h-full cursor-pointer flex-col overflow-hidden border-border/70 transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_-48px_rgba(6,43,99,0.45)]">
-                        <Link href={detailHref} className="relative block p-3 pb-0">
-                          <ListingPhotoGrid listing={listing} className="rounded-[28px]" />
+                      <Card className="gi-game-card group flex h-full cursor-pointer flex-col overflow-hidden border-border/70 transition duration-300 hover:-translate-y-1.5 hover:border-primary/35 hover:shadow-[0_34px_82px_-48px_rgba(0,87,255,0.62)]">
+                        <div className={`h-1.5 bg-gradient-to-r ${accent.strip}`} />
+                        <Link href={detailHref} className="relative block overflow-hidden p-3 pb-0">
+                          <ListingPhotoGrid
+                            listing={listing}
+                            className="rounded-[28px] transition duration-500 group-hover:scale-[1.025]"
+                          />
                           <div className="pointer-events-none absolute inset-x-6 top-6 flex items-start justify-between gap-3">
                             <Badge
                               variant={listing.status === "sold" ? "danger" : "success"}
-                              className="border border-white/20 bg-white/95 px-4 py-2 text-sm font-semibold shadow-sm ring-0"
+                              className="border border-white/25 bg-white/95 px-4 py-2 text-sm font-semibold shadow-[0_14px_28px_-20px_rgba(0,0,0,0.55)] ring-0"
                             >
                               {listing.status === "sold" ? "Sold" : "Active"}
                             </Badge>
                             {listing.seller_tag === "top_seller" ? (
                               <Badge
                                 variant="info"
-                                className="border border-white/20 bg-white/95 px-4 py-2 text-sm font-semibold uppercase tracking-[0.12em] shadow-sm ring-0"
+                                className="border border-white/25 bg-white/95 px-4 py-2 text-sm font-semibold uppercase tracking-[0.12em] shadow-[0_14px_28px_-20px_rgba(0,0,0,0.55)] ring-0"
                               >
                                 Top Seller
                               </Badge>
                             ) : null}
                           </div>
-                          <span className="pointer-events-none absolute bottom-5 right-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/30 bg-white/95 text-primary shadow-sm transition group-hover:scale-105 group-hover:bg-primary group-hover:text-white">
+                          <span className="pointer-events-none absolute bottom-5 right-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/30 bg-white/95 text-primary shadow-sm transition duration-300 group-hover:scale-110 group-hover:bg-primary group-hover:text-white group-hover:shadow-[0_18px_34px_-18px_rgba(0,87,255,0.9)]">
                             <ArrowUpRight className="h-4 w-4" />
                           </span>
                         </Link>
                         <CardContent className="flex flex-1 flex-col p-6 sm:p-7">
                           <div className="flex items-start justify-between gap-4">
-                            <span className="inline-flex rounded-full bg-primary-soft px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-dark">
-                              {listing.game}
-                            </span>
-                            <div className="flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-600 ring-1 ring-inset ring-amber-100">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="inline-flex rounded-full bg-primary-soft px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-dark ring-1 ring-primary/10">
+                                {listing.game}
+                              </span>
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground ring-1 ring-border/70">
+                                <span className={`h-1.5 w-1.5 rounded-full ${accent.dot}`} />
+                                {accent.label}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-600 shadow-[0_12px_22px_-18px_rgba(217,119,6,0.9)] ring-1 ring-inset ring-amber-100">
                               <Star className="h-3.5 w-3.5 fill-current" />
                               <span>{listing.seller_rating?.toFixed(1) ?? "0.0"}</span>
                             </div>
@@ -517,6 +562,18 @@ export default function MarketplacePreview({
                             </p>
                           </div>
 
+                          <div className="mt-2 grid gap-2 text-xs font-semibold text-muted-foreground sm:grid-cols-3">
+                            <span className="rounded-2xl bg-surface px-3 py-2 ring-1 ring-border/60">
+                              {listing.platform}
+                            </span>
+                            <span className="rounded-2xl bg-surface px-3 py-2 ring-1 ring-border/60">
+                              Lv {listing.account_level || "New"}
+                            </span>
+                            <span className="rounded-2xl bg-surface px-3 py-2 ring-1 ring-border/60">
+                              {listing.login_method}
+                            </span>
+                          </div>
+
                           <div className="mt-auto border-t border-border/70 pt-5">
                             <div className="space-y-4">
                               <div className="min-w-0 space-y-2">
@@ -525,6 +582,18 @@ export default function MarketplacePreview({
                                   {listing.seller_reviews ?? 0}{" "}
                                   {(listing.seller_reviews ?? 0) === 1 ? "buyer rating" : "buyer ratings"}
                                 </p>
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                                    <span>Trust meter</span>
+                                    <span>{trustScore}%</span>
+                                  </div>
+                                  <div className="h-2 overflow-hidden rounded-full bg-primary-soft ring-1 ring-primary/10">
+                                    <div
+                                      className={`h-full rounded-full bg-gradient-to-r ${accent.strip}`}
+                                      style={{ width: `${trustScore}%` }}
+                                    />
+                                  </div>
+                                </div>
                                 <p
                                   className="break-words font-heading text-3xl font-semibold leading-none text-foreground sm:text-[2.15rem]"
                                   title={formatPrice(listing.price)}
@@ -596,35 +665,45 @@ export default function MarketplacePreview({
 
                   return (
                     <Link href={detailHref} className="block h-full">
-                      <Card className="group flex h-full cursor-pointer flex-col overflow-hidden border-border/70 transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_-48px_rgba(6,43,99,0.45)]">
-                        <div className="relative p-3 pb-0">
-                          <ListingPhotoGrid listing={listing} className="rounded-[28px]" />
+                      <Card className="gi-game-card group flex h-full cursor-pointer flex-col overflow-hidden border-border/70 transition duration-300 hover:-translate-y-1.5 hover:border-primary/35 hover:shadow-[0_34px_82px_-48px_rgba(0,87,255,0.62)]">
+                        <div className={`h-1.5 bg-gradient-to-r ${accent.strip}`} />
+                        <div className="relative overflow-hidden p-3 pb-0">
+                          <ListingPhotoGrid
+                            listing={listing}
+                            className="rounded-[28px] transition duration-500 group-hover:scale-[1.025]"
+                          />
                           <div className="pointer-events-none absolute inset-x-6 top-6 flex items-start justify-between gap-3">
                             <Badge
                               variant={listing.status === "sold" ? "danger" : "success"}
-                              className="border border-white/20 bg-white/95 px-4 py-2 text-sm font-semibold shadow-sm ring-0"
+                              className="border border-white/25 bg-white/95 px-4 py-2 text-sm font-semibold shadow-[0_14px_28px_-20px_rgba(0,0,0,0.55)] ring-0"
                             >
                               {listing.status === "sold" ? "Sold" : "Active"}
                             </Badge>
                             {listing.seller_tag === "top_seller" ? (
                               <Badge
                                 variant="info"
-                                className="border border-white/20 bg-white/95 px-4 py-2 text-sm font-semibold uppercase tracking-[0.12em] shadow-sm ring-0"
+                                className="border border-white/25 bg-white/95 px-4 py-2 text-sm font-semibold uppercase tracking-[0.12em] shadow-[0_14px_28px_-20px_rgba(0,0,0,0.55)] ring-0"
                               >
                                 Top Seller
                               </Badge>
                             ) : null}
                           </div>
-                          <span className="pointer-events-none absolute bottom-5 right-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/30 bg-white/95 text-primary shadow-sm transition group-hover:scale-105 group-hover:bg-primary group-hover:text-white">
+                          <span className="pointer-events-none absolute bottom-5 right-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/30 bg-white/95 text-primary shadow-sm transition duration-300 group-hover:scale-110 group-hover:bg-primary group-hover:text-white group-hover:shadow-[0_18px_34px_-18px_rgba(0,87,255,0.9)]">
                             <ArrowUpRight className="h-4 w-4" />
                           </span>
                         </div>
                         <CardContent className="flex flex-1 flex-col p-6 sm:p-7">
                           <div className="flex items-start justify-between gap-4">
-                            <span className="inline-flex rounded-full bg-primary-soft px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-dark">
-                              {listing.game}
-                            </span>
-                            <div className="flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-600 ring-1 ring-inset ring-amber-100">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="inline-flex rounded-full bg-primary-soft px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-dark ring-1 ring-primary/10">
+                                {listing.game}
+                              </span>
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground ring-1 ring-border/70">
+                                <span className={`h-1.5 w-1.5 rounded-full ${accent.dot}`} />
+                                {accent.label}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-600 shadow-[0_12px_22px_-18px_rgba(217,119,6,0.9)] ring-1 ring-inset ring-amber-100">
                               <Star className="h-3.5 w-3.5 fill-current" />
                               <span>{listing.seller_rating?.toFixed(1) ?? "0.0"}</span>
                             </div>
@@ -639,13 +718,37 @@ export default function MarketplacePreview({
                             </p>
                           </div>
 
+                          <div className="mt-2 grid gap-2 text-xs font-semibold text-muted-foreground sm:grid-cols-3">
+                            <span className="rounded-2xl bg-surface px-3 py-2 ring-1 ring-border/60">
+                              {listing.platform}
+                            </span>
+                            <span className="rounded-2xl bg-surface px-3 py-2 ring-1 ring-border/60">
+                              Lv {listing.account_level || "New"}
+                            </span>
+                            <span className="rounded-2xl bg-surface px-3 py-2 ring-1 ring-border/60">
+                              {listing.login_method}
+                            </span>
+                          </div>
+
                           <div className="mt-auto space-y-4 border-t border-border/70 pt-5">
                             <div className="min-w-0 space-y-2">
-                                <SellerIdentityChip listing={listing} />
+                              <SellerIdentityChip listing={listing} />
                               <p className="text-sm text-muted-foreground">
                                 {listing.seller_reviews ?? 0}{" "}
                                 {(listing.seller_reviews ?? 0) === 1 ? "buyer rating" : "buyer ratings"}
                               </p>
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                                  <span>Trust meter</span>
+                                  <span>{trustScore}%</span>
+                                </div>
+                                <div className="h-2 overflow-hidden rounded-full bg-primary-soft ring-1 ring-primary/10">
+                                  <div
+                                    className={`h-full rounded-full bg-gradient-to-r ${accent.strip}`}
+                                    style={{ width: `${trustScore}%` }}
+                                  />
+                                </div>
+                              </div>
                               <p
                                 className="break-words font-heading text-3xl font-semibold leading-none text-foreground sm:text-[2.15rem]"
                                 title={formatPrice(listing.price)}
@@ -659,7 +762,7 @@ export default function MarketplacePreview({
                                 variant: "secondary",
                                 size: "md",
                                 className:
-                                  "pointer-events-none w-full rounded-2xl border-primary/12 bg-primary-soft/70 text-primary sm:w-auto"
+                                  "pointer-events-none w-full rounded-2xl border-primary/12 bg-primary-soft/70 text-primary transition group-hover:border-primary/25 group-hover:bg-primary group-hover:text-white sm:w-auto"
                               })}
                             >
                               More Info

@@ -681,11 +681,22 @@ export async function saveListingSubmission({
   const deliveryNotPersonalConfirmed =
     String(formData.get("deliveryNotPersonalConfirmed") ?? "").trim() === "yes";
   const price = Number(String(formData.get("price") ?? "0").replace(/,/g, ""));
+  const uploadedListingImagePath = String(formData.get("uploadedListingImagePath") ?? "").trim();
+  const uploadedListingImageName = String(formData.get("uploadedListingImageName") ?? "").trim();
   const listingImageEntries = formData.getAll("listingImage");
   const listingImageFiles = listingImageEntries
     .map((entry) => getUploadedFile(entry))
     .filter((file): file is File => Boolean(file));
   const listingImageFile = listingImageFiles[0] ?? null;
+  const uploadedListingImageError = uploadedListingImagePath
+    ? validateUploadedStorageAsset({
+        fileName: uploadedListingImageName || uploadedListingImagePath,
+        filePath: uploadedListingImagePath,
+        fieldLabel: "Final grid image",
+        allowedExtensions: LISTING_IMAGE_EXTENSIONS,
+        expectedOwnerId: seller.id
+      })
+    : "";
 
   if (seller.kyc_status !== "approved") {
     return {
@@ -722,26 +733,35 @@ export async function saveListingSubmission({
     };
   }
 
-  if (!listingImageFile) {
+  if (uploadedListingImageError) {
+    return {
+      status: "error",
+      message: uploadedListingImageError
+    };
+  }
+
+  if (!listingImageFile && !uploadedListingImagePath) {
     return {
       status: "error",
       message: "Upload one final grid image for this listing."
     };
   }
 
-  if (listingImageFiles.length > MAX_LISTING_IMAGES) {
+  if (listingImageFiles.length > MAX_LISTING_IMAGES || (uploadedListingImagePath && listingImageFiles.length > 0)) {
     return {
       status: "error",
       message: "Upload only one final grid image per listing."
     };
   }
 
-  const imageValidationError = validateFileUpload({
-    file: listingImageFile,
-    fieldLabel: "Final grid image",
-    allowedExtensions: LISTING_IMAGE_EXTENSIONS,
-    maxBytes: MAX_LISTING_IMAGE_BYTES
-  });
+  const imageValidationError = listingImageFile
+    ? validateFileUpload({
+        file: listingImageFile,
+        fieldLabel: "Final grid image",
+        allowedExtensions: LISTING_IMAGE_EXTENSIONS,
+        maxBytes: MAX_LISTING_IMAGE_BYTES
+      })
+    : "";
 
   if (imageValidationError) {
     return {
@@ -750,7 +770,7 @@ export async function saveListingSubmission({
     };
   }
 
-  if (listingImageFile.size > MAX_LISTING_IMAGE_BYTES) {
+  if (listingImageFile && listingImageFile.size > MAX_LISTING_IMAGE_BYTES) {
     return {
       status: "error",
       message: "Final grid image must be 8MB or smaller."
@@ -770,6 +790,11 @@ export async function saveListingSubmission({
   });
 
   if (duplicateListingExists) {
+    if (uploadedListingImagePath && hasSupabaseEnv) {
+      const supabase = await getSupabaseServerClient();
+      await supabase?.storage.from(LISTING_STORAGE_BUCKET).remove([uploadedListingImagePath]);
+    }
+
     return {
       status: "success",
       message:
@@ -779,12 +804,17 @@ export async function saveListingSubmission({
 
   if (hasSupabaseEnv) {
     const supabase = await getSupabaseServerClient();
-    const uploadedImage = await uploadListingAsset({
-      supabase: supabase!,
-      sellerId: seller.id,
-      file: listingImageFile,
-      index: 0
-    });
+    const uploadedImage = uploadedListingImagePath
+      ? {
+          path: uploadedListingImagePath,
+          name: uploadedListingImageName || sanitizeFileName(uploadedListingImagePath)
+        }
+      : await uploadListingAsset({
+          supabase: supabase!,
+          sellerId: seller.id,
+          file: listingImageFile!,
+          index: 0
+        });
 
     if ("error" in uploadedImage) {
       return {
@@ -816,6 +846,8 @@ export async function saveListingSubmission({
       .maybeSingle();
 
     if (error) {
+      await supabase!.storage.from(LISTING_STORAGE_BUCKET).remove([uploadedImage.path]);
+
       return {
         status: "error",
         message: error.message
@@ -823,6 +855,8 @@ export async function saveListingSubmission({
     }
 
     if (!createdListing?.id) {
+      await supabase!.storage.from(LISTING_STORAGE_BUCKET).remove([uploadedImage.path]);
+
       return {
         status: "error",
         message: "Listing was created without an ID. Please try again."
@@ -877,7 +911,7 @@ export async function saveListingSubmission({
     accountLevel,
     loginMethod,
     extraNotes,
-    imageNames: [listingImageFile.name.trim()]
+    imageNames: [listingImageFile?.name.trim() || uploadedListingImageName]
   });
 
   await addDemoListingDeliveryDetails({

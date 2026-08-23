@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ImagePlus } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import FormMessage from "@/components/auth/FormMessage";
 import SubmitButton from "@/components/auth/SubmitButton";
 import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
@@ -11,18 +11,34 @@ import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
+import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabaseClient";
+import {
+  inferContentType,
+  sanitizeFileName,
+  validateFileUpload
+} from "@/lib/storageUploads";
 import { gameOptions, loginMethodOptions, platformOptions } from "@/lib/utils";
 
+const LISTING_STORAGE_BUCKET = "listing-media";
+const MAX_LISTING_IMAGE_BYTES = 12 * 1024 * 1024;
+const LISTING_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
+const ACCOUNT_LIMITED_MESSAGE =
+  "Your account is currently limited. Publishing is unavailable while our team reviews your account.";
+
 export default function SellerUploadForm({
+  sellerId,
+  accountLimited = false,
   feedbackMessage = ""
 }: {
+  sellerId: string;
+  accountLimited?: boolean;
   feedbackMessage?: string;
 }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [priceInput, setPriceInput] = useState("");
+  const [localFeedback, setLocalFeedback] = useState(feedbackMessage);
   const router = useRouter();
-  const pathname = usePathname();
   const previewUrl = useMemo(
     () => (selectedFile ? URL.createObjectURL(selectedFile) : ""),
     [selectedFile]
@@ -37,12 +53,105 @@ export default function SellerUploadForm({
   }, [previewUrl]);
 
   useEffect(() => {
-    if (!feedbackMessage) {
+    setLocalFeedback(feedbackMessage);
+  }, [feedbackMessage]);
+
+  async function uploadListingImageDirect(file: File) {
+    if (!hasSupabaseEnv) {
+      throw new Error("Connect Supabase to upload listing images.");
+    }
+
+    const supabase = getSupabaseBrowserClient();
+
+    if (!supabase) {
+      throw new Error("Supabase storage is not available right now. Please refresh and try again.");
+    }
+
+    const safeName = sanitizeFileName(file.name || "listing-image.png") || "listing-image.png";
+    const filePath = `${sellerId}/${crypto.randomUUID()}-listing-1-${safeName}`;
+    const { error } = await supabase.storage.from(LISTING_STORAGE_BUCKET).upload(filePath, file, {
+      contentType: inferContentType(file),
+      upsert: false
+    });
+
+    if (error) {
+      throw new Error(`Listing image upload failed: ${error.message}`);
+    }
+
+    return {
+      path: filePath,
+      name: file.name.trim() || safeName
+    };
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isSubmitting) {
       return;
     }
 
-    router.replace(pathname, { scroll: false });
-  }, [feedbackMessage, pathname, router]);
+    if (accountLimited) {
+      setLocalFeedback(ACCOUNT_LIMITED_MESSAGE);
+      return;
+    }
+
+    const form = event.currentTarget;
+
+    if (!form.reportValidity()) {
+      return;
+    }
+
+    const listingImageFile = selectedFile;
+    const validationError = validateFileUpload({
+      file: listingImageFile,
+      fieldLabel: "Final grid image",
+      allowedExtensions: LISTING_IMAGE_EXTENSIONS,
+      maxBytes: MAX_LISTING_IMAGE_BYTES
+    });
+
+    if (validationError) {
+      setLocalFeedback(validationError);
+      return;
+    }
+
+    let uploadedPath = "";
+    setIsSubmitting(true);
+    setLocalFeedback("");
+
+    try {
+      const uploadedImage = await uploadListingImageDirect(listingImageFile!);
+      uploadedPath = uploadedImage.path;
+
+      const formData = new FormData(form);
+      formData.delete("listingImage");
+      formData.set("uploadedListingImagePath", uploadedImage.path);
+      formData.set("uploadedListingImageName", uploadedImage.name);
+
+      const response = await fetch("/seller/upload/submit", {
+        method: "POST",
+        body: formData
+      });
+
+      if (response.redirected) {
+        router.push(response.url);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Listing could not be published right now.");
+      }
+
+      router.push("/seller/listings?listing=published");
+    } catch (error) {
+      if (uploadedPath) {
+        await getSupabaseBrowserClient()?.storage.from(LISTING_STORAGE_BUCKET).remove([uploadedPath]);
+      }
+
+      setLocalFeedback(error instanceof Error ? error.message : "Listing could not be published right now.");
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <Card className="max-w-5xl">
@@ -64,12 +173,12 @@ export default function SellerUploadForm({
       </CardHeader>
       <CardContent>
         <form
-          action="/seller/upload/submit"
-          method="POST"
-          encType="multipart/form-data"
-          onSubmit={() => setIsSubmitting(true)}
+          onSubmit={handleSubmit}
           className="space-y-6"
         >
+          {accountLimited ? (
+            <FormMessage message={ACCOUNT_LIMITED_MESSAGE} tone="error" />
+          ) : null}
           <div className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
               <label htmlFor="game" className="text-sm font-semibold text-foreground">
@@ -335,10 +444,10 @@ export default function SellerUploadForm({
             </div>
           </div>
 
-          <FormMessage message={feedbackMessage} tone="error" />
+          <FormMessage message={localFeedback} tone="error" />
 
           <div className="flex justify-end">
-            <SubmitButton disabled={isSubmitting} pendingLabel="Publishing listing...">
+            <SubmitButton disabled={isSubmitting || accountLimited} pendingLabel="Publishing listing...">
               Publish Listing
             </SubmitButton>
           </div>

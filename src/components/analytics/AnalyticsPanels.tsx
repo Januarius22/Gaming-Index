@@ -156,6 +156,7 @@ export function BarListChart({
   description: string;
   data: AnalyticsDatum[];
   valueKind?: "count" | "currency" | "decimal";
+
 }) {
   const maxValue = Math.max(...data.map((item) => item.value), 1);
 
