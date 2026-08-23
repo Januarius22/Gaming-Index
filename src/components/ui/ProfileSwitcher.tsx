@@ -21,13 +21,62 @@ import ProfileAvatar from "@/components/ui/ProfileAvatar";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 
-type Workspace = "account" | "seller" | "admin";
+export type Workspace = "account" | "seller" | "admin";
 
 const workspaceLabels: Record<Workspace, string> = {
   account: "Account",
   seller: "Seller",
   admin: "Admin"
 };
+
+export function WorkspaceSwitchPanel({
+  profile,
+  workspace,
+  onNavigate,
+  className
+}: {
+  profile: Pick<Profile, "role" | "seller_enabled">;
+  workspace: Workspace;
+  onNavigate?: () => void;
+  className?: string;
+}) {
+  const pathname = usePathname();
+  const sellerHref = profile.seller_enabled ? "/seller/dashboard" : "/account/seller";
+  const sellerLabel = profile.seller_enabled ? "Seller dashboard" : "Unlock seller access";
+
+  return (
+    <div className={cn("rounded-[24px] border border-border/70 bg-white p-2 text-foreground shadow-sm", className)}>
+      <p className="px-3 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        Switch workspace
+      </p>
+      <div className="grid gap-1">
+        <SwitcherLink
+          href="/account/dashboard"
+          active={workspace === "account"}
+          icon={<LayoutDashboard className="h-4 w-4" />}
+          label="Account dashboard"
+          onClick={onNavigate}
+        />
+        <SwitcherLink
+          href={sellerHref}
+          active={workspace === "seller"}
+          icon={<Store className="h-4 w-4" />}
+          label={sellerLabel}
+          onClick={onNavigate}
+        />
+        {profile.role === "admin" ? (
+          <SwitcherLink
+            href="/admin/dashboard"
+            active={workspace === "admin" || pathname.startsWith("/admin")}
+            icon={<ShieldCheck className="h-4 w-4" />}
+            label="Admin dashboard"
+            onClick={onNavigate}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 export default function ProfileSwitcher({
   profile,
@@ -215,7 +264,7 @@ function SwitcherLink({
   icon: ReactNode;
   label: string;
   active?: boolean;
-  onClick: () => void;
+  onClick?: () => void;
 }) {
   return (
     <Link

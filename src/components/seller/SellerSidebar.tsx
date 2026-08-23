@@ -27,6 +27,7 @@ import {
 import LogoutConfirmButton from "@/components/auth/LogoutConfirmButton";
 import { BrandMark } from "@/components/branding/BrandLogo";
 import Button, { buttonClassName } from "@/components/ui/Button";
+import { WorkspaceSwitchPanel } from "@/components/ui/ProfileSwitcher";
 import { cn } from "@/lib/utils";
 import type { Profile, SidebarCounts } from "@/types";
 
@@ -157,6 +158,14 @@ export default function SellerSidebar({
         >
           @{profile.username}
         </p>
+        {mobile ? (
+          <WorkspaceSwitchPanel
+            profile={profile}
+            workspace="seller"
+            onNavigate={onNavigate}
+            className="mt-4"
+          />
+        ) : null}
       </div>
 
       <nav

@@ -25,6 +25,7 @@ import LogoutConfirmButton from "@/components/auth/LogoutConfirmButton";
 import { BrandMark } from "@/components/branding/BrandLogo";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import { WorkspaceSwitchPanel } from "@/components/ui/ProfileSwitcher";
 import { cn } from "@/lib/utils";
 import type { Profile, SidebarCounts } from "@/types";
 
@@ -159,6 +160,14 @@ export default function AccountSidebar({
             {profile.seller_enabled ? "Seller access enabled" : "Buyer account"}
           </Badge>
         </div>
+        {mobile ? (
+          <WorkspaceSwitchPanel
+            profile={profile}
+            workspace="account"
+            onNavigate={onNavigate}
+            className="mt-4"
+          />
+        ) : null}
       </div>
 
       <nav
