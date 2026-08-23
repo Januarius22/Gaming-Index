@@ -77,7 +77,7 @@ function getListingAccent(listing: Listing) {
   if (listing.status === "sold") {
     return {
       strip: "from-rose-500 via-red-500 to-orange-400",
-      label: "Archived",
+      label: "Sold",
       dot: "bg-rose-500"
     };
   }
