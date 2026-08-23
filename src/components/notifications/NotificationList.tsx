@@ -1,9 +1,22 @@
 import Link from "next/link";
-import { ArrowRight, ChevronDown } from "lucide-react";
+import {
+  ArrowRight,
+  Bell,
+  ChevronDown,
+  CreditCard,
+  Megaphone,
+  MessageSquareWarning,
+  PackageCheck,
+  ShieldAlert,
+  UserRound
+} from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Notification } from "@/types";
+
+export type NotificationCategory = "orders" | "wallet" | "disputes" | "account" | "system";
 
 function formatMetadataKey(key: string) {
   return key
@@ -11,11 +24,53 @@ function formatMetadataKey(key: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function formatNotificationType(type: string) {
+export function formatNotificationType(type: string) {
   return type
     .replace(/^admin_/, "")
     .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+export function getNotificationCategory(notification: Notification): NotificationCategory {
+  const text = `${notification.type} ${notification.title} ${notification.message}`.toLowerCase();
+
+  if (text.includes("dispute") || text.includes("case")) {
+    return "disputes";
+  }
+
+  if (
+    text.includes("wallet") ||
+    text.includes("withdraw") ||
+    text.includes("payout") ||
+    text.includes("fund") ||
+    text.includes("refund")
+  ) {
+    return "wallet";
+  }
+
+  if (
+    text.includes("order") ||
+    text.includes("checkout") ||
+    text.includes("purchase") ||
+    text.includes("sale") ||
+    text.includes("listing")
+  ) {
+    return "orders";
+  }
+
+  if (
+    text.includes("account") ||
+    text.includes("kyc") ||
+    text.includes("seller") ||
+    text.includes("suspend") ||
+    text.includes("appeal") ||
+    text.includes("deactivation") ||
+    text.includes("deletion")
+  ) {
+    return "account";
+  }
+
+  return "system";
 }
 
 function formatMetadataValue(value: unknown) {
@@ -54,6 +109,32 @@ function notificationVariant(notification: Notification) {
   return "info";
 }
 
+function notificationIcon(notification: Notification) {
+  const category = getNotificationCategory(notification);
+
+  if (notification.type.includes("alert") || notification.type.includes("news")) {
+    return Megaphone;
+  }
+
+  if (category === "orders") {
+    return PackageCheck;
+  }
+
+  if (category === "wallet") {
+    return CreditCard;
+  }
+
+  if (category === "disputes") {
+    return MessageSquareWarning;
+  }
+
+  if (category === "account") {
+    return UserRound;
+  }
+
+  return Bell;
+}
+
 export default function NotificationList({
   notifications,
   emptyMessage = "No notifications yet.",
@@ -65,9 +146,12 @@ export default function NotificationList({
 }) {
   if (notifications.length === 0) {
     return (
-      <p className={cn("rounded-[22px] bg-surface text-sm text-muted-foreground", compact ? "p-3" : "p-5")}>
-        {emptyMessage}
-      </p>
+      <EmptyState
+        icon={<ShieldAlert className="h-7 w-7" />}
+        title="Nothing new here"
+        description={emptyMessage}
+        className={cn(compact && "min-h-0 rounded-[22px] px-4 py-8")}
+      />
     );
   }
 
@@ -78,17 +162,22 @@ export default function NotificationList({
           ([, value]) => value !== null && value !== undefined && value !== ""
         );
         const unread = !notification.read_at;
+        const Icon = notificationIcon(notification);
+        const category = getNotificationCategory(notification);
 
         if (compact) {
           return (
             <div
               key={notification.id}
               className={cn(
-                "rounded-[18px] bg-surface p-3",
+                "rounded-[18px] border border-border/60 bg-surface p-3",
                 unread && "ring-1 ring-primary/20"
               )}
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-primary shadow-sm ring-1 ring-border/70">
+                  <Icon className="h-4 w-4" />
+                </span>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="break-words text-sm font-semibold text-foreground">
@@ -103,6 +192,7 @@ export default function NotificationList({
                     <Badge variant={notificationVariant(notification)}>
                       {formatNotificationType(notification.type)}
                     </Badge>
+                    <Badge variant="neutral">{formatNotificationType(category)}</Badge>
                     <span className="text-xs text-muted-foreground">
                       {formatDate(notification.created_at)}
                     </span>
@@ -117,29 +207,35 @@ export default function NotificationList({
           <details
             key={notification.id}
             className={cn(
-              "group rounded-[22px] bg-surface p-4",
+              "group rounded-[22px] border border-border/60 bg-surface p-4 transition hover:border-primary/25 hover:shadow-[0_18px_50px_-42px_rgba(0,87,255,0.75)]",
               unread && "ring-1 ring-primary/20",
               "space-y-4"
             )}
           >
             <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="break-words font-semibold text-foreground">
-                    {notification.title}
+              <div className="flex min-w-0 gap-3">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-primary shadow-sm ring-1 ring-border/70">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="break-words font-semibold text-foreground">
+                      {notification.title}
+                    </p>
+                    {unread ? <Badge variant="info">Unread</Badge> : null}
+                  </div>
+                  <p className="mt-1 break-words text-sm leading-6 text-muted-foreground">
+                    {notification.message}
                   </p>
-                  {unread ? <Badge variant="info">Unread</Badge> : null}
-                </div>
-                <p className="mt-1 break-words text-sm leading-6 text-muted-foreground">
-                  {notification.message}
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <Badge variant={notificationVariant(notification)}>
-                    {formatNotificationType(notification.type)}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {formatDate(notification.created_at)}
-                  </span>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Badge variant={notificationVariant(notification)}>
+                      {formatNotificationType(notification.type)}
+                    </Badge>
+                    <Badge variant="neutral">{formatNotificationType(category)}</Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {formatDate(notification.created_at)}
+                    </span>
+                  </div>
                 </div>
               </div>
               <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition group-open:rotate-180" />
