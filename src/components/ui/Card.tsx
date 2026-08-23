@@ -8,7 +8,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "gi-panel-card rounded-3xl border border-border/80 bg-white shadow-[0_18px_60px_-40px_rgba(6,43,99,0.4)]",
+        "gi-panel-card gi-game-card rounded-3xl border border-border/80 bg-white shadow-[0_18px_60px_-40px_rgba(6,43,99,0.4)]",
         className
       )}
       {...props}
