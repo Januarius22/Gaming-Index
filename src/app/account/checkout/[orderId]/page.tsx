@@ -308,53 +308,18 @@ export default async function AccountCheckoutPage({
               </CardContent>
             </Card>
           ) : (
-            <Card className="border-border/70">
+            <Card id="checkout-payment" className="border-border/70">
               <CardHeader>
                 <CardTitle>Secure payment</CardTitle>
                 <CardDescription>
-                  You will be redirected to Paystack to complete this payment securely.
+                  Continue to Paystack to complete this payment securely.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form action={completeCheckoutAction} className="space-y-5">
                   <input type="hidden" name="orderId" value={order.id} />
 
-                  <div className="grid gap-4">
-                    <div>
-                      <label
-                        htmlFor="buyerPhone"
-                        className="mb-2 block text-sm font-medium text-foreground"
-                      >
-                        Phone number
-                      </label>
-                      <Input
-                        id="buyerPhone"
-                        name="buyerPhone"
-                        type="tel"
-                        autoComplete="tel"
-                        defaultValue={order.buyer_phone || ""}
-                        placeholder="+234 801 234 5678"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="buyerEmail"
-                        className="mb-2 block text-sm font-medium text-foreground"
-                      >
-                        Email address
-                      </label>
-                      <Input
-                        id="buyerEmail"
-                        defaultValue={profile.email}
-                        readOnly
-                        className="bg-surface"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-5 rounded-3xl bg-surface p-5">
+                  <div className="rounded-3xl bg-surface p-5">
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="text-sm text-muted-foreground">Amount payable</p>
@@ -371,24 +336,41 @@ export default async function AccountCheckoutPage({
                         <CreditCard className="h-5 w-5" />
                       </div>
                     </div>
+                  </div>
 
-                    <p className="rounded-2xl border border-border/80 bg-white px-4 py-3 text-sm leading-6 text-muted-foreground">
-                      Paystack will show the available payment options on the secure checkout page.
-                    </p>
-                    <p className="text-xs leading-6 text-muted-foreground">
-                      Gaming Index settles checkout in NGN. Your saved currency remains a display
-                      estimate.
-                    </p>
+                  <div className="grid gap-4">
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-medium text-foreground">
+                        Phone number
+                      </span>
+                      <Input
+                        name="buyerPhone"
+                        type="tel"
+                        autoComplete="tel"
+                        defaultValue={order.buyer_phone || ""}
+                        placeholder="+234 801 234 5678"
+                        required
+                      />
+                    </label>
+
+                    <div className="rounded-3xl border border-border/80 bg-white px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Paystack email
+                      </p>
+                      <p className="mt-1 break-words text-sm font-semibold text-foreground">
+                        {profile.email}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="grid gap-3 rounded-3xl border border-primary/10 bg-primary-soft/55 p-5 text-sm text-muted-foreground">
                     <div className="flex items-center gap-3">
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
-                      <span>Paystack verification must pass before this order is marked paid.</span>
+                      <span>Paystack will show the available payment options.</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
-                      <span>Seller earnings stay under buyer protection hold first.</span>
+                      <span>Payment is verified before this order is marked paid.</span>
                     </div>
                   </div>
 
