@@ -372,16 +372,9 @@ export default async function AccountCheckoutPage({
                       </div>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      {["Card", "Bank transfer", "USSD"].map((method) => (
-                        <div
-                          key={method}
-                          className="rounded-2xl border border-border/80 bg-white px-4 py-3 text-center text-sm font-semibold text-foreground"
-                        >
-                          {method}
-                        </div>
-                      ))}
-                    </div>
+                    <p className="rounded-2xl border border-border/80 bg-white px-4 py-3 text-sm leading-6 text-muted-foreground">
+                      Paystack will show the available payment options on the secure checkout page.
+                    </p>
                     <p className="text-xs leading-6 text-muted-foreground">
                       Gaming Index settles checkout in NGN. Your saved currency remains a display
                       estimate.
