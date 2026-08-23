@@ -38,6 +38,11 @@ function getNoticeMessage(notice?: string) {
         message: "We could not complete payment right now. Please try again.",
         tone: "error" as const
       };
+    case "payment-config":
+      return {
+        message: "Secure payment is not ready yet. Please try again shortly.",
+        tone: "error" as const
+      };
     case "checkout-unavailable":
       return {
         message: "This checkout is no longer available for the current listing state.",
@@ -135,8 +140,8 @@ export default async function AccountCheckoutPage({
           <CardHeader>
             <CardTitle>Secure checkout</CardTitle>
             <CardDescription>
-              Review this order, complete payment, and then unlock the seller delivery vault from
-              your order page.
+              Review this order, continue to Paystack, and unlock delivery after payment is
+              verified.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -307,13 +312,12 @@ export default async function AccountCheckoutPage({
               <CardHeader>
                 <CardTitle>Secure payment</CardTitle>
                 <CardDescription>
-                  Complete payment securely to continue with this order.
+                  You will be redirected to Paystack to complete this payment securely.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form action={completeCheckoutAction} className="space-y-5">
                   <input type="hidden" name="orderId" value={order.id} />
-                  <input type="hidden" name="paymentMode" value="paystack_mock" />
 
                   <div className="grid gap-4">
                     <div>
@@ -379,8 +383,8 @@ export default async function AccountCheckoutPage({
                       ))}
                     </div>
                     <p className="text-xs leading-6 text-muted-foreground">
-                      Gaming Index settles this checkout in NGN. Other currencies are display
-                      estimates only.
+                      Gaming Index settles checkout in NGN. Your saved currency remains a display
+                      estimate.
                     </p>
                   </div>
 
@@ -395,8 +399,8 @@ export default async function AccountCheckoutPage({
                     </div>
                   </div>
 
-                  <SubmitButton pendingLabel="Processing..." size="lg" className="w-full rounded-2xl">
-                    Pay securely with Paystack
+                  <SubmitButton pendingLabel="Opening Paystack..." size="lg" className="w-full rounded-2xl">
+                    Continue to Paystack
                   </SubmitButton>
                 </form>
               </CardContent>

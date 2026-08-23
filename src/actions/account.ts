@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentProfile, requireAccountProfile } from "@/lib/auth";
 import {
@@ -30,6 +31,11 @@ import {
 } from "@/lib/demoStore";
 import { hasSupabaseEnv } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
+import {
+  hasPaystackEnv,
+  initializePaystackTransaction,
+  verifyPaystackTransaction
+} from "@/lib/paystack";
 import {
   getPendingCheckoutExpiresAt,
   BASE_CURRENCY_CODE,
@@ -155,19 +161,16 @@ function getPaymentReference() {
   return `GI-${stamp}-${randomChunk}`;
 }
 
-function isValidExpiry(value: string) {
-  const trimmed = value.trim();
+async function getRequestOrigin() {
+  const headerStore = await headers();
+  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
+  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
 
-  if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(trimmed)) {
-    return false;
+  if (!host) {
+    return process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000";
   }
 
-  const [monthPart, yearPart] = trimmed.split("/");
-  const month = Number(monthPart);
-  const year = Number(`20${yearPart}`);
-  const expiryDate = new Date(year, month, 0, 23, 59, 59, 999);
-
-  return expiryDate.getTime() >= Date.now();
+  return `${protocol}://${host}`;
 }
 
 function revalidateBuyerWorkspace() {
@@ -798,13 +801,7 @@ export async function requestBuyerWithdrawalAction(
 export async function completeCheckoutAction(formData: FormData) {
   const profile = await requireAccountProfile();
   const orderId = String(formData.get("orderId") ?? "").trim();
-  const paymentMode = String(formData.get("paymentMode") ?? "").trim();
   const buyerPhone = String(formData.get("buyerPhone") ?? "").trim();
-  const cardholderName = String(formData.get("cardholderName") ?? "").trim();
-  const cardNumber = String(formData.get("cardNumber") ?? "").replace(/\s+/g, "");
-  const expiry = String(formData.get("expiry") ?? "").trim();
-  const cvv = String(formData.get("cvv") ?? "").trim();
-  const useMockProvider = paymentMode === "paystack_mock";
 
   if (!orderId) {
     redirect("/account/orders");
@@ -830,27 +827,47 @@ export async function completeCheckoutAction(formData: FormData) {
     redirect(getCheckoutPath(order.id, "checkout-unavailable"));
   }
 
-  const cardDetailsInvalid =
-    !useMockProvider &&
-    (cardholderName.length < 3 ||
-      !/^\d{12,19}$/.test(cardNumber) ||
-      !isValidExpiry(expiry) ||
-      !/^\d{3,4}$/.test(cvv));
-
-  if (!buyerPhone || !isValidPhoneNumber(buyerPhone) || cardDetailsInvalid) {
+  if (!buyerPhone || !isValidPhoneNumber(buyerPhone)) {
     redirect(getCheckoutPath(order.id, "payment-invalid"));
   }
 
+  if (hasPaystackEnv()) {
+    const paymentReference = getPaymentReference();
+    const origin = await getRequestOrigin();
+    const paymentResult = await initializePaystackTransaction({
+      email: profile.email,
+      amount: order.amount,
+      reference: paymentReference,
+      callbackUrl: `${origin}/account/checkout/paystack/callback`,
+      metadata: {
+        order_id: order.id,
+        listing_id: order.listing_id,
+        buyer_id: profile.id,
+        buyer_phone: buyerPhone
+      }
+    });
+
+    if (!paymentResult.ok) {
+      redirect(
+        getCheckoutPath(
+          order.id,
+          paymentResult.reason === "missing-config" ? "payment-config" : "payment-failed"
+        )
+      );
+    }
+
+    redirect(paymentResult.authorizationUrl);
+  }
+
   const paymentReference = getPaymentReference();
-  const paymentLast4 = useMockProvider ? "TEST" : cardNumber.slice(-4);
   const paymentResult = await markOrderPaid({
     orderId: order.id,
     listingId: order.listing_id,
     buyerPhone,
     paymentReference,
-    paymentLast4,
-    paymentProvider: useMockProvider ? "paystack_mock" : "secure_checkout",
-    paymentChannel: useMockProvider ? "provider_test" : "card"
+    paymentLast4: "TEST",
+    paymentProvider: "paystack_test_fallback",
+    paymentChannel: "provider_test"
   });
 
   if (!paymentResult.ok) {
@@ -869,4 +886,77 @@ export async function completeCheckoutAction(formData: FormData) {
   revalidateBuyerCheckout(order.listing_id, order.id);
 
   redirect(getCheckoutSuccessPath(order.id));
+}
+
+export async function getPaystackCheckoutVerificationPath(reference: string) {
+  const profile = await requireAccountProfile();
+  const trimmedReference = reference.trim();
+
+  if (!trimmedReference) {
+    return "/account/orders?notice=payment-invalid";
+  }
+
+  const verificationResult = await verifyPaystackTransaction(trimmedReference);
+
+  if (!verificationResult.ok) {
+    return "/account/orders?notice=payment-failed";
+  }
+
+  const { transaction } = verificationResult;
+  const orderId = transaction.metadata.order_id;
+
+  if (!orderId) {
+    return "/account/orders?notice=payment-invalid";
+  }
+
+  const orderDetail = await getBuyerOrderDetail(profile, orderId);
+
+  if (!orderDetail) {
+    return "/account/orders?notice=payment-invalid";
+  }
+
+  const { order, listing, paymentConfirmed } = orderDetail;
+
+  if (paymentConfirmed) {
+    return getCheckoutSuccessPath(order.id);
+  }
+
+  const amountMatches = Math.round(transaction.amount * 100) === Math.round(order.amount * 100);
+  const metadataMatches =
+    transaction.currency === BASE_CURRENCY_CODE &&
+    transaction.metadata.buyer_id === profile.id &&
+    transaction.metadata.listing_id === order.listing_id;
+
+  if (
+    !amountMatches ||
+    !metadataMatches ||
+    order.status !== "pending" ||
+    !listing ||
+    listing.seller_id === profile.id
+  ) {
+    return getCheckoutPath(order.id, "payment-invalid");
+  }
+
+  const paymentResult = await markOrderPaid({
+    orderId: order.id,
+    listingId: order.listing_id,
+    buyerPhone: transaction.metadata.buyer_phone || order.buyer_phone || "",
+    paymentReference: transaction.reference,
+    paymentLast4: transaction.last4,
+    paymentProvider: "paystack",
+    paymentChannel: transaction.channel
+  });
+
+  if (!paymentResult.ok) {
+    return getCheckoutPath(
+      order.id,
+      paymentResult.reason === "listing-unavailable" ? "checkout-unavailable" : "payment-failed"
+    );
+  }
+
+  await removeCartListingId(order.listing_id);
+
+  revalidateBuyerCheckout(order.listing_id, order.id);
+
+  return getCheckoutSuccessPath(order.id);
 }
