@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { ShieldAlert } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import { requireSellerProfile } from "@/lib/auth";
 import { getSellerDisputes } from "@/lib/data";
 import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
@@ -29,9 +31,11 @@ export default async function SellerDisputesPage() {
       </CardHeader>
       <CardContent className="space-y-3">
         {disputes.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center text-sm text-muted-foreground">
-            No seller disputes yet.
-          </div>
+          <EmptyState
+            icon={<ShieldAlert className="h-7 w-7" />}
+            title="No seller disputes yet"
+            description="Cases that require your response will appear here."
+          />
         ) : (
           disputes.map((dispute) => (
             <div

@@ -1,6 +1,8 @@
+import { Landmark } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import WithdrawalRequestForm from "@/components/seller/WithdrawalRequestForm";
+import EmptyState from "@/components/ui/EmptyState";
 import { requireSellerProfile } from "@/lib/auth";
 import { getCurrencyRates, getProfileSettings, getProfileWallet, getSellerWithdrawalRequests } from "@/lib/data";
 import { BASE_CURRENCY_CODE, formatCurrency, formatDate, titleCase } from "@/lib/utils";
@@ -78,9 +80,12 @@ export default async function SellerWithdrawalsPage() {
         </CardHeader>
         <CardContent className="space-y-3 p-5 pt-0 sm:p-6 sm:pt-0">
           {withdrawalRequests.length === 0 ? (
-            <p className="rounded-[22px] bg-surface p-5 text-sm text-muted-foreground">
-              No withdrawal requests yet.
-            </p>
+            <EmptyState
+              icon={<Landmark className="h-7 w-7" />}
+              title="No withdrawal requests yet"
+              description="Submitted withdrawal requests will appear here with status updates."
+              className="min-h-[18rem]"
+            />
           ) : (
             withdrawalRequests.map((request) => (
               <div

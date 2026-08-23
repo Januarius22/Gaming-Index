@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { MessageSquareWarning } from "lucide-react";
+import { MessageSquareWarning, ShieldAlert } from "lucide-react";
 import { openDisputeCaseAction } from "@/actions/disputes";
 import DisputeNotice from "@/components/disputes/DisputeNotice";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import { requireAccountProfile } from "@/lib/auth";
@@ -47,9 +48,12 @@ export default async function AccountDisputesPage({
         </CardHeader>
         <CardContent className="space-y-4">
           {candidates.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-surface p-6 text-center text-sm text-muted-foreground">
-              No eligible paid orders are available for dispute.
-            </div>
+            <EmptyState
+              icon={<ShieldAlert className="h-7 w-7" />}
+              title="No eligible orders"
+              description="Paid orders within the dispute window will appear here."
+              className="min-h-[18rem]"
+            />
           ) : (
             candidates.map(({ order, dispute }) => (
               <div
@@ -123,7 +127,12 @@ export default async function AccountDisputesPage({
         </CardHeader>
         <CardContent className="space-y-3">
           {disputes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No dispute cases yet.</p>
+            <EmptyState
+              icon={<MessageSquareWarning className="h-7 w-7" />}
+              title="No dispute cases yet"
+              description="When you open a case, updates and evidence will stay here."
+              className="min-h-[16rem]"
+            />
           ) : (
             disputes.slice(0, 5).map((dispute) => (
               <Link

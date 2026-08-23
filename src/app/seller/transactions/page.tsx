@@ -1,5 +1,7 @@
+import { ReceiptText } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import PaginationControls from "@/components/ui/PaginationControls";
 import { requireSellerProfile } from "@/lib/auth";
 import { getCurrencyRates, getProfileSettings, getProfileWalletTransactions } from "@/lib/data";
@@ -67,9 +69,12 @@ export default async function SellerTransactionsPage({
         </div>
 
         {paginatedTransactions.length === 0 ? (
-          <p className="rounded-[22px] bg-surface p-5 text-sm text-muted-foreground">
-            No wallet transactions yet.
-          </p>
+          <EmptyState
+            icon={<ReceiptText className="h-7 w-7" />}
+            title="No wallet activity yet"
+            description="Sales, releases, withdrawals, and balance movements will appear here."
+            className="min-h-[18rem]"
+          />
         ) : (
           paginatedTransactions.map((transaction) => (
             <div

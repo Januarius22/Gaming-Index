@@ -105,6 +105,16 @@ html {
   }
 }
 
+@keyframes gi-skeleton-shimmer {
+  from {
+    background-position: 180% 0;
+  }
+
+  to {
+    background-position: -80% 0;
+  }
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -431,6 +441,30 @@ textarea {
 
 .gi-glow-orbit {
   position: relative;
+}
+
+.gi-skeleton {
+  background-image:
+    linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.72) 38%, transparent 62%),
+    linear-gradient(145deg, rgba(234, 242, 255, 0.88), rgba(215, 227, 248, 0.72));
+  background-size:
+    220% 100%,
+    100% 100%;
+  animation: gi-skeleton-shimmer 1.35s ease-in-out infinite;
+}
+
+.gi-theme-dark .gi-skeleton {
+  background-image:
+    linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.1) 38%, transparent 62%),
+    linear-gradient(145deg, rgba(19, 43, 85, 0.9), rgba(49, 65, 92, 0.6));
+}
+
+@media (prefers-color-scheme: dark) {
+  .gi-theme-system .gi-skeleton {
+    background-image:
+      linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.1) 38%, transparent 62%),
+      linear-gradient(145deg, rgba(19, 43, 85, 0.9), rgba(49, 65, 92, 0.6));
+  }
 }
 
 .gi-glow-orbit::before {

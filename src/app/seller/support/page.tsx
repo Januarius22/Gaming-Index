@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { LifeBuoy } from "lucide-react";
 import { submitSellerSupportTicketAction } from "@/actions/support";
 import SupportTicketForm from "@/components/support/SupportTicketForm";
 import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import PaginationControls from "@/components/ui/PaginationControls";
 import { requireSellerProfile } from "@/lib/auth";
 import { getProfileSupportTickets } from "@/lib/data";
@@ -52,9 +54,12 @@ export default async function SellerSupportPage({
         </CardHeader>
         <CardContent className="space-y-4">
           {tickets.length === 0 ? (
-            <p className="rounded-[22px] bg-surface p-5 text-sm text-muted-foreground">
-              No support requests yet.
-            </p>
+            <EmptyState
+              icon={<LifeBuoy className="h-7 w-7" />}
+              title="No support requests yet"
+              description="Your support conversations will appear here after you send a request."
+              className="min-h-[18rem]"
+            />
           ) : (
             <>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

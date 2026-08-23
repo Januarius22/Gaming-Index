@@ -1,4 +1,6 @@
+import { PackageCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import PaginationControls from "@/components/ui/PaginationControls";
 import { getCurrencyRates, getProfileSettings, getSellerOrders } from "@/lib/data";
 import { requireSellerProfile } from "@/lib/auth";
@@ -46,37 +48,38 @@ export default async function SellerOrdersPage({
         <CardDescription>Track buyer orders connected to your approved gaming accounts.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {pageStart}-{pageEnd} of {totalCount} orders
-          </p>
-          <PaginationControls
-            pathname="/seller/orders"
-            currentPage={currentPage}
-            totalPages={totalPages}
+        {orders.length === 0 ? (
+          <EmptyState
+            icon={<PackageCheck className="h-7 w-7" />}
+            title="No orders yet"
+            description="Paid buyer orders connected to your listings will appear here."
           />
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-border text-muted-foreground">
-                <th className="px-4 py-3 font-medium">Order ID</th>
-                <th className="px-4 py-3 font-medium">Buyer Name</th>
-                <th className="px-4 py-3 font-medium">Game Account</th>
-                <th className="px-4 py-3 font-medium">Seller Payout</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
-                    No orders yet.
-                  </td>
-                </tr>
-              ) : (
-                paginatedOrders.map((order) => (
+        ) : (
+          <>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Showing {pageStart}-{pageEnd} of {totalCount} orders
+              </p>
+              <PaginationControls
+                pathname="/seller/orders"
+                currentPage={currentPage}
+                totalPages={totalPages}
+              />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border text-muted-foreground">
+                    <th className="px-4 py-3 font-medium">Order ID</th>
+                    <th className="px-4 py-3 font-medium">Buyer Name</th>
+                    <th className="px-4 py-3 font-medium">Game Account</th>
+                    <th className="px-4 py-3 font-medium">Seller Payout</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedOrders.map((order) => (
                   <tr key={order.id} className="border-b border-border/60">
                     <td className="px-4 py-4 font-medium text-foreground">{order.id.slice(0, 8)}</td>
                     <td className="px-4 py-4">{order.buyer_name}</td>
@@ -99,11 +102,12 @@ export default async function SellerOrdersPage({
                     </td>
                     <td className="px-4 py-4">{formatDate(order.created_at)}</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

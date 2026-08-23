@@ -1,6 +1,8 @@
+import { Landmark } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import BuyerWithdrawalRequestForm from "@/components/account/BuyerWithdrawalRequestForm";
+import EmptyState from "@/components/ui/EmptyState";
 import PaginationControls from "@/components/ui/PaginationControls";
 import { requireAccountProfile } from "@/lib/auth";
 import { getCurrencyRates, getProfileSettings, getProfileWallet, getProfileWithdrawalRequests } from "@/lib/data";
@@ -104,9 +106,12 @@ export default async function AccountWithdrawalsPage({
           </div>
 
           {paginatedWithdrawals.length === 0 ? (
-            <p className="rounded-[22px] bg-surface p-5 text-sm text-muted-foreground">
-              No withdrawal requests yet.
-            </p>
+            <EmptyState
+              icon={<Landmark className="h-7 w-7" />}
+              title="No withdrawal requests yet"
+              description="Submitted withdrawal requests will appear here with status updates."
+              className="min-h-[18rem]"
+            />
           ) : (
             paginatedWithdrawals.map((request) => (
               <div
