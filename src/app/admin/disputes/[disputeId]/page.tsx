@@ -8,27 +8,16 @@ import {
 } from "@/actions/admin";
 import AdminDisputeActionsModal from "@/components/admin/AdminDisputeActionsModal";
 import CaseAutoRefresh from "@/components/disputes/CaseAutoRefresh";
+import DisputeCaseRoom from "@/components/disputes/DisputeCaseRoom";
 import DisputeInstructions from "@/components/disputes/DisputeInstructions";
 import DisputeMessageForm from "@/components/disputes/DisputeMessageForm";
 import DisputeNotice from "@/components/disputes/DisputeNotice";
 import DisputeThread from "@/components/disputes/DisputeThread";
-import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { requireAdminProfile } from "@/lib/auth";
 import { getDisputeCase } from "@/lib/data";
-import { BASE_CURRENCY_CODE, formatCurrency, formatCurrencyValue, formatDate, titleCase } from "@/lib/utils";
-
-const statusVariant = {
-  pending_admin_review: "warning",
-  awaiting_seller_response: "info",
-  under_investigation: "warning",
-  resolved: "success",
-  rejected: "neutral",
-  refunded: "success",
-  open: "danger",
-  reviewing: "warning"
-} as const;
+import { BASE_CURRENCY_CODE, formatCurrency, formatCurrencyValue, formatDate } from "@/lib/utils";
 
 export default async function AdminDisputeCasePage({
   params,
@@ -118,20 +107,25 @@ export default async function AdminDisputeCasePage({
       </div>
 
       <div className="space-y-6">
+        <DisputeCaseRoom
+          dispute={caseData.dispute}
+          order={caseData.order}
+          messages={caseData.messages}
+          role="admin"
+        />
+
         <Card>
-          <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <CardHeader>
             <div>
-              <CardTitle>Case Summary</CardTitle>
+              <CardTitle>Admin review data</CardTitle>
               <CardDescription>
                 {caseData.order
                   ? `${formatCurrency(caseData.order.amount)} official NGN - ${formatDate(caseData.order.created_at)}`
                   : "Order case"}
               </CardDescription>
             </div>
-            <Badge variant={statusVariant[caseData.dispute.status]}>{titleCase(caseData.dispute.status)}</Badge>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-7 text-muted-foreground">
-            <p>{caseData.dispute.details}</p>
             {caseData.order ? (
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-border bg-surface p-4">
@@ -175,12 +169,6 @@ export default async function AdminDisputeCasePage({
                 <p>{caseData.dispute.seller_username ? `@${caseData.dispute.seller_username}` : "Seller account"}</p>
               </div>
             </div>
-            {caseData.dispute.resolution ? (
-              <div className="rounded-2xl border border-border bg-surface p-4">
-                <p className="font-semibold text-foreground">Resolution</p>
-                <p className="mt-1">{caseData.dispute.resolution}</p>
-              </div>
-            ) : null}
           </CardContent>
         </Card>
 

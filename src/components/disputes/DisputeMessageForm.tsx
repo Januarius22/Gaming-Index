@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileImage, Paperclip, Send, Video, X } from "lucide-react";
+import { FileImage, LockKeyhole, Paperclip, Send, Video, X } from "lucide-react";
 import FormMessage from "@/components/auth/FormMessage";
 import Button from "@/components/ui/Button";
 import Textarea from "@/components/ui/Textarea";
@@ -170,8 +170,18 @@ export default function DisputeMessageForm({
 
   if (disabled) {
     return (
-      <div className="rounded-2xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-        This case is closed.
+      <div className="rounded-3xl border border-border bg-white p-5 shadow-[0_-18px_42px_rgba(15,23,42,0.12)]">
+        <div className="flex items-start gap-3">
+          <div className="rounded-2xl bg-primary-soft p-3 text-primary">
+            <LockKeyhole className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground">Case discussion locked</p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              New replies are closed for this case.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }

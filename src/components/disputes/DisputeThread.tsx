@@ -6,7 +6,7 @@ import { Check, CheckCheck, CircleAlert, ImageIcon, LoaderCircle, Video } from "
 import { BrandMark } from "@/components/branding/BrandLogo";
 import Badge from "@/components/ui/Badge";
 import { cn, formatDate } from "@/lib/utils";
-import type { DisputeMessage } from "@/types";
+import type { DisputeAttachment, DisputeMessage } from "@/types";
 
 const roleLabel = {
   buyer: "Buyer",
@@ -134,37 +134,81 @@ export default function DisputeThread({
                 </p>
               ) : null}
 
-              {message.attachments && message.attachments.length > 0 ? (
-                <div className="mt-4 grid min-w-0 gap-2 overflow-hidden">
-                  {message.attachments.map((attachment) => (
-                    <Link
-                      key={attachment.id}
-                      href={attachment.file_url ?? "#"}
-                      target="_blank"
-                      className={cn(
-                        "flex min-w-0 max-w-full items-center gap-3 overflow-hidden rounded-2xl border p-3 text-sm font-semibold transition",
-                        mine
-                          ? "border-white/25 bg-white/10 text-white hover:bg-white/20"
-                          : "border-border bg-surface text-foreground hover:bg-primary-soft"
-                      )}
-                    >
-                      {attachment.file_type === "video" ? (
-                        <Video className={cn("h-5 w-5 shrink-0", mine ? "text-white" : "text-primary")} />
-                      ) : (
-                        <ImageIcon className={cn("h-5 w-5 shrink-0", mine ? "text-white" : "text-primary")} />
-                      )}
-                      <span className="block min-w-0 flex-1 truncate">
-                        {attachment.file_name || "Evidence"}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              ) : null}
+              <EvidenceGallery attachments={message.attachments ?? []} mine={mine} />
             </div>
           </article>
         );
       })}
       <div ref={endRef} />
+    </div>
+  );
+}
+
+function EvidenceGallery({
+  attachments,
+  mine
+}: {
+  attachments: DisputeAttachment[];
+  mine: boolean;
+}) {
+  if (attachments.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 grid min-w-0 gap-2 overflow-hidden sm:grid-cols-2">
+      {attachments.map((attachment) => {
+        const href = attachment.file_url ?? "#";
+        const isImage = attachment.file_type === "image";
+
+        return (
+          <Link
+            key={attachment.id}
+            href={href}
+            target="_blank"
+            className={cn(
+              "group min-w-0 overflow-hidden rounded-2xl border text-sm font-semibold transition",
+              mine
+                ? "border-white/25 bg-white/10 text-white hover:bg-white/20"
+                : "border-border bg-surface text-foreground hover:bg-primary-soft"
+            )}
+          >
+            <div
+              className={cn(
+                "relative flex aspect-[16/10] items-center justify-center overflow-hidden",
+                mine ? "bg-white/10" : "bg-white"
+              )}
+            >
+              {isImage && attachment.file_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={attachment.file_url}
+                  alt={attachment.file_name || "Dispute evidence"}
+                  className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                />
+              ) : (
+                <Video className={cn("h-8 w-8", mine ? "text-white" : "text-primary")} />
+              )}
+              <span className="absolute left-3 top-3 rounded-full bg-slate-950/70 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur">
+                {isImage ? "Image" : "Video"}
+              </span>
+            </div>
+            <div className="flex min-w-0 items-center gap-2 p-3">
+              {isImage ? (
+                <ImageIcon className={cn("h-4 w-4 shrink-0", mine ? "text-white" : "text-primary")} />
+              ) : (
+                <Video className={cn("h-4 w-4 shrink-0", mine ? "text-white" : "text-primary")} />
+              )}
+              <span className="min-w-0 flex-1 truncate">{attachment.file_name || "Evidence"}</span>
+              {attachment.file_type === "video" && attachment.duration_seconds ? (
+                <span className={cn("shrink-0 text-xs", mine ? "text-white/70" : "text-muted-foreground")}>
+                  {Math.ceil(attachment.duration_seconds)}s
+                </span>
+              ) : null}
+            </div>
+          </Link>
+        );
+      })}
     </div>
   );
 }

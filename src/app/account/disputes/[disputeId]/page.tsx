@@ -1,27 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import CaseAutoRefresh from "@/components/disputes/CaseAutoRefresh";
+import DisputeCaseRoom from "@/components/disputes/DisputeCaseRoom";
 import DisputeInstructions from "@/components/disputes/DisputeInstructions";
 import DisputeMessageForm from "@/components/disputes/DisputeMessageForm";
 import DisputeNotice from "@/components/disputes/DisputeNotice";
 import DisputeThread from "@/components/disputes/DisputeThread";
-import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { requireAccountProfile } from "@/lib/auth";
 import { getDisputeCase } from "@/lib/data";
-import { formatCurrency, formatDate, titleCase } from "@/lib/utils";
-
-const statusVariant = {
-  pending_admin_review: "warning",
-  awaiting_seller_response: "info",
-  under_investigation: "warning",
-  resolved: "success",
-  rejected: "neutral",
-  refunded: "success",
-  open: "danger",
-  reviewing: "warning"
-} as const;
 
 export default async function AccountDisputeCasePage({
   params,
@@ -63,26 +50,12 @@ export default async function AccountDisputeCasePage({
         </Link>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle>Case Summary</CardTitle>
-            <CardDescription>
-              {caseData.order ? `${formatCurrency(caseData.order.amount)} - ${formatDate(caseData.order.created_at)}` : "Order case"}
-            </CardDescription>
-          </div>
-          <Badge variant={statusVariant[caseData.dispute.status]}>{titleCase(caseData.dispute.status)}</Badge>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm leading-7 text-muted-foreground">
-          <p>{caseData.dispute.details}</p>
-          {caseData.dispute.resolution ? (
-            <div className="rounded-2xl border border-border bg-surface p-4">
-              <p className="font-semibold text-foreground">Resolution</p>
-              <p className="mt-1">{caseData.dispute.resolution}</p>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+      <DisputeCaseRoom
+        dispute={caseData.dispute}
+        order={caseData.order}
+        messages={caseData.messages}
+        role="buyer"
+      />
 
       <DisputeInstructions
         sellerVisible={Boolean(caseData.dispute.seller_visible)}
