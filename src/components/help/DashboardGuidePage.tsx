@@ -465,7 +465,7 @@ export default function DashboardGuidePage({
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
+        <CardHeader className="p-6 sm:p-7">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-soft text-primary">
               <Icon className="h-5 w-5" />
@@ -502,7 +502,7 @@ export default function DashboardGuidePage({
             <div className="grid gap-4 lg:grid-cols-2">
               {section.entries.map((entry) => (
                 <Card key={entry.title}>
-                  <CardContent className="p-5">
+                  <CardContent className="p-6 sm:p-7">
                     <div className="flex gap-4">
                       <span className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
                         <LifeBuoy className="h-4 w-4" />
