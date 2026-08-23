@@ -131,8 +131,8 @@ export default function NotificationInbox({
                 className={cn(
                   "shrink-0 rounded-2xl px-4 py-2 text-sm font-semibold transition",
                   activeCategory === category.value
-                    ? "bg-primary text-white shadow-[0_14px_30px_-18px_rgba(0,87,255,0.8)]"
-                    : "bg-white text-muted-foreground hover:bg-primary-soft hover:text-primary"
+                    ? "bg-primary !text-white visited:!text-white hover:!text-white shadow-[0_14px_30px_-18px_rgba(0,87,255,0.8)]"
+                    : "bg-white text-muted-foreground visited:text-muted-foreground hover:bg-primary-soft hover:text-primary"
                 )}
               >
                 {category.label}
