@@ -358,15 +358,12 @@ export default async function AccountCheckoutPage({
                 {formatOfficialPrice(order.amount)}
               </p>
             </div>
-            <a
-              href="#checkout-payment"
-              className={buttonClassName({
-                size: "md",
-                className: "shrink-0 rounded-2xl px-5"
-              })}
-            >
-              Pay Now
-            </a>
+            <form action={completeCheckoutAction} className="shrink-0">
+              <input type="hidden" name="orderId" value={order.id} />
+              <SubmitButton pendingLabel="Opening..." size="md" className="rounded-2xl px-5">
+                Pay Now
+              </SubmitButton>
+            </form>
           </div>
         </div>
       ) : null}
