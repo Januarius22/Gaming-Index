@@ -46,7 +46,7 @@ export default async function MarketplaceListingDetailPage({
     : "Login to continue";
 
   return (
-    <section className="px-3 py-6 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+    <section className="px-3 pb-28 pt-6 sm:px-6 sm:pt-10 lg:px-8 lg:pt-12 xl:pb-12">
       <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
         <Link
           href="/marketplace"
@@ -91,13 +91,13 @@ export default async function MarketplaceListingDetailPage({
                           )}
                         </span>
                         <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground">Seller</p>
-                        <p className="mt-2 break-words text-lg font-semibold text-foreground">
-                          {listing.seller_name}
-                        </p>
-                        <p className="mt-1 break-all text-sm text-muted-foreground">
-                          @{listing.seller_username}
-                        </p>
+                          <p className="text-sm font-semibold text-foreground">Seller</p>
+                          <p className="mt-2 break-words text-lg font-semibold text-foreground">
+                            {listing.seller_name}
+                          </p>
+                          <p className="mt-1 break-all text-sm text-muted-foreground">
+                            @{listing.seller_username}
+                          </p>
                         </div>
                       </div>
                       {ratingState.tag === "top_seller" ? (
@@ -206,7 +206,7 @@ export default async function MarketplaceListingDetailPage({
                     <ShieldCheck className="h-5 w-5" />
                   </div>
                   <div className="space-y-2">
-                        <p className="font-semibold text-foreground">Reviewed marketplace listing</p>
+                    <p className="font-semibold text-foreground">Reviewed marketplace listing</p>
                     <p className="text-sm leading-6 text-muted-foreground">
                       Review the account specs, seller notes, screenshots, and buyer rating signals
                       before checkout.
@@ -236,6 +236,28 @@ export default async function MarketplaceListingDetailPage({
               ) : null}
             </CardContent>
           </Card>
+        </div>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white/94 px-4 py-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] backdrop-blur-xl xl:hidden">
+        <div className="mx-auto flex max-w-2xl items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {listing.game}
+            </p>
+            <p className="truncate font-heading text-xl font-semibold text-foreground">
+              {formatCompactCurrency(listing.price, displayCurrency, currencyRates)}
+            </p>
+          </div>
+          <Link
+            href={ctaHref}
+            className={buttonClassName({
+              size: "md",
+              className: "shrink-0 rounded-2xl px-5"
+            })}
+          >
+            {ctaLabel}
+          </Link>
         </div>
       </div>
     </section>

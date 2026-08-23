@@ -9,9 +9,10 @@ import {
 } from "@/actions/account";
 import BuyerListingDetailActions from "@/components/account/BuyerListingDetailActions";
 import FormMessage from "@/components/auth/FormMessage";
+import SubmitButton from "@/components/auth/SubmitButton";
 import SellerRatingPanel from "@/components/public/SellerRatingPanel";
 import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
-import Button, { buttonClassName } from "@/components/ui/Button";
+import { buttonClassName } from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
 import {
@@ -85,7 +86,7 @@ export default async function AccountMarketplaceListingDetailPage({
   const displayCurrency = settings.display_currency;
 
   return (
-    <section className="-mx-2 px-2 py-6 sm:mx-0 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+    <section className="-mx-2 px-2 pb-28 pt-6 sm:mx-0 sm:px-6 sm:pt-10 lg:px-8 lg:pt-12 xl:pb-12">
       <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
         <Link
           href="/account/marketplace"
@@ -132,13 +133,13 @@ export default async function AccountMarketplaceListingDetailPage({
                           )}
                         </span>
                         <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground">Seller</p>
-                        <p className="mt-2 break-words text-lg font-semibold text-foreground">
-                          {listing.seller_name}
-                        </p>
-                        <p className="mt-1 break-all text-sm text-muted-foreground">
-                          @{listing.seller_username}
-                        </p>
+                          <p className="text-sm font-semibold text-foreground">Seller</p>
+                          <p className="mt-2 break-words text-lg font-semibold text-foreground">
+                            {listing.seller_name}
+                          </p>
+                          <p className="mt-1 break-all text-sm text-muted-foreground">
+                            @{listing.seller_username}
+                          </p>
                         </div>
                       </div>
                       {ratingState.tag === "top_seller" ? (
@@ -254,14 +255,15 @@ export default async function AccountMarketplaceListingDetailPage({
                     name="returnTo"
                     value={`/account/marketplace/${listing.id}`}
                   />
-                  <Button
+                  <SubmitButton
                     type="submit"
                     size="lg"
                     disabled={listing.status === "sold"}
                     className="w-full rounded-2xl"
+                    pendingLabel="Starting checkout..."
                   >
                     Buy Now
-                  </Button>
+                  </SubmitButton>
                 </form>
 
                 <BuyerListingDetailActions
@@ -284,6 +286,35 @@ export default async function AccountMarketplaceListingDetailPage({
               </Link>
             </CardContent>
           </Card>
+        </div>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white/94 px-4 py-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] backdrop-blur-xl xl:hidden">
+        <div className="mx-auto flex max-w-2xl items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {listing.game}
+            </p>
+            <p className="truncate font-heading text-xl font-semibold text-foreground">
+              {formatCompactCurrency(listing.price, displayCurrency, currencyRates)}
+            </p>
+          </div>
+          <form action={buyNowAction} className="shrink-0">
+            <input type="hidden" name="listingId" value={listing.id} />
+            <input
+              type="hidden"
+              name="returnTo"
+              value={`/account/marketplace/${listing.id}`}
+            />
+            <SubmitButton
+              size="md"
+              disabled={listing.status === "sold"}
+              className="rounded-2xl px-5"
+              pendingLabel="Starting..."
+            >
+              Buy Now
+            </SubmitButton>
+          </form>
         </div>
       </div>
     </section>

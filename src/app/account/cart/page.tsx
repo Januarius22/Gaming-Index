@@ -11,6 +11,7 @@ import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
 import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import PaginationControls from "@/components/ui/PaginationControls";
 import {
   getCartMarketplaceListings,
@@ -97,24 +98,20 @@ export default async function AccountCartPage({
 
       {cartListings.length === 0 ? (
         <Card className="mx-auto max-w-4xl">
-          <CardContent>
-            <div className="flex min-h-[44vh] flex-col items-center justify-center rounded-[32px] border border-dashed border-border bg-surface px-6 py-14 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-primary shadow-sm">
-                <ReceiptText className="h-6 w-6" />
-              </div>
-              <h2 className="mt-5 font-heading text-2xl font-semibold text-foreground">
-                Your cart is empty
-              </h2>
-              <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">
-                Use the cart icon to keep accounts here while you compare them.
-              </p>
+          <CardContent className="p-4 sm:p-6">
+            <EmptyState
+              icon={<ReceiptText className="h-7 w-7" />}
+              title="Your cart is empty"
+              description="Use the cart icon to keep accounts here while you compare them."
+              action={
               <Link
                 href="/account/marketplace"
-                className={buttonClassName({ className: "mt-6 rounded-2xl" })}
+                className={buttonClassName({ className: "rounded-2xl" })}
               >
                 Browse Marketplace
               </Link>
-            </div>
+              }
+            />
           </CardContent>
         </Card>
       ) : (

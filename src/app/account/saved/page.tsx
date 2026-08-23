@@ -4,6 +4,7 @@ import FormMessage from "@/components/auth/FormMessage";
 import MarketplacePreview from "@/components/public/MarketplacePreview";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import {
   getCartMarketplaceListingIds,
   getCurrencyRates,
@@ -71,25 +72,20 @@ export default async function AccountSavedPage({
 
       {savedListings.length === 0 ? (
         <Card className="mx-auto max-w-4xl">
-          <CardContent>
-            <div className="flex min-h-[44vh] flex-col items-center justify-center rounded-[32px] border border-dashed border-border bg-surface px-6 py-14 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-primary shadow-sm">
-                <Bookmark className="h-6 w-6" />
-              </div>
-              <h2 className="mt-5 font-heading text-2xl font-semibold text-foreground">
-                No saved listings yet
-              </h2>
-              <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">
-                Tap the heart icon on any buyer-dashboard listing and it will stay here for
-                later review.
-              </p>
+          <CardContent className="p-4 sm:p-6">
+            <EmptyState
+              icon={<Bookmark className="h-7 w-7" />}
+              title="No saved listings yet"
+              description="Tap the heart icon on any buyer-dashboard listing and it will stay here for later review."
+              action={
               <Link
                 href="/account/marketplace"
-                className={buttonClassName({ className: "mt-6 rounded-2xl" })}
+                className={buttonClassName({ className: "rounded-2xl" })}
               >
                 Browse Marketplace
               </Link>
-            </div>
+              }
+            />
           </CardContent>
         </Card>
       ) : (

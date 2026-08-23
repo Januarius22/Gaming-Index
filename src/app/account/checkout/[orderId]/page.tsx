@@ -122,7 +122,7 @@ export default async function AccountCheckoutPage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24 xl:pb-0">
       <div className="space-y-3">
         <Link
           href="/account/orders"
@@ -236,7 +236,7 @@ export default async function AccountCheckoutPage({
 
         <div className="space-y-6">
           {checkoutBlocked ? (
-            <Card className="border-border/70">
+            <Card id="checkout-payment" className="scroll-mt-28 border-border/70">
               <CardHeader>
                 <CardTitle>Checkout unavailable</CardTitle>
                 <CardDescription>
@@ -360,6 +360,30 @@ export default async function AccountCheckoutPage({
           )}
         </div>
       </div>
+
+      {!checkoutBlocked ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white/94 px-4 py-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] backdrop-blur-xl xl:hidden">
+          <div className="mx-auto flex max-w-2xl items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Amount payable
+              </p>
+              <p className="truncate font-heading text-xl font-semibold text-foreground">
+                {formatOfficialPrice(order.amount)}
+              </p>
+            </div>
+            <a
+              href="#checkout-payment"
+              className={buttonClassName({
+                size: "md",
+                className: "shrink-0 rounded-2xl px-5"
+              })}
+            >
+              Pay Now
+            </a>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

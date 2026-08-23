@@ -3,6 +3,7 @@ import { ReceiptText } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import PaginationControls from "@/components/ui/PaginationControls";
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrders, getCurrencyRates, getProfileSettings } from "@/lib/data";
@@ -65,18 +66,11 @@ export default async function AccountOrdersPage({
       </CardHeader>
       <CardContent>
         {orders.length === 0 ? (
-          <div className="mx-auto flex min-h-[44vh] max-w-4xl flex-col items-center justify-center rounded-[32px] border border-dashed border-border bg-surface px-6 py-14 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-primary shadow-sm">
-              <ReceiptText className="h-6 w-6" />
-            </div>
-            <h2 className="mt-5 font-heading text-2xl font-semibold text-foreground">
-              No order history yet
-            </h2>
-            <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">
-              Start checkout from a listing or from your cart and the full order record will
-              show up here automatically.
-            </p>
-          </div>
+          <EmptyState
+            icon={<ReceiptText className="h-7 w-7" />}
+            title="No order history yet"
+            description="Start checkout from a listing or from your cart and the full order record will show up here automatically."
+          />
         ) : (
           <div className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

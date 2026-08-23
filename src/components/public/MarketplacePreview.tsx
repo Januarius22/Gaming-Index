@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Heart, Loader2, ShoppingCart, SlidersHorizontal, Star } from "lucide-react";
+import { ArrowUpRight, Gamepad2, Heart, Loader2, ShoppingCart, SlidersHorizontal, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   buyNowAction,
@@ -18,6 +18,7 @@ import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
 import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import {
@@ -457,13 +458,13 @@ export default function MarketplacePreview({
 
         {sortedListings.length === 0 ? (
           <Card className="mx-auto max-w-4xl border-border/70">
-            <CardContent className="flex min-h-[36vh] flex-col items-center justify-center p-8 text-center sm:p-10">
-              <h3 className="font-heading text-2xl font-semibold text-foreground">
-                No listings match these filters.
-              </h3>
-              <p className="mt-3 text-sm leading-7 text-muted-foreground">
-                Try a wider price range or switch to a different account type.
-              </p>
+            <CardContent className="p-4 sm:p-6">
+              <EmptyState
+                icon={<Gamepad2 className="h-7 w-7" />}
+                title="No listings match these filters"
+                description="Try a wider price range or switch to another account type."
+                className="min-h-[36vh]"
+              />
             </CardContent>
           </Card>
         ) : (
