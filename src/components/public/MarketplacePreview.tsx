@@ -3,7 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Gamepad2, Heart, Loader2, ShoppingCart, SlidersHorizontal, Star } from "lucide-react";
+import {
+  ArrowUpRight,
+  ChevronDown,
+  Gamepad2,
+  Heart,
+  Loader2,
+  ShoppingCart,
+  SlidersHorizontal,
+  Star
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   buyNowAction,
@@ -147,6 +156,7 @@ export default function MarketplacePreview({
   const [pendingCartListingIds, setPendingCartListingIds] = useState<string[]>([]);
   const [draftFilters, setDraftFilters] = useState(defaultFilters);
   const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeCurrency, setActiveCurrency] = useState(displayCurrency);
   const sourceListings = context === "account" ? accountListings : listings;
@@ -362,97 +372,125 @@ export default function MarketplacePreview({
 
         {enableSearch ? (
           <div className="gi-game-card rounded-[28px] border border-border/70 bg-white p-4 shadow-[0_18px_50px_-40px_rgba(6,43,99,0.35)] sm:p-5">
-            <div className="mb-4 flex flex-col gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div
+              className={cn(
+                "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between",
+                filtersOpen && "border-b border-border/70 pb-4"
+              )}
+            >
               <div>
                 <p className="text-sm font-semibold text-foreground">Display currency</p>
                 <p className="text-xs text-muted-foreground">
                   Prices are stored in NGN and shown in your selected currency.
                 </p>
               </div>
-              <Select
-                value={activeCurrencyRate.code}
-                onChange={(event) => updateActiveCurrency(event.target.value)}
-                className="h-11 w-full rounded-2xl sm:w-56"
-              >
-                {(currencyRates?.filter((rate) => rate.enabled) ?? [activeCurrencyRate]).map((rate) => (
-                  <option key={rate.code} value={rate.code}>
-                    {rate.code} - {rate.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                applyFilters();
-              }}
-              className="space-y-4"
-            >
-              <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                <SlidersHorizontal className="h-4 w-4 text-primary" />
-                Marketplace filters
-              </div>
-
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]">
-                <Input
-                  value={draftFilters.minPrice}
-                  onChange={(event) => updateDraftFilter("minPrice", event.target.value)}
-                  type="number"
-                  min="0"
-                  inputMode="numeric"
-                  placeholder={`Min price (${activeCurrencyRate.code})`}
-                  className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
-                />
-
-                <Input
-                  value={draftFilters.maxPrice}
-                  onChange={(event) => updateDraftFilter("maxPrice", event.target.value)}
-                  type="number"
-                  min={minPrice ?? 0}
-                  inputMode="numeric"
-                  placeholder={`Max price (${activeCurrencyRate.code})`}
-                  className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
-                />
-
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Select
-                  value={draftFilters.game}
-                  onChange={(event) => updateDraftFilter("game", event.target.value)}
-                  className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
+                  value={activeCurrencyRate.code}
+                  onChange={(event) => updateActiveCurrency(event.target.value)}
+                  className="h-11 w-full rounded-2xl sm:w-56"
                 >
-                  <option value="all">All Accounts</option>
-                  {gameOptions.map((game) => (
-                    <option key={game} value={game}>
-                      {game}
+                  {(currencyRates?.filter((rate) => rate.enabled) ?? [activeCurrencyRate]).map((rate) => (
+                    <option key={rate.code} value={rate.code}>
+                      {rate.code} - {rate.name}
                     </option>
                   ))}
                 </Select>
-
-                <Select
-                  value={draftFilters.status}
-                  onChange={(event) =>
-                    updateDraftFilter("status", event.target.value as MarketplaceFilters["status"])
-                  }
-                  className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="active">Active</option>
-                  <option value="sold">Sold</option>
-                </Select>
-              </div>
-
-              <div className="flex justify-end">
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={() => setFiltersOpen((current) => !current)}
                   className={buttonClassName({
-                    size: "lg",
-                    className: "h-14 w-full rounded-2xl px-10 lg:w-auto"
+                    variant: "secondary",
+                    size: "sm",
+                    className: "gap-2 rounded-2xl"
                   })}
-                  disabled={minPriceInvalid || maxPriceInvalid}
+                  aria-expanded={filtersOpen}
                 >
-                  Filter
+                  <SlidersHorizontal className="h-4 w-4" />
+                  {filtersOpen ? "Hide filters" : "Show filters"}
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 transition-transform",
+                      filtersOpen && "rotate-180"
+                    )}
+                  />
                 </button>
               </div>
-            </form>
+            </div>
+            {filtersOpen ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  applyFilters();
+                }}
+                className="mt-4 space-y-4"
+              >
+                <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                  <SlidersHorizontal className="h-4 w-4 text-primary" />
+                  Marketplace filters
+                </div>
+
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]">
+                  <Input
+                    value={draftFilters.minPrice}
+                    onChange={(event) => updateDraftFilter("minPrice", event.target.value)}
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    placeholder={`Min price (${activeCurrencyRate.code})`}
+                    className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
+                  />
+
+                  <Input
+                    value={draftFilters.maxPrice}
+                    onChange={(event) => updateDraftFilter("maxPrice", event.target.value)}
+                    type="number"
+                    min={minPrice ?? 0}
+                    inputMode="numeric"
+                    placeholder={`Max price (${activeCurrencyRate.code})`}
+                    className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
+                  />
+
+                  <Select
+                    value={draftFilters.game}
+                    onChange={(event) => updateDraftFilter("game", event.target.value)}
+                    className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
+                  >
+                    <option value="all">All Accounts</option>
+                    {gameOptions.map((game) => (
+                      <option key={game} value={game}>
+                        {game}
+                      </option>
+                    ))}
+                  </Select>
+
+                  <Select
+                    value={draftFilters.status}
+                    onChange={(event) =>
+                      updateDraftFilter("status", event.target.value as MarketplaceFilters["status"])
+                    }
+                    className="h-14 rounded-2xl border-border/80 px-5 text-base shadow-none"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="sold">Sold</option>
+                  </Select>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className={buttonClassName({
+                      size: "lg",
+                      className: "h-14 w-full rounded-2xl px-10 lg:w-auto"
+                    })}
+                    disabled={minPriceInvalid || maxPriceInvalid}
+                  >
+                    Filter
+                  </button>
+                </div>
+              </form>
+            ) : null}
           </div>
         ) : null}
 
