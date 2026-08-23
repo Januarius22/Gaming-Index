@@ -801,7 +801,6 @@ export async function requestBuyerWithdrawalAction(
 export async function completeCheckoutAction(formData: FormData) {
   const profile = await requireAccountProfile();
   const orderId = String(formData.get("orderId") ?? "").trim();
-  const buyerPhone = String(formData.get("buyerPhone") ?? "").trim();
 
   if (!orderId) {
     redirect("/account/orders");
@@ -827,10 +826,6 @@ export async function completeCheckoutAction(formData: FormData) {
     redirect(getCheckoutPath(order.id, "checkout-unavailable"));
   }
 
-  if (!buyerPhone || !isValidPhoneNumber(buyerPhone)) {
-    redirect(getCheckoutPath(order.id, "payment-invalid"));
-  }
-
   if (!hasPaystackEnv()) {
     redirect(getCheckoutPath(order.id, "payment-config"));
   }
@@ -846,7 +841,7 @@ export async function completeCheckoutAction(formData: FormData) {
       order_id: order.id,
       listing_id: order.listing_id,
       buyer_id: profile.id,
-      buyer_phone: buyerPhone
+      buyer_phone: order.buyer_phone && isValidPhoneNumber(order.buyer_phone) ? order.buyer_phone : ""
     }
   });
 

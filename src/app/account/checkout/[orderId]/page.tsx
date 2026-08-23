@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, CheckCircle2, CreditCard, LockKeyhole, PackageCheck, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CreditCard, LockKeyhole, PackageCheck, ShieldCheck } from "lucide-react";
 import { completeCheckoutAction } from "@/actions/account";
 import FormMessage from "@/components/auth/FormMessage";
 import SubmitButton from "@/components/auth/SubmitButton";
@@ -8,7 +8,6 @@ import ListingPhotoGrid from "@/components/public/ListingPhotoGrid";
 import Badge from "@/components/ui/Badge";
 import { buttonClassName } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
-import Input from "@/components/ui/Input";
 import { requireAccountProfile } from "@/lib/auth";
 import { getBuyerOrderDetail, getCurrencyRates, getProfileSettings } from "@/lib/data";
 import {
@@ -335,42 +334,6 @@ export default async function AccountCheckoutPage({
                       <div className="rounded-2xl bg-white p-3 text-primary shadow-sm">
                         <CreditCard className="h-5 w-5" />
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4">
-                    <label className="block">
-                      <span className="mb-2 block text-sm font-medium text-foreground">
-                        Phone number
-                      </span>
-                      <Input
-                        name="buyerPhone"
-                        type="tel"
-                        autoComplete="tel"
-                        defaultValue={order.buyer_phone || ""}
-                        placeholder="+234 801 234 5678"
-                        required
-                      />
-                    </label>
-
-                    <div className="rounded-3xl border border-border/80 bg-white px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                        Paystack email
-                      </p>
-                      <p className="mt-1 break-words text-sm font-semibold text-foreground">
-                        {profile.email}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 rounded-3xl border border-primary/10 bg-primary-soft/55 p-5 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
-                      <span>Paystack will show the available payment options.</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
-                      <span>Payment is verified before this order is marked paid.</span>
                     </div>
                   </div>
 
