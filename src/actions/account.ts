@@ -831,61 +831,35 @@ export async function completeCheckoutAction(formData: FormData) {
     redirect(getCheckoutPath(order.id, "payment-invalid"));
   }
 
-  if (hasPaystackEnv()) {
-    const paymentReference = getPaymentReference();
-    const origin = await getRequestOrigin();
-    const paymentResult = await initializePaystackTransaction({
-      email: profile.email,
-      amount: order.amount,
-      reference: paymentReference,
-      callbackUrl: `${origin}/account/checkout/paystack/callback`,
-      metadata: {
-        order_id: order.id,
-        listing_id: order.listing_id,
-        buyer_id: profile.id,
-        buyer_phone: buyerPhone
-      }
-    });
-
-    if (!paymentResult.ok) {
-      redirect(
-        getCheckoutPath(
-          order.id,
-          paymentResult.reason === "missing-config" ? "payment-config" : "payment-failed"
-        )
-      );
-    }
-
-    redirect(paymentResult.authorizationUrl);
+  if (!hasPaystackEnv()) {
+    redirect(getCheckoutPath(order.id, "payment-config"));
   }
 
   const paymentReference = getPaymentReference();
-  const paymentResult = await markOrderPaid({
-    orderId: order.id,
-    listingId: order.listing_id,
-    buyerPhone,
-    paymentReference,
-    paymentLast4: "TEST",
-    paymentProvider: "paystack_test_fallback",
-    paymentChannel: "provider_test"
+  const origin = await getRequestOrigin();
+  const paymentResult = await initializePaystackTransaction({
+    email: profile.email,
+    amount: order.amount,
+    reference: paymentReference,
+    callbackUrl: `${origin}/account/checkout/paystack/callback`,
+    metadata: {
+      order_id: order.id,
+      listing_id: order.listing_id,
+      buyer_id: profile.id,
+      buyer_phone: buyerPhone
+    }
   });
 
   if (!paymentResult.ok) {
     redirect(
       getCheckoutPath(
         order.id,
-        paymentResult.reason === "listing-unavailable"
-          ? "checkout-unavailable"
-          : "payment-failed"
+        paymentResult.reason === "missing-config" ? "payment-config" : "payment-failed"
       )
     );
   }
 
-  await removeCartListingId(order.listing_id);
-
-  revalidateBuyerCheckout(order.listing_id, order.id);
-
-  redirect(getCheckoutSuccessPath(order.id));
+  redirect(paymentResult.authorizationUrl);
 }
 
 export async function getPaystackCheckoutVerificationPath(reference: string) {

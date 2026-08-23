@@ -384,7 +384,7 @@ export default async function AccountCheckoutPage({
                   <div className="grid gap-3 rounded-3xl border border-primary/10 bg-primary-soft/55 p-5 text-sm text-muted-foreground">
                     <div className="flex items-center gap-3">
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
-                      <span>Your order record is created immediately after payment.</span>
+                      <span>Paystack verification must pass before this order is marked paid.</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
