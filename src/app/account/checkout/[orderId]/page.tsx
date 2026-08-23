@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, CreditCard } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CreditCard, LockKeyhole, PackageCheck, ShieldCheck } from "lucide-react";
 import { completeCheckoutAction } from "@/actions/account";
 import FormMessage from "@/components/auth/FormMessage";
 import SubmitButton from "@/components/auth/SubmitButton";
@@ -141,6 +141,39 @@ export default async function AccountCheckoutPage({
           </CardHeader>
         </Card>
       </div>
+
+      <Card className="border-border/70">
+        <CardContent className="grid gap-3 p-4 sm:grid-cols-3 sm:p-5">
+          {[
+            { label: "Review order", icon: PackageCheck, active: true },
+            { label: "Confirm payment", icon: LockKeyhole, active: true },
+            { label: "Open delivery vault", icon: ShieldCheck, active: false }
+          ].map((step, index) => {
+            const Icon = step.icon;
+
+            return (
+              <div
+                key={step.label}
+                className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-3"
+              >
+                <span
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                    step.active ? "bg-primary text-white" : "bg-white text-primary"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Step {index + 1}
+                  </p>
+                  <p className="truncate text-sm font-semibold text-foreground">{step.label}</p>
+                </div>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
 
       <FormMessage message={noticeState.message} tone={noticeState.tone} />
 
@@ -351,6 +384,17 @@ export default async function AccountCheckoutPage({
                     </p>
                   </div>
 
+                  <div className="grid gap-3 rounded-3xl border border-primary/10 bg-primary-soft/55 p-5 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+                      <span>Your order record is created immediately after payment.</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
+                      <span>Seller earnings stay under buyer protection hold first.</span>
+                    </div>
+                  </div>
+
                   <SubmitButton pendingLabel="Processing..." size="lg" className="w-full rounded-2xl">
                     Pay securely with Paystack
                   </SubmitButton>
@@ -362,7 +406,7 @@ export default async function AccountCheckoutPage({
       </div>
 
       {!checkoutBlocked ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white/94 px-4 py-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] backdrop-blur-xl xl:hidden">
+        <div className="gi-mobile-action-bar fixed inset-x-0 bottom-0 z-40 border-t border-border px-4 pt-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] backdrop-blur-xl xl:hidden">
           <div className="mx-auto flex max-w-2xl items-center gap-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">

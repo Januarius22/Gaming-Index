@@ -601,6 +601,27 @@ textarea {
   opacity: 1;
 }
 
+.gi-mobile-action-bar {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.98)),
+    radial-gradient(circle at 12% 0%, rgba(0, 87, 255, 0.08), transparent 42%);
+}
+
+.gi-theme-dark .gi-mobile-action-bar {
+  background:
+    linear-gradient(180deg, rgba(17, 29, 49, 0.92), rgba(8, 17, 31, 0.98)),
+    radial-gradient(circle at 12% 0%, rgba(110, 162, 255, 0.12), transparent 42%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .gi-theme-system .gi-mobile-action-bar {
+    background:
+      linear-gradient(180deg, rgba(17, 29, 49, 0.92), rgba(8, 17, 31, 0.98)),
+      radial-gradient(circle at 12% 0%, rgba(110, 162, 255, 0.12), transparent 42%);
+  }
+}
+
 .gi-theme-dark .gi-cursor-shade {
   background:
     radial-gradient(circle, rgba(40, 103, 214, 0.2) 0%, rgba(0, 87, 255, 0.12) 34%, transparent 70%);

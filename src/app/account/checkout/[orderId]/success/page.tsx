@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, PackageCheck, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, PackageCheck, ShieldCheck, Sparkles } from "lucide-react";
 import PurchaseCelebration from "@/components/account/PurchaseCelebration";
 import PurchaseSuccessScrollReset from "@/components/account/PurchaseSuccessScrollReset";
 import Badge from "@/components/ui/Badge";
@@ -92,6 +92,38 @@ export default async function PurchaseSuccessPage({
             </div>
           </CardContent>
         </Card>
+
+        <div className="mt-6 grid w-full max-w-2xl gap-3 text-left sm:grid-cols-3">
+          {[
+            {
+              icon: CheckCircle2,
+              title: "Payment saved",
+              text: "Your order record is ready."
+            },
+            {
+              icon: ShieldCheck,
+              title: "Protection active",
+              text: "Seller funds stay on hold first."
+            },
+            {
+              icon: Clock3,
+              title: "Next step",
+              text: deliveryAvailable ? "Open delivery details." : "Wait for seller delivery."
+            }
+          ].map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <div key={item.title} className="rounded-3xl bg-surface p-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <p className="mt-3 text-sm font-semibold text-foreground">{item.title}</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.text}</p>
+              </div>
+            );
+          })}
+        </div>
 
         <div className="mt-8 flex w-full max-w-2xl flex-col gap-3 sm:flex-row sm:justify-center">
           <Link

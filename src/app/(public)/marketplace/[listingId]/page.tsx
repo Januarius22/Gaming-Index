@@ -239,7 +239,7 @@ export default async function MarketplaceListingDetailPage({
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white/94 px-4 py-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] backdrop-blur-xl xl:hidden">
+      <div className="gi-mobile-action-bar fixed inset-x-0 bottom-0 z-40 border-t border-border px-4 pt-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] backdrop-blur-xl xl:hidden">
         <div className="mx-auto flex max-w-2xl items-center gap-3">
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">

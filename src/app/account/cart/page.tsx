@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Heart, ReceiptText, Trash2 } from "lucide-react";
+import { Heart, PackageCheck, ReceiptText, ShieldCheck, Trash2 } from "lucide-react";
 import {
   buyNowAction,
   removeCartListingAction,
@@ -139,6 +139,23 @@ export default async function AccountCartPage({
                 <p className="text-sm text-muted-foreground">Estimated total</p>
                 <p className="mt-2 font-heading text-4xl font-semibold text-foreground">
                   {formatPrice(estimatedTotal)}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/70">
+            <CardContent className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5">
+              <div className="flex items-center gap-3 rounded-2xl bg-primary-soft/60 px-4 py-3">
+                <PackageCheck className="h-5 w-5 shrink-0 text-primary" />
+                <p className="text-sm font-semibold text-foreground">
+                  Checkout opens one account at a time.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-3">
+                <ShieldCheck className="h-5 w-5 shrink-0 text-primary" />
+                <p className="text-sm font-semibold text-foreground">
+                  Compare first, then pay for the exact account you choose.
                 </p>
               </div>
             </CardContent>

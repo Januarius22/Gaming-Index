@@ -1,6 +1,9 @@
 import Link from "next/link";
 import {
   ArrowLeft,
+  BadgeCheck,
+  Clock3,
+  ShieldCheck,
   Star
 } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -247,6 +250,24 @@ export default async function AccountMarketplaceListingDetailPage({
                 not control third-party game or platform account-transfer rules.
               </div>
 
+              <div className="rounded-3xl border border-primary/10 bg-primary-soft/55 p-5">
+                <p className="font-semibold text-foreground">Buyer confidence</p>
+                <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
+                    <span>Payment is held before seller earnings are released.</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <BadgeCheck className="h-4 w-4 shrink-0 text-primary" />
+                    <span>Seller identity and rating signals stay visible.</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Clock3 className="h-4 w-4 shrink-0 text-primary" />
+                    <span>Order history keeps your delivery and case records.</span>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-3">
                 <form action={buyNowAction}>
                   <input type="hidden" name="listingId" value={listing.id} />
@@ -289,7 +310,7 @@ export default async function AccountMarketplaceListingDetailPage({
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white/94 px-4 py-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] backdrop-blur-xl xl:hidden">
+      <div className="gi-mobile-action-bar fixed inset-x-0 bottom-0 z-40 border-t border-border px-4 pt-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] backdrop-blur-xl xl:hidden">
         <div className="mx-auto flex max-w-2xl items-center gap-3">
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
