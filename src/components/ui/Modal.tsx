@@ -39,7 +39,7 @@ export default function Modal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex cursor-pointer items-center justify-center bg-slate-950/45 px-4 py-10 backdrop-blur-md"
+          className="gi-modal-root fixed inset-0 z-[2147483647] flex cursor-pointer items-start justify-center overflow-y-auto bg-slate-950/45 px-4 py-10 backdrop-blur-md sm:items-center"
           onClick={onClose}
         >
           <motion.div

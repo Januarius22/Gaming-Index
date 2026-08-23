@@ -132,7 +132,7 @@ body {
   font-family: var(--font-body), sans-serif;
 }
 
-body > :not(.gi-game-backdrop):not(.gi-cursor-shade) {
+body > :not(.gi-game-backdrop):not(.gi-cursor-shade):not(.gi-modal-root) {
   position: relative;
   z-index: 1;
 }
