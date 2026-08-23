@@ -79,6 +79,10 @@ const navGroups = [
   }
 ];
 
+function isSidebarItemActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export default function SellerSidebar({
   profile,
   sidebarCounts,
@@ -163,18 +167,19 @@ export default function SellerSidebar({
       >
         {priorityItems.map((item) => {
           const Icon = item.icon;
-          const active = pathname === item.href;
+          const active = isSidebarItemActive(pathname, item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? "page" : undefined}
               onClick={onNavigate}
               title={collapsedDesktop ? item.label : undefined}
               className={cn(
                 "relative flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
                 collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
                 active
-                  ? "bg-white !text-primary-dark visited:!text-primary-dark hover:!text-primary-dark shadow-sm"
+                  ? "bg-white !text-primary-dark visited:!text-primary-dark hover:!text-primary-dark shadow-sm before:absolute before:left-2 before:top-1/2 before:h-7 before:w-1 before:-translate-y-1/2 before:rounded-full before:bg-primary"
                   : "text-blue-100/85 hover:bg-white/10 hover:text-white"
               )}
             >
@@ -205,7 +210,7 @@ export default function SellerSidebar({
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const locked = item.href === "/seller/upload" && uploadLocked;
-                const active = !locked && pathname === item.href;
+                const active = !locked && isSidebarItemActive(pathname, item.href);
                 const label = locked
                   ? restrictedUntil > Date.now()
                     ? "Upload Account (restricted)"
@@ -246,13 +251,14 @@ export default function SellerSidebar({
                   <Link
                     key={item.href}
                     href={item.href}
+                    aria-current={active ? "page" : undefined}
                     onClick={onNavigate}
                     title={collapsedDesktop ? item.label : undefined}
                     className={cn(
                       "relative flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
                       collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
                       active
-                        ? "bg-white !text-primary-dark visited:!text-primary-dark hover:!text-primary-dark shadow-sm"
+                        ? "bg-white !text-primary-dark visited:!text-primary-dark hover:!text-primary-dark shadow-sm before:absolute before:left-2 before:top-1/2 before:h-7 before:w-1 before:-translate-y-1/2 before:rounded-full before:bg-primary"
                         : "text-blue-100/85 hover:bg-white/10 hover:text-white"
                     )}
                   >

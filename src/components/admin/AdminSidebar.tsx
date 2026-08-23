@@ -94,6 +94,10 @@ const navGroups = [
   }
 ];
 
+function isSidebarItemActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export default function AdminSidebar({
   profile,
   sidebarCounts,
@@ -174,18 +178,19 @@ export default function AdminSidebar({
       >
         {priorityItems.map((item) => {
           const Icon = item.icon;
-          const active = pathname === item.href;
+          const active = isSidebarItemActive(pathname, item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? "page" : undefined}
               onClick={onNavigate}
               title={collapsedDesktop ? item.label : undefined}
               className={cn(
                 "relative flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
                 collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
                 active
-                  ? "bg-primary !text-white visited:!text-white hover:!text-white shadow-[0_18px_30px_-20px_rgba(0,87,255,0.8)]"
+                  ? "bg-primary !text-white visited:!text-white hover:!text-white shadow-[0_18px_30px_-20px_rgba(0,87,255,0.8)] before:absolute before:left-2 before:top-1/2 before:h-7 before:w-1 before:-translate-y-1/2 before:rounded-full before:bg-white/90"
                   : "text-muted-foreground hover:bg-primary-soft hover:text-primary-dark"
               )}
             >
@@ -215,19 +220,20 @@ export default function AdminSidebar({
             <div className="space-y-1">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const active = pathname === item.href;
+                const active = isSidebarItemActive(pathname, item.href);
 
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
+                    aria-current={active ? "page" : undefined}
                     onClick={onNavigate}
                     title={collapsedDesktop ? item.label : undefined}
                     className={cn(
                       "relative flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
                       collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
                       active
-                        ? "bg-primary !text-white visited:!text-white hover:!text-white shadow-[0_18px_30px_-20px_rgba(0,87,255,0.8)]"
+                        ? "bg-primary !text-white visited:!text-white hover:!text-white shadow-[0_18px_30px_-20px_rgba(0,87,255,0.8)] before:absolute before:left-2 before:top-1/2 before:h-7 before:w-1 before:-translate-y-1/2 before:rounded-full before:bg-white/90"
                         : "text-muted-foreground hover:bg-primary-soft hover:text-primary-dark"
                     )}
                   >

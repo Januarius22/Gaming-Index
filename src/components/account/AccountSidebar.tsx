@@ -28,6 +28,10 @@ import Button from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import type { Profile, SidebarCounts } from "@/types";
 
+function isSidebarItemActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export default function AccountSidebar({
   profile,
   sidebarCounts,
@@ -165,20 +169,20 @@ export default function AccountSidebar({
       >
         {priorityItems.map((item) => {
           const Icon = item.icon;
-          const active =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active = isSidebarItemActive(pathname, item.href);
 
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? "page" : undefined}
               onClick={onNavigate}
               title={collapsedDesktop ? item.label : undefined}
               className={cn(
                 "relative flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
                 collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
                 active
-                  ? "bg-primary-dark !text-white visited:!text-white hover:!text-white shadow-sm"
+                  ? "bg-primary-dark !text-white visited:!text-white hover:!text-white shadow-sm before:absolute before:left-2 before:top-1/2 before:h-7 before:w-1 before:-translate-y-1/2 before:rounded-full before:bg-white/90"
                   : "text-muted-foreground hover:bg-primary-soft hover:text-foreground"
               )}
             >
@@ -208,20 +212,20 @@ export default function AccountSidebar({
             <div className="space-y-1">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const active =
-                  pathname === item.href || pathname.startsWith(`${item.href}/`);
+                const active = isSidebarItemActive(pathname, item.href);
 
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
+                    aria-current={active ? "page" : undefined}
                     onClick={onNavigate}
                     title={collapsedDesktop ? item.label : undefined}
                     className={cn(
                       "relative flex items-center rounded-2xl py-3 text-sm font-medium transition-all duration-300 ease-in-out",
                       collapsedDesktop ? "justify-center px-3" : "gap-3 px-4",
                       active
-                        ? "bg-primary-dark !text-white visited:!text-white hover:!text-white shadow-sm"
+                        ? "bg-primary-dark !text-white visited:!text-white hover:!text-white shadow-sm before:absolute before:left-2 before:top-1/2 before:h-7 before:w-1 before:-translate-y-1/2 before:rounded-full before:bg-white/90"
                         : "text-muted-foreground hover:bg-primary-soft hover:text-foreground"
                     )}
                   >
